@@ -518,6 +518,44 @@ img {
   border-color: var(--primary-red);
 }
 
+.alert-box {
+  background: #fff1f1;
+  border: 1px solid rgba(211, 47, 47, 0.2);
+  color: var(--primary-red);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-top: 18px;
+  font-weight: 600;
+}
+
+.checkbox-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.auth-switch {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.auth-switch a {
+  color: var(--secondary-blue);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 900px) {
   .hero-section {
     grid-template-columns: 1fr;
