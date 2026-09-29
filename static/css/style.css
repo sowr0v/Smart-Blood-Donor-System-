@@ -420,3 +420,263 @@ body {
   background-color: #000000;
   border-color: #000000;
 }
+/* ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= */
+.sbds-cta-section {
+  padding: 80px 20px;
+  background-color: #f8fafc;
+}
+
+.sbds-cta-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.sbds-cta-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 45%, #880e4f 100%);
+  border-radius: 24px;
+  padding: 60px 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 40px;
+  box-shadow: 0 20px 40px -15px rgba(211, 47, 47, 0.45);
+}
+
+/* Ambient Radial Glow */
+.sbds-cta-glow {
+  position: absolute;
+  top: -30%;
+  left: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Content Area */
+.sbds-cta-content {
+  max-width: 620px;
+  position: relative;
+  z-index: 2;
+}
+
+.sbds-cta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 20px;
+}
+
+.badge-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #4ade80;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #4ade80;
+}
+
+.sbds-cta-title {
+  color: #ffffff;
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0 0 18px 0;
+}
+
+.sbds-cta-title span {
+  color: #ffebee;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 6px;
+}
+
+.sbds-cta-description {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  line-height: 1.65;
+  margin: 0 0 36px 0;
+}
+
+/* Action Buttons */
+.sbds-cta-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.btn-cta-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #ffffff;
+  color: #d32f2f;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 14px 28px;
+  border-radius: 12px;
+  text-decoration: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.btn-cta-main:hover {
+  background-color: #fff5f5;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+}
+
+.cta-drop-icon {
+  width: 20px;
+  height: 20px;
+  fill: #d32f2f;
+}
+
+.btn-cta-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: transparent;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 1rem;
+  padding: 14px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-cta-sub:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: #ffffff;
+}
+
+.cta-arrow {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
+}
+
+.btn-cta-sub:hover .cta-arrow {
+  transform: translateX(4px);
+}
+
+/* Graphic Area & Floating Stat */
+.sbds-cta-graphic {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 280px;
+}
+
+.graphic-rings {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+.graphic-metric-card {
+  position: relative;
+  background: #ffffff;
+  padding: 24px 30px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+  animation: floatCard 4s ease-in-out infinite;
+}
+
+@keyframes floatCard {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.metric-icon-wrap {
+  width: 48px;
+  height: 48px;
+  background: #ffebee;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d32f2f;
+}
+
+.metric-icon-wrap svg {
+  width: 26px;
+  height: 26px;
+}
+
+.metric-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-val {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+}
+
+.metric-tag {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* Mobile & Tablet Responsiveness */
+@media (max-width: 992px) {
+  .sbds-cta-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 45px 30px;
+  }
+
+  .sbds-cta-content {
+    max-width: 100%;
+  }
+
+  .sbds-cta-buttons {
+    justify-content: center;
+  }
+
+  .sbds-cta-graphic {
+    margin-top: 20px;
+  }
+}
+
+@media (max-width: 576px) {
+  .sbds-cta-title {
+    font-size: 1.85rem;
+  }
+
+  .sbds-cta-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-cta-main, 
+  .btn-cta-sub {
+    width: 100%;
+    justify-content: center;
+  }
+}
