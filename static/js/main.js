@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Close mobile drawer when clicking outside
   document.addEventListener("click", (e) => {
+    if (!hamburgerBtn || !mobileDrawer) return;
+
     if (!hamburgerBtn.contains(e.target) && !mobileDrawer.contains(e.target)) {
       hamburgerBtn.classList.remove("is-active");
       mobileDrawer.classList.remove("open");
@@ -63,4 +65,37 @@ function initLiveTicker() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initLiveTicker();
+
+  const registrationForm = document.getElementById("registration-form");
+  const roleSelect = document.getElementById("register-role");
+  const personalFields = document.getElementById("personal-fields");
+  const organizationFields = document.getElementById("organization-fields");
+  const bloodGroup = document.getElementById("blood-group");
+
+  if (roleSelect && personalFields && organizationFields && bloodGroup) {
+    const updateRegistrationFields = () => {
+      const isOrganization = roleSelect.value === "blood_bank" || roleSelect.value === "hospital";
+      personalFields.hidden = isOrganization;
+      organizationFields.hidden = !isOrganization;
+      bloodGroup.required = !isOrganization;
+      personalFields.querySelectorAll("input, select").forEach((field) => {
+        field.disabled = isOrganization;
+      });
+      organizationFields.querySelectorAll("input, select").forEach((field) => {
+        field.disabled = !isOrganization;
+      });
+    };
+
+    roleSelect.addEventListener("change", updateRegistrationFields);
+    updateRegistrationFields();
+  }
+
+  if (registrationForm) {
+    registrationForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const status = document.getElementById("registration-status");
+      status.textContent = "Account creation is not connected yet. Your information has not been submitted.";
+      status.hidden = false;
+    });
+  }
 });
