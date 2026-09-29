@@ -266,3 +266,157 @@ body {
     display: flex;
   }
 }
+
+/* ================= SBDS-02: LIVE TICKER STYLES ================= */
+.ticker-wrapper {
+  background-color: #FFF5F5;
+  border-bottom: 1px solid #FFCDD2;
+  overflow: hidden;
+  height: 42px;
+  display: flex;
+  align-items: center;
+}
+
+.ticker-container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Badge on Left */
+.ticker-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--primary-red);
+  color: #FFFFFF;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(211, 47, 47, 0.3);
+}
+
+/* Green Pulsing Live Dot */
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #00E676;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(0, 230, 118, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0);
+  }
+}
+
+/* Ticker Scrolling Area */
+.ticker-track-container {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.ticker-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  animation: scrollTicker 30s linear infinite;
+}
+
+/* Pause animation on hover */
+.ticker-track-container:hover .ticker-track {
+  animation-play-state: paused;
+}
+
+.ticker-item {
+  font-size: 13px;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ticker-item .blood-group {
+  background-color: #FFEBEE;
+  color: var(--primary-red);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #FFCDD2;
+}
+
+.ticker-divider {
+  color: #EF9A9A;
+  font-size: 14px;
+}
+
+/* Keyframe for continuous scrolling */
+@keyframes scrollTicker {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .ticker-wrapper {
+    height: auto;
+    padding: 8px 0;
+  }
+  .ticker-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 0 16px;
+  }
+  .ticker-badge {
+    font-size: 10px;
+  }
+  .ticker-item {
+    font-size: 12px;
+  }
+}
+.mobile-auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; 
+  margin-top: 15px;
+}
+.btn-admin {
+  background-color: #212529; 
+  color: #ffffff;
+  border: 1px solid #212529;
+  transition: all 0.3s ease;
+}
+
+.btn-admin:hover {
+  background-color: #000000;
+  border-color: #000000;
+}

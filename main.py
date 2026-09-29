@@ -16,3 +16,13 @@ async def serve_home(request: Request):
         name="index.html",
         context={"request": request},
     )
+
+@app.get("/api/v1/donors/live-ticker")
+def get_live_ticker():
+    return [
+        {"blood_group": "O+", "message": "Mijanur R. verified in Farmgate, Dhaka (Just now)"},
+        {"blood_group": "A-", "message": "Farhana Y. completed donation at DMCH (10 mins ago)"},
+        {"blood_group": "B+", "message": "Anisur R. verified in Dhanmondi (20 mins ago)"},
+        {"blood_group": "O-", "message": "Sultana K. responded to emergency request (35 mins ago)"},
+        {"blood_group": "AB+", "message": "Tanvir A. available in Mirpur-10 (45 mins ago)"}
+    ]
