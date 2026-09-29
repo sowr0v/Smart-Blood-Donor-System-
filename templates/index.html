@@ -115,45 +115,72 @@
     </div>
   </section>
   <!-- ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= -->
-<section class="cta-banner-section" id="join-cta" aria-label="Join as a Blood Donor">
-  <div class="cta-container">
-    <div class="cta-card">
-      <div class="cta-content">
-        <span class="cta-badge">Save Lives</span>
-        <h2 class="cta-title">A Single Bag of Blood Can Save up to Three Lives</h2>
-        <p class="cta-description">
-          Become a verified donor on the Smart Blood Donor platform today. Respond to critical emergencies, connect with local patients, and bring hope to families in need.
-        </p>
+<section class="sbds-cta-section" id="join-cta" aria-labelledby="cta-heading">
+  <div class="sbds-cta-container">
+    <div class="sbds-cta-card">
+      
+      <!-- Background Ambient Glow -->
+      <div class="sbds-cta-glow" aria-hidden="true"></div>
+
+      <!-- Main Banner Content -->
+      <div class="sbds-cta-content">
+        <div class="sbds-cta-badge">
+          <span class="badge-dot"></span>
+          <span>Be A Hero Today</span>
+        </div>
         
-        <div class="cta-actions">
-          <a href="/auth/register" class="btn btn-cta-primary">
-            <svg class="cta-icon" viewBox="0 0 24 24" fill="currentColor">
+        <h2 id="cta-heading" class="sbds-cta-title">
+          Your One Donation Can Save Up to <span>Three Lives</span>
+        </h2>
+        
+        <p class="sbds-cta-description">
+          Join thousands of verified donors in our smart network. Get notified instantly when someone nearby is in critical need of your blood group.
+        </p>
+
+        <div class="sbds-cta-buttons">
+          <a href="/auth/register" class="btn-cta-main">
+            <svg class="cta-drop-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
             </svg>
             Register as a Donor
           </a>
-          <a href="#how-it-works" class="btn btn-cta-secondary">How It Works</a>
+          <a href="#how-it-works" class="btn-cta-sub">
+            Contact Us 
+            <svg class="cta-arrow" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+            </svg>
+          </a>
         </div>
       </div>
 
-      <div class="cta-visual" aria-hidden="true">
-        <div class="visual-circle outer-circle"></div>
-        <div class="visual-circle inner-circle"></div>
-        <div class="stat-pill">
-          <span class="pill-number">10k+</span>
-          <span class="pill-label">Active Donors</span>
+      <!-- Graphical Badge / Metrics Card -->
+      <div class="sbds-cta-graphic" aria-hidden="true">
+        <div class="graphic-rings"></div>
+        <div class="graphic-metric-card">
+          <div class="metric-icon-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+            </svg>
+          </div>
+          <div class="metric-info">
+            <span class="metric-val">10,480+</span>
+            <span class="metric-tag">Active Life Savers</span>
+          </div>
         </div>
       </div>
+
     </div>
   </div>
 </section>
   <!-- ================= MAIN BODY SHELL CONTAINER ================= -->
   <main class="main-shell" id="main-content">
     <div class="container placeholder-content">
+  
+     
     </div>
   </main>
 
   <!-- JavaScript file -->
-  <script src="/static/js/main.js?v=2"></script>
+  <script src="/static/js/main.js"></script>
 </body>
 </html>
