@@ -1,88 +1,140 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>রক্ত লাগবে? | Smart Blood Donor System</title>
-  
-  <!-- Inter Google Font -->
+  <title>Smart Blood Donor System</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-
-  <!-- ================= TOP NAVIGATION (SBDS-01) ================= -->
   <header class="global-navbar" id="global-navbar">
     <div class="nav-container">
-      
-      <!-- Brand Logo -->
-      <a href="/" class="brand-logo" aria-label="Rokto Lagbe Home">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Home">
         <div class="logo-icon-wrap">
           <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
           </svg>
         </div>
         <div class="brand-text">
-          <span class="brand-name">রক্ত লাগবে?</span>
-          <span class="brand-sub">Smart Blood Donor</span>
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
         </div>
       </a>
 
-      <!-- Desktop Nav Links -->
       <nav class="desktop-nav" aria-label="Main Navigation">
         <ul class="nav-links">
           <li><a href="/" class="nav-link active">Home</a></li>
-          <li><a href="#urgent-board" class="nav-link">Urgent Requests</a></li>
-          <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
           <li><a href="/about" class="nav-link">About</a></li>
           <li><a href="/contact" class="nav-link">Contact</a></li>
         </ul>
       </nav>
 
-      <!-- Desktop Auth Action CTAs -->
       <div class="nav-auth-actions">
         <a href="/auth/login" class="btn btn-outline">Login</a>
-        <a href="/auth/register" class="btn btn-primary">Register</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
       </div>
 
-      <!-- Mobile Hamburger Button -->
       <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
         <span class="bar"></span>
         <span class="bar"></span>
         <span class="bar"></span>
       </button>
-
     </div>
 
-    <!-- Mobile Slide-out Drawer Navigation -->
     <div class="mobile-drawer" id="mobile-drawer">
       <ul class="mobile-nav-links">
         <li><a href="/" class="mobile-nav-link active">Home</a></li>
-        <li><a href="#urgent-board" class="mobile-nav-link">Urgent Requests</a></li>
-        <li><a href="#how-it-works" class="mobile-nav-link">How It Works</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
         <li><a href="/about" class="mobile-nav-link">About</a></li>
         <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
       </ul>
       <div class="mobile-auth-actions">
         <a href="/auth/login" class="btn btn-outline btn-full">Login</a>
-        <a href="/auth/register" class="btn btn-primary btn-full">Register</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary btn-full">Register</a>
       </div>
     </div>
   </header>
 
-  <!-- ================= MAIN BODY SHELL CONTAINER ================= -->
   <main class="main-shell" id="main-content">
-    <div class="container placeholder-content">
-      <!-- Onnanno component gulo (Hero, Ticker, Urgent Board) ekhane porer step-e boshbe -->
-    
+    <div class="container">
+      <section class="hero-section">
+        <div class="hero-copy">
+          <span class="eyebrow">Fast, free, verified donor matching</span>
+          <h1>When Every Second Matters</h1>
+          <p class="hero-subtext">
+            100% free and middleman-free. Connect with nearby donors, hospitals, and community volunteers when urgent blood support is needed most.
+          </p>
+
+          <div class="cta-group">
+            <a href="/find-blood" class="btn btn-primary btn-cta">Find Blood</a>
+            <a href="/auth/register?role=donor" class="btn btn-secondary btn-cta">Become a Donor</a>
+          </div>
+
+          <div class="trust-row" aria-label="Trust indicators">
+            <span>✓ 100% free</span>
+            <span>✓ No middlemen</span>
+            <span>✓ Live donor network</span>
+          </div>
+        </div>
+
+        <div class="hero-panel" aria-label="Network metrics panel">
+          <div class="info-card highlight-card">
+            <span class="card-label">Average response</span>
+            <strong>12 minutes</strong>
+          </div>
+
+          <div class="mini-grid">
+            <div class="info-card">
+              <span class="card-label">Nearby donors</span>
+              <strong>2,480</strong>
+            </div>
+            <div class="info-card">
+              <span class="card-label">Lives supported</span>
+              <strong>9.4k</strong>
+            </div>
+          </div>
+
+          <div class="activity-list">
+            <div class="activity-item">
+              <span class="status-dot urgent"></span>
+              <div>
+                <strong>O+ needed</strong>
+                <small>Dhaka Medical - 15 mins ago</small>
+              </div>
+            </div>
+            <div class="activity-item">
+              <span class="status-dot ready"></span>
+              <div>
+                <strong>4 donors available</strong>
+                <small>Within 5km radius</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="metrics-row" aria-label="Fast response metrics">
+        <article class="metric-card">
+          <strong>2.4k+</strong>
+          <span>Verified donors</span>
+        </article>
+        <article class="metric-card">
+          <strong>93%</strong>
+          <span>Requests matched within 30 min</span>
+        </article>
+        <article class="metric-card">
+          <strong>4.8/5</strong>
+          <span>Community trust rating</span>
+        </article>
+      </section>
     </div>
   </main>
 
-  <!-- JavaScript file -->
   <script src="/static/js/main.js"></script>
 </body>
 </html>
