@@ -17,6 +17,14 @@ async def serve_home(request: Request):
         context={"request": request},
     )
 
+@app.get("/auth/register", response_class=HTMLResponse)
+async def serve_registration(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="register.html",
+        context={"request": request},
+    )
+
 @app.get("/api/v1/donors/live-ticker")
 def get_live_ticker():
     return [
