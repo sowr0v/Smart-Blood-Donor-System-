@@ -403,3 +403,20 @@ body {
     font-size: 12px;
   }
 }
+.mobile-auth-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; 
+  margin-top: 15px;
+}
+.btn-admin {
+  background-color: #212529; 
+  color: #ffffff;
+  border: 1px solid #212529;
+  transition: all 0.3s ease;
+}
+
+.btn-admin:hover {
+  background-color: #000000;
+  border-color: #000000;
+}
