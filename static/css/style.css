@@ -420,6 +420,241 @@ body {
   background-color: #000000;
   border-color: #000000;
 }
+
+/* ================= REGISTRATION FORM ================= */
+.registration-page {
+  min-height: 100vh;
+  padding: 24px;
+  background-color: #f8f9fa;
+}
+
+.registration-nav {
+  max-width: 1120px;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.registration-nav a {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.registration-layout {
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1.2fr);
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 16px 44px rgba(33, 33, 33, 0.08);
+}
+
+.registration-intro {
+  padding: 48px 38px;
+  background: #fff1f1;
+  border-right: 1px solid #f2d9d9;
+}
+
+.registration-kicker {
+  color: var(--primary-red);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.registration-intro h1 {
+  margin: 14px 0;
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.registration-intro p {
+  color: #5f5555;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.registration-form-wrap {
+  padding: 38px;
+}
+
+.registration-form-wrap h2 {
+  margin-bottom: 6px;
+  font-size: 23px;
+}
+
+.registration-subtitle {
+  margin-bottom: 24px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.registration-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 17px 16px;
+}
+
+.registration-form > #personal-fields,
+.registration-form > #organization-fields {
+  grid-column: 1 / -1;
+}
+
+.registration-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.registration-field.full-width,
+.registration-location,
+.registration-submit,
+.registration-status {
+  grid-column: 1 / -1;
+}
+
+.registration-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.registration-field input,
+.registration-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid #d8d8d8;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.registration-field input:focus,
+.registration-field select:focus {
+  outline: 2px solid rgba(211, 47, 47, 0.22);
+  border-color: var(--primary-red);
+}
+
+.registration-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  background: #f8f9fa;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.registration-location input {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  accent-color: var(--primary-red);
+}
+
+.registration-location span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.registration-location small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.registration-submit {
+  min-height: 46px;
+  padding: 11px 18px;
+  color: #fff;
+  background: var(--primary-red);
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.registration-submit:hover {
+  background: var(--primary-dark);
+}
+
+.registration-status {
+  padding: 12px;
+  color: #783d00;
+  background: #fff4df;
+  border: 1px solid #f1d8a9;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.registration-login {
+  margin-top: 18px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.registration-login a {
+  color: var(--primary-red);
+  font-weight: 600;
+}
+
+.registration-form [hidden] {
+  display: none;
+}
+
+.registration-form[hidden] {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .registration-page {
+    padding: 16px;
+  }
+
+  .registration-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-intro {
+    padding: 28px 24px;
+    border-right: 0;
+    border-bottom: 1px solid #f2d9d9;
+  }
+
+  .registration-intro h1 {
+    font-size: 28px;
+  }
+
+  .registration-form-wrap {
+    padding: 26px 22px;
+  }
+}
+
+@media (max-width: 480px) {
+  .registration-form {
+    grid-template-columns: 1fr;
+  }
+
+  .registration-field.full-width,
+  .registration-location,
+  .registration-submit,
+  .registration-status {
+    grid-column: auto;
+  }
+}
+
 /* ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= */
 .sbds-cta-section {
   padding: 80px 20px;
