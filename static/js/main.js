@@ -55,6 +55,8 @@ function initLiveTicker() {
     }
   }
 
+  fetchTickerUpdates();
+
   // Prottek 60 second por por live data refresh hobe
   setInterval(fetchTickerUpdates, 60000);
 }
