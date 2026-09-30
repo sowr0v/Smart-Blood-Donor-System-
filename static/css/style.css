@@ -1846,3 +1846,127 @@ img {
 
   }
 }
+
+/* ==========================================================================
+   PUBLIC FOOTER (SBDS-09)
+   ========================================================================== */
+.public-footer {
+  background-color: var(--secondary-navy);
+  color: #E0E0E0;
+  padding: 4rem 1rem 2rem;
+  font-size: 0.875rem;
+}
+
+.public-footer-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.public-footer-brand p {
+  color: #B0BEC5;
+  margin-top: 1rem;
+  line-height: 1.5;
+}
+
+.public-footer-logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-decoration: none;
+}
+
+.public-footer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.public-footer-column h2 {
+  color: #FFFFFF;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.public-footer-column a {
+  color: #B0BEC5;
+  text-decoration: none;
+  transition: color var(--transition-speed);
+}
+
+.public-footer-column a:hover {
+  color: var(--primary-red);
+}
+
+.public-footer-hotlines a {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255,255,255,0.05);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  color: #FFFFFF;
+  text-decoration: none;
+}
+
+.public-footer-hotlines a span {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--primary-red);
+}
+
+.public-footer-hotlines a small {
+  color: #90A4AE;
+}
+
+.public-footer-hotlines a:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.public-footer-bottom {
+  max-width: 1200px;
+  margin: 2rem auto 0;
+  text-align: center;
+  color: #78909C;
+}
+
+.public-footer-disclaimer {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   PUBLIC INFO PAGES (ABOUT, CONTACT, PRIVACY, TERMS)
+   ========================================================================== */
+.page-panel {
+  max-width: 800px;
+  margin: 4rem auto;
+  padding: 3rem 2rem;
+  background: var(--bg-card);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+.page-panel.form-panel {
+  max-width: 600px;
+}
+
+.page-panel h1 {
+  font-size: 2.25rem;
+  color: var(--text-primary);
+  margin: 0.5rem 0 1rem;
+}
+
+.page-panel p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.narrow-container {
+  max-width: 800px;
+}
