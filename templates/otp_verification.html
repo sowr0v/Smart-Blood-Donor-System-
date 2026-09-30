@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification - Smart Blood Donor System</title>
+
+    <link rel="stylesheet" href="/static/css/otp.css">
+</head>
+
+<body>
+
+<div class="otp-container">
+
+    <div class="otp-card">
+
+        <div class="logo">
+            🩸
+        </div>
+
+        <h2>OTP Verification</h2>
+
+        <p class="subtitle">
+            Enter the 6-digit verification code sent to your phone number.
+        </p>
+
+        <div class="otp-inputs">
+            <input type="text" maxlength="1">
+            <input type="text" maxlength="1">
+            <input type="text" maxlength="1">
+            <input type="text" maxlength="1">
+            <input type="text" maxlength="1">
+            <input type="text" maxlength="1">
+        </div>
+
+        <button id="verifyBtn">
+            Verify OTP
+        </button>
+
+        <p class="resend-text">
+            Didn't receive code?
+            <button id="resendBtn">
+                Resend OTP
+            </button>
+        </p>
+
+        <p id="timer">
+            Resend available in 60s
+        </p>
+
+    </div>
+
+</div>
+
+
+<script src="/static/js/otp.js"></script>
+
+</body>
+</html>
