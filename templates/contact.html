@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us | Smart Blood Donor System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="public-info-page">
+  {% include "partials/public_info_header.html" %}
+  <main class="public-info-main contact-main">
+    <p class="public-info-eyebrow">Support</p>
+    <h1>Contact Us</h1>
+    <p class="public-info-lede">Questions about the platform? Send the team a note.</p>
+    <form class="public-contact-form" id="public-contact-form" data-contact-email="{{ contact_email }}">
+      <label for="contact-name">Your name</label>
+      <input id="contact-name" name="name" type="text" autocomplete="name" maxlength="120" required>
+      <label for="contact-email">Email address</label>
+      <input id="contact-email" name="email" type="email" autocomplete="email" maxlength="254" required>
+      <label for="contact-subject">Subject</label>
+      <input id="contact-subject" name="subject" type="text" maxlength="160" required>
+      <label for="contact-message">Message</label>
+      <textarea id="contact-message" name="message" rows="6" maxlength="5000" required></textarea>
+      <button type="submit">Prepare email</button>
+      <p id="contact-form-status" class="contact-form-status" role="status" aria-live="polite">{% if contact_email %}Submitting opens your email app with a draft; you can review it before sending.{% else %}Email delivery is not configured yet. Your message will not be sent from this page.{% endif %}</p>
+    </form>
+    <p class="contact-emergency-note">This form is not monitored for emergencies. For urgent help, use the helplines listed below.</p>
+  </main>
+  {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

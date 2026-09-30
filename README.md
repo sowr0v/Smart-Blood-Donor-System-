@@ -56,6 +56,12 @@ The public landing page introduces the platform and provides quick access to imp
 * About Public Page
 * Contact Public Page
 
+### Public Footer and Information Pages
+
+The public footer is shared by the landing, registration, About, Contact, Terms of Use, and Privacy Notice pages. It links to patient and donor actions, support and safety information, and the official helpline numbers 10666 and 999. The platform is independent and is not affiliated with hospitals or government emergency services.
+
+The About page describes the platform's purpose and limitations. The Contact page form opens an email draft in the visitor's email application when `PUBLIC_CONTACT_EMAIL` is configured. Without that environment variable, the page clearly explains that messages cannot be delivered; it does not store or submit the form. Emergency services should not be contacted through this form.
+
 ---
 
 # 02 — Authentication
