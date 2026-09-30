@@ -46,6 +46,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Smart Blood Donor System", lifespan=lifespan)
 
 # Mount Static and Templates folder
+BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
