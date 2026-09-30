@@ -114,6 +114,35 @@
 
     </div>
   </section>
+  <section class="urgent-board-section" id="urgent-board" aria-labelledby="urgent-board-title">
+    <div class="urgent-board-container">
+      <div class="urgent-board-heading">
+        <div>
+          <p class="urgent-board-kicker"><span class="urgent-live-dot" aria-hidden="true"></span> Live emergency board</p>
+          <h1 id="urgent-board-title">Critical blood requests</h1>
+        </div>
+        <p class="urgent-board-status" id="urgent-board-status" role="status" aria-live="polite">Loading requests...</p>
+      </div>
+
+      <div class="urgent-board-filters" aria-label="Filter emergency requests">
+        <label for="urgent-blood-filter">Blood group
+          <select id="urgent-blood-filter">
+            <option value="">All blood groups</option>
+            <option>O+</option><option>O-</option><option>A+</option><option>A-</option>
+            <option>B+</option><option>B-</option><option>AB+</option><option>AB-</option>
+          </select>
+        </label>
+        <label for="urgent-district-filter">District
+          <select id="urgent-district-filter">
+            <option value="">All districts</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="urgent-request-grid" id="urgent-request-list" aria-live="polite"></div>
+      <p class="urgent-board-empty" id="urgent-board-empty" hidden>No active emergency requests.</p>
+    </div>
+  </section>
   <!-- ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= -->
 <section class="sbds-cta-section" id="join-cta" aria-labelledby="cta-heading">
   <div class="sbds-cta-container">
@@ -172,14 +201,6 @@
     </div>
   </div>
 </section>
-  <!-- ================= MAIN BODY SHELL CONTAINER ================= -->
-  <main class="main-shell" id="main-content">
-    <div class="container placeholder-content">
-  
-     
-    </div>
-  </main>
-
   <!-- JavaScript file -->
   <script src="/static/js/main.js"></script>
 </body>
