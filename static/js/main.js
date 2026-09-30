@@ -419,38 +419,44 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const registrationForm = document.getElementById("registration-form");
-  const roleSelect = document.getElementById("register-role");
-  const personalFields = document.getElementById("personal-fields");
-  const organizationFields = document.getElementById("organization-fields");
-  const bloodGroup = document.getElementById("blood-group");
-
-  if (roleSelect && personalFields && organizationFields && bloodGroup) {
-    const updateRegistrationFields = () => {
-      const isOrganization = roleSelect.value === "blood_bank" || roleSelect.value === "hospital";
-      personalFields.hidden = isOrganization;
-      organizationFields.hidden = !isOrganization;
-      bloodGroup.required = !isOrganization;
-      personalFields.querySelectorAll("input, select").forEach((field) => {
-        field.disabled = isOrganization;
+  // ================= SBDS-10: Multi-Role User Registration =================
+  const roleSwitcher = document.getElementById("role-switcher");
+  const formIndividual = document.getElementById("form-individual");
+  const formOrganization = document.getElementById("form-organization");
+  
+  if (roleSwitcher && formIndividual && formOrganization) {
+    const roleButtons = roleSwitcher.querySelectorAll(".role-chip");
+    
+    roleButtons.forEach(button => {
+      button.addEventListener("click", () => {
+        // Remove active class from all
+        roleButtons.forEach(btn => btn.classList.remove("active"));
+        // Add active class to clicked
+        button.classList.add("active");
+        
+        const role = button.getAttribute("data-role");
+        const roleName = button.textContent;
+        
+        if (role === "donor" || role === "seeker") {
+          formIndividual.style.display = "block";
+          formOrganization.style.display = "none";
+          document.getElementById("individual-role-input").value = role;
+          document.getElementById("btn-text-individual").textContent = roleName;
+        } else {
+          formIndividual.style.display = "none";
+          formOrganization.style.display = "block";
+          document.getElementById("organization-role-input").value = role;
+          document.getElementById("btn-text-organization").textContent = roleName;
+        }
       });
-      organizationFields.querySelectorAll("input, select").forEach((field) => {
-        field.disabled = !isOrganization;
+    });
+    
+    // Default mock submit prevention
+    document.querySelectorAll(".multi-role-form").forEach(form => {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        alert("Registration endpoint not connected. Form validated and ready.");
       });
-    };
-
-    roleSelect.addEventListener("change", updateRegistrationFields);
-    updateRegistrationFields();
-  }
-
-  if (registrationForm) {
-    registrationForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const status = document.getElementById("registration-status");
-      if (status) {
-        status.textContent = "Account creation is not connected yet. Your information has not been submitted.";
-        status.hidden = false;
-      }
     });
   }
 });

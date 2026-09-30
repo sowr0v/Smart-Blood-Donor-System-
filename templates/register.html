@@ -31,26 +31,59 @@
         <h1>Register as a {{ selected_role|title }}</h1>
         <p class="hero-subtext">Create your account to help save lives and respond to local emergencies.</p>
 
-        <div class="role-switcher">
-          <button class="role-chip {% if selected_role == 'donor' %}active{% endif %}">Donor</button>
-          <button class="role-chip {% if selected_role == 'seeker' %}active{% endif %}">Seeker</button>
-          <button class="role-chip">Hospital</button>
+        <div class="role-switcher" id="role-switcher">
+          <button type="button" class="role-chip {% if selected_role == 'donor' or not selected_role %}active{% endif %}" data-role="donor">Blood Donor</button>
+          <button type="button" class="role-chip {% if selected_role == 'seeker' %}active{% endif %}" data-role="seeker">Blood Seeker</button>
+          <button type="button" class="role-chip {% if selected_role == 'bank' %}active{% endif %}" data-role="bank">Blood Bank</button>
+          <button type="button" class="role-chip {% if selected_role == 'hospital' %}active{% endif %}" data-role="hospital">Hospital</button>
         </div>
 
-        <form class="search-panel">
-          <label>
-            Full name
-            <input type="text" placeholder="Your name" />
+        <!-- Individual Form (Donor, Seeker) -->
+        <form class="search-panel multi-role-form" id="form-individual">
+          <input type="hidden" name="role" value="donor" id="individual-role-input">
+          <div class="field-row">
+            <label>Name<input type="text" name="name" placeholder="Full Name" required /></label>
+            <label>Phone Number<input type="tel" name="phone" placeholder="+8801..." required /></label>
+          </div>
+          <div class="field-row">
+            <label>NID<input type="text" name="nid" placeholder="National ID Number" required /></label>
+            <label>Blood Group
+              <select name="blood_group" required>
+                <option value="">Select Group</option>
+                <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+              </select>
+            </label>
+          </div>
+          <label>Address<input type="text" name="address" placeholder="Full Address" required /></label>
+          <label>Password<input type="password" name="password" placeholder="Create a password" required /></label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" name="allow_location" required /> Allow Location Access
           </label>
-          <label>
-            Email
-            <input type="email" placeholder="you@example.com" />
+          
+          <button type="submit" class="btn btn-primary btn-cta">Register as <span id="btn-text-individual">Blood Donor</span></button>
+        </form>
+
+        <!-- Organization Form (Blood Bank, Hospital) -->
+        <form class="search-panel multi-role-form" id="form-organization" style="display: none;">
+          <input type="hidden" name="role" value="bank" id="organization-role-input">
+          <div class="field-row">
+            <label>Organization Name<input type="text" name="org_name" placeholder="Name of Organization" required /></label>
+            <label>Phone Number<input type="tel" name="phone" placeholder="+8801..." required /></label>
+          </div>
+          <div class="field-row">
+            <label>Manager Number<input type="tel" name="manager_number" placeholder="+8801..." required /></label>
+            <label>Govt Reg. Number<input type="text" name="govt_reg" placeholder="Registration No" required /></label>
+          </div>
+          <label>Address<input type="text" name="address" placeholder="Full Address" required /></label>
+          <label>Password<input type="password" name="password" placeholder="Create a password" required /></label>
+          
+          <label class="checkbox-label">
+            <input type="checkbox" name="allow_location" required /> Allow Location Access
           </label>
-          <label>
-            Phone number
-            <input type="tel" placeholder="+8801..." />
-          </label>
-          <button type="button" class="btn btn-primary btn-cta">Create account</button>
+          
+          <button type="submit" class="btn btn-primary btn-cta">Register as <span id="btn-text-organization">Blood Bank</span></button>
         </form>
       </section>
     </div>
