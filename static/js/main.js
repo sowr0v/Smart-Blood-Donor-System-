@@ -9,6 +9,16 @@ document.addEventListener("DOMContentLoaded", () => {
       hamburgerBtn.classList.toggle("is-active");
       mobileDrawer.classList.toggle("open");
     });
+
+    // Close drawer when a mobile link is clicked
+    const drawerLinks = mobileDrawer.querySelectorAll(".mobile-nav-link");
+    drawerLinks.forEach((link) => {
+      link.addEventListener("click", () => {
+        hamburgerBtn.classList.remove("is-active");
+        mobileDrawer.classList.remove("open");
+        hamburgerBtn.setAttribute("aria-expanded", "false");
+      });
+    });
   }
 
   // Close mobile drawer when clicking outside
@@ -437,8 +447,10 @@ document.addEventListener("DOMContentLoaded", () => {
     registrationForm.addEventListener("submit", (event) => {
       event.preventDefault();
       const status = document.getElementById("registration-status");
-      status.textContent = "Account creation is not connected yet. Your information has not been submitted.";
-      status.hidden = false;
+      if (status) {
+        status.textContent = "Account creation is not connected yet. Your information has not been submitted.";
+        status.hidden = false;
+      }
     });
   }
 });
