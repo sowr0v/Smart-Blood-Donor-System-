@@ -452,11 +452,20 @@ document.addEventListener("DOMContentLoaded", () => {
     roleSelect.addEventListener("change", updateForms);
     updateForms();
     
-    // Default mock submit prevention
+    // Form submission logic
     document.querySelectorAll(".multi-role-form").forEach(form => {
       form.addEventListener("submit", (e) => {
         e.preventDefault();
-        alert("Registration endpoint not connected. Form validated and ready.");
+        // Hide forms
+        formIndividual.style.display = "none";
+        formOrganization.style.display = "none";
+        document.querySelector(".role-switcher").style.display = "none";
+        
+        // Show success message
+        const successMsg = document.getElementById("registration-success-msg");
+        if (successMsg) {
+          successMsg.style.display = "block";
+        }
       });
     });
   }
