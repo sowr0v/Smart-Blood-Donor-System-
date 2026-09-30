@@ -132,6 +132,50 @@
           <span>Community trust rating</span>
         </article>
       </section>
+
+      <section class="requests-section" id="blood-requests" aria-labelledby="requests-heading">
+        <div class="requests-heading-row">
+          <div>
+            <span class="eyebrow">Regional requests</span>
+            <h2 id="requests-heading">Blood needed right now</h2>
+            <p>Open requisitions from hospitals across Dhaka.</p>
+          </div>
+          <label class="blood-group-filter">
+            <span>Blood group</span>
+            <select id="blood-group-filter" aria-label="Filter requests by blood group">
+              <option value="ALL">All groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="request-feed" id="request-feed" aria-live="polite" aria-busy="false">
+          {% for item in blood_requests %}
+          <article class="request-card">
+            <div class="request-card-top">
+              <span class="request-blood-group">{{ item.blood_group }}</span>
+              <span class="request-status status-{{ item.status|lower }}">{{ item.status }}</span>
+            </div>
+            <h3>{{ item.hospital }}</h3>
+            <p class="request-area">{{ item.area }}</p>
+            <p class="request-units">{{ item.units }} unit{% if item.units != 1 %}s{% endif %} required</p>
+            <div class="request-card-footer">
+              <time datetime="{{ item.posted_at }}">Just posted</time>
+              <a class="connect-button" href="/requests/{{ item.id }}/connect">Connect</a>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        <p class="feed-message" id="feed-message" role="status" hidden></p>
+        <p class="feed-updated">Updates automatically every 30 seconds</p>
+      </section>
     </div>
   </main>
 
