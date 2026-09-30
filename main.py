@@ -738,3 +738,11 @@ async def contact(request: Request):
         name="contact.html",
         context={"request": request},
     )
+
+@app.get("/otp-verification", response_class=HTMLResponse)
+async def otp_verification(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="otp_verification.html",
+        context={"request": request},
+    )
