@@ -69,6 +69,35 @@
         <span class="ticker-badge-text">10,482 VERIFIED DONORS ACTIVE TODAY</span>
       </div>
 
+      <!-- Scrolling Ticker Track -->
+      <div class="ticker-track-container" id="ticker-track-container">
+        <div class="ticker-track" id="ticker-track">
+          
+          <span class="ticker-item">
+            <strong class="blood-group">O+</strong> Mijanur R. verified in Farmgate, Dhaka (Just now)
+          </span>
+          <span class="ticker-divider">•</span>
+          <span class="ticker-item">
+            <strong class="blood-group">A-</strong> Farhana Y. completed donation at DMCH (15 mins ago)
+          </span>
+          <span class="ticker-divider">•</span>
+          <span class="ticker-item">
+            <strong class="blood-group">B+</strong> Anisur R. verified in Dhanmondi (25 mins ago)
+          </span>
+          <span class="ticker-divider">•</span>
+          <span class="ticker-item">
+            <strong class="blood-group">AB+</strong> Tanvir A. available in Mirpur-10 (40 mins ago)
+          </span>
+          <span class="ticker-divider">•</span>
+          <span class="ticker-item">
+            <strong class="blood-group">O-</strong> Sultana K. responded to emergency request (1 hour ago)
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
   <!-- ================= MAIN BODY SHELL CONTAINER ================= -->
   <main class="main-shell" id="main-content">
     <div class="container">
@@ -142,52 +171,95 @@
           <span>Community trust rating</span>
         </article>
       </section>
-    </div>
 
-  <!-- ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= -->
-  <section class="join-banner-section" aria-labelledby="join-banner-title">
-    <div class="join-banner-container">
-      <div class="join-banner-card">
-        
-        <!-- Decorative Blood Drop Watermark Icon -->
-        <div class="banner-watermark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
-          </svg>
-        </div>
-
-        <div class="join-banner-content">
-          <span class="banner-badge">JOIN THE LIFESAVING NETWORK</span>
-          <h2 id="join-banner-title" class="banner-heading">
-            Ready to make a difference? Join us today.
-          </h2>
-          <p class="banner-subtext">
-            Your simple decision to register as a donor could be the lifeline someone's family is desperately praying for. Join thousands of verified heroes across Bangladesh.
-          </p>
-          
-          <div class="banner-action-group">
-            <a href="/auth/register?role=donor" class="btn btn-banner-primary">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="8.5" cy="7.5" r="4"/>
-                <line x1="20" y1="8" x2="20" y2="14"/>
-                <line x1="23" y1="11" x2="17" y2="11"/>
-              </svg>
-              Register as a Donor
-            </a>
-            <a href="tel:10666" class="btn btn-banner-secondary">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-              </svg>
-              Contact US
-            </a>
+      <section class="requests-section" id="blood-requests" aria-labelledby="requests-heading">
+        <div class="requests-heading-row">
+          <div>
+            <span class="eyebrow">Regional requests</span>
+            <h2 id="requests-heading">Blood needed right now</h2>
+            <p>Open requisitions from hospitals across Dhaka.</p>
           </div>
+          <label class="blood-group-filter">
+            <span>Blood group</span>
+            <select id="blood-group-filter" aria-label="Filter requests by blood group">
+              <option value="ALL">All groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+          </label>
         </div>
 
+        <div class="request-feed" id="request-feed" aria-live="polite" aria-busy="false">
+          {% for item in blood_requests %}
+          <article class="request-card">
+            <div class="request-card-top">
+              <span class="request-blood-group">{{ item.blood_group }}</span>
+              <span class="request-status status-{{ item.status|lower }}">{{ item.status }}</span>
+            </div>
+            <h3>{{ item.hospital }}</h3>
+            <p class="request-area">{{ item.area }}</p>
+            <p class="request-units">{{ item.units }} unit{% if item.units != 1 %}s{% endif %} required</p>
+            <div class="request-card-footer">
+              <time datetime="{{ item.posted_at }}">Just posted</time>
+              <a class="connect-button" href="/requests/{{ item.id }}/connect">Connect</a>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+        <p class="feed-message" id="feed-message" role="status" hidden></p>
+        <p class="feed-updated">Updates automatically every 30 seconds</p>
+      </section>
+    </div>
+
+    <!-- ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= -->
+    <section class="join-banner-section" aria-labelledby="join-banner-title">
+      <div class="join-banner-container">
+        <div class="join-banner-card">
+          
+          <!-- Decorative Blood Drop Watermark Icon -->
+          <div class="banner-watermark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
+            </svg>
+          </div>
+
+          <div class="join-banner-content">
+            <span class="banner-badge">JOIN THE LIFESAVING NETWORK</span>
+            <h2 id="join-banner-title" class="banner-heading">
+              Ready to make a difference? Join us today.
+            </h2>
+            <p class="banner-subtext">
+              Your simple decision to register as a donor could be the lifeline someone's family is desperately praying for. Join thousands of verified heroes across Bangladesh.
+            </p>
+            
+            <div class="banner-action-group">
+              <a href="/auth/register?role=donor" class="btn btn-banner-primary">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="8.5" cy="7.5" r="4"/>
+                  <line x1="20" y1="8" x2="20" y2="14"/>
+                  <line x1="23" y1="11" x2="17" y2="11"/>
+                </svg>
+                Register as a Donor
+              </a>
+              <a href="tel:10666" class="btn btn-banner-secondary">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                </svg>
+                Contact US
+              </a>
+            </div>
+          </div>
+
+        </div>
       </div>
-    </div>
-  </section>
-    </div>
+    </section>
   </main>
 
   <script src="/static/js/main.js"></script>

@@ -27,19 +27,49 @@
   <main class="main-shell">
     <div class="container narrow-container">
       <section class="page-panel form-panel">
-        <span class="eyebrow">Welcome back</span>
-        <h1>Login to your account</h1>
-        <form class="search-panel">
+        <span class="eyebrow">{{ 'Administrative Console' if admin_console else 'Welcome back' }}</span>
+        <h1>{{ 'Administrative Console Sign-In' if admin_console else 'Login to your account' }}</h1>
+        <p class="login-support-text">Use your phone number and password or OTP to access your secure portal. Admin Console access is also available here.</p>
+
+        {% if error %}
+        <div class="alert-box" role="alert">
+          {{ error }}
+        </div>
+        {% endif %}
+
+        <form class="search-panel" method="post" action="/login">
+          {% if next_url %}<input type="hidden" name="next_url" value="{{ next_url }}" />{% endif %}
           <label>
-            Email
-            <input type="email" placeholder="you@example.com" />
+            Phone Number (+880 format)
+            <input type="tel" name="phone_number" placeholder="+8801712345678" required />
           </label>
+
           <label>
             Password
-            <input type="password" placeholder="Enter your password" />
+            <input type="password" name="password" placeholder="Enter your password" />
           </label>
-          <button type="button" class="btn btn-primary btn-cta">Sign in</button>
+
+          <label>
+            OTP Code (optional)
+            <input type="text" name="otp" placeholder="Enter OTP if using one-time code" />
+          </label>
+
+          <label class="checkbox-row">
+            <input type="checkbox" name="admin_console" {% if admin_console %}checked{% endif %} />
+            Administrative Console sign-in
+          </label>
+
+          <button type="submit" class="btn btn-primary btn-cta">Sign in</button>
         </form>
+
+        <div class="auth-switch">
+          {% if admin_console %}
+            <a href="/login">Switch to regular user login</a>
+          {% else %}
+            <a href="/login?admin_console=1">Switch to Administrative Console sign-in</a>
+          {% endif %}
+          <p>New to the network? <a href="/auth/register?role=donor">Register as a donor</a></p>
+        </div>
       </section>
     </div>
   </main>
