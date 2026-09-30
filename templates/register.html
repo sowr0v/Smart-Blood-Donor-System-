@@ -61,9 +61,17 @@
           <label>Address<input type="text" name="address" placeholder="Full Address" required /></label>
           <label>Password<input type="password" name="password" placeholder="Create a password" required /></label>
           
-          <label class="checkbox-label">
-            <input type="checkbox" name="allow_location" required /> Allow Location Access
-          </label>
+          <div class="location-permission-box">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="location-icon"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="currentColor"/></svg>
+            <div class="location-text">
+              <strong>Allow Location Access</strong>
+              <span>Required to find nearby blood matches during emergencies.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="allow_location" required />
+              <span class="slider"></span>
+            </label>
+          </div>
           
           <button type="submit" class="btn btn-primary btn-cta">Register as <span id="btn-text-individual">Blood Donor</span></button>
         </form>
@@ -82,9 +90,17 @@
           <label>Address<input type="text" name="address" placeholder="Full Address" required /></label>
           <label>Password<input type="password" name="password" placeholder="Create a password" required /></label>
           
-          <label class="checkbox-label">
-            <input type="checkbox" name="allow_location" required /> Allow Location Access
-          </label>
+          <div class="location-permission-box">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="location-icon"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="currentColor"/></svg>
+            <div class="location-text">
+              <strong>Allow Location Access</strong>
+              <span>Required to connect your organization with local blood requests.</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" name="allow_location" required />
+              <span class="slider"></span>
+            </label>
+          </div>
           
           <button type="submit" class="btn btn-primary btn-cta">Register as <span id="btn-text-organization">Blood Bank</span></button>
         </form>
