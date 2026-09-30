@@ -571,13 +571,83 @@ async def connect_to_request(request: Request, request_id: str):
         context={"request": request, "blood_request": blood_request},
     )
 
+
+@app.get("/about", response_class=HTMLResponse)
+async def serve_about(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="about.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
+
+@app.get("/contact", response_class=HTMLResponse)
+async def serve_contact(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={
+            "request": request,
+            "current_year": datetime.now(timezone.utc).year,
+            "contact_email": os.environ.get("PUBLIC_CONTACT_EMAIL", "").strip(),
+        },
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def serve_terms(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="terms.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def serve_privacy(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
+
 @app.get("/auth/register", response_class=HTMLResponse)
 async def serve_registration(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="register.html",
-        context={"request": request},
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
     )
+
+@app.get("/api/v1/requests/urgent")
+def get_urgent_requests():
+    now = datetime.now(timezone.utc)
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """SELECT id, blood_group, hospital_name, district, area,
+                      distance_km, expires_at, contact_phone
+               FROM blood_requests
+               WHERE is_emergency = 1
+               ORDER BY expires_at ASC"""
+        ).fetchall()
+
+    active_requests = []
+    for row in rows:
+        try:
+            expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= now:
+            continue
+        request_data = dict(row)
+        request_data["expires_at"] = expires_at.isoformat()
+        active_requests.append(request_data)
+    return active_requests
+
 
 @app.get("/api/v1/donors/live-ticker")
 def get_live_ticker():
