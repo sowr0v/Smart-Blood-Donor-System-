@@ -1970,3 +1970,82 @@ img {
 .narrow-container {
   max-width: 800px;
 }
+
+/* ==========================================================================
+   ROLE SWITCHER & MULTI-ROLE FORMS
+   ========================================================================== */
+.role-switcher {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.role-chip {
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  background: white;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  color: var(--text-secondary);
+}
+
+.role-chip:hover {
+  border-color: var(--primary-red);
+  color: var(--primary-red);
+}
+
+.role-chip.active {
+  background: var(--primary-red);
+  color: white;
+  border-color: var(--primary-red);
+}
+
+.multi-role-form .field-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+  .multi-role-form .field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+.multi-role-form .field-row > label {
+  flex: 1;
+}
+
+.multi-role-form label {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+}
+
+.multi-role-form input:not([type="checkbox"]),
+.multi-role-form select {
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  margin-top: 4px;
+  font-family: inherit;
+}
+
+.multi-role-form .checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.multi-role-form .checkbox-label input {
+  margin: 0;
+}
