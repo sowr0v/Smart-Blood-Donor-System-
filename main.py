@@ -46,8 +46,8 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Smart Blood Donor System", lifespan=lifespan)
 
 # Mount Static and Templates folder
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 JWT_SECRET = os.environ.get("JWT_SECRET") or secrets.token_urlsafe(32)
