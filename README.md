@@ -72,6 +72,12 @@ The authentication module manages user registration, login, verification, and ac
 * Password Reset
 * Role-Based Login Redirection
 
+### Password Recovery Setup
+
+Password recovery uses the SQLite database at `auth.db` by default; set `SBDS_AUTH_DATABASE_PATH` to use another file. Configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` before enabling SMS delivery. The recovery code expires after 10 minutes, allows up to five verification attempts, and can be reissued once per minute per registered number.
+
+Passwords are stored as PBKDF2 hashes. New passwords must have at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. A successful reset updates `auth_users` and deletes every persisted session for that account. The existing registration page is still a UI-only stub; an account-registration/authentication provider must provision `auth_users` with an E.164 Bangladesh phone number and a password hash before login or recovery is available.
+
 ### Authentication Flow
 
 ```text
