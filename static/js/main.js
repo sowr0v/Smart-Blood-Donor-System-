@@ -66,6 +66,30 @@ function initLiveTicker() {
 document.addEventListener("DOMContentLoaded", () => {
   initLiveTicker();
 
+  const contactForm = document.getElementById("public-contact-form");
+  if (contactForm) {
+    contactForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const status = document.getElementById("contact-form-status");
+      const contactEmail = contactForm.dataset.contactEmail;
+      if (!contactEmail) {
+        status.textContent = "Email delivery is not configured yet. Your message has not been sent.";
+        return;
+      }
+
+      const formData = new FormData(contactForm);
+      const subject = `[Smart Blood Donor System] ${formData.get("subject")}`;
+      const body = [
+        `Name: ${formData.get("name")}`,
+        `Reply email: ${formData.get("email")}`,
+        "",
+        formData.get("message"),
+      ].join("\n");
+      window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      status.textContent = "Your email app should open with a draft. Review it and send it from there.";
+    });
+  }
+
   const registrationForm = document.getElementById("registration-form");
   const roleSelect = document.getElementById("register-role");
   const personalFields = document.getElementById("personal-fields");

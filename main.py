@@ -1,3 +1,6 @@
+import os
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,15 +17,56 @@ async def serve_home(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="index.html",
-        context={"request": request},
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
     )
+
+
+@app.get("/about", response_class=HTMLResponse)
+async def serve_about(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="about.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
+
+@app.get("/contact", response_class=HTMLResponse)
+async def serve_contact(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={
+            "request": request,
+            "current_year": datetime.now(timezone.utc).year,
+            "contact_email": os.environ.get("PUBLIC_CONTACT_EMAIL", "").strip(),
+        },
+    )
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def serve_terms(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="terms.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def serve_privacy(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+    )
+
 
 @app.get("/auth/register", response_class=HTMLResponse)
 async def serve_registration(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="register.html",
-        context={"request": request},
+        context={"request": request, "current_year": datetime.now(timezone.utc).year},
     )
 
 @app.get("/api/v1/donors/live-ticker")

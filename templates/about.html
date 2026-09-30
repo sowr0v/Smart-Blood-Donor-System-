@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>About Us | Smart Blood Donor System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="public-info-page">
+  {% include "partials/public_info_header.html" %}
+  <main class="public-info-main">
+    <p class="public-info-eyebrow">About the platform</p>
+    <h1>Making blood support easier to reach.</h1>
+    <p class="public-info-lede">Smart Blood Donor System is a community platform intended to help blood donors, patients, hospitals, and blood banks find one another more easily.</p>
+    <section class="public-info-section">
+      <h2>Our purpose</h2>
+      <p>Finding a compatible donor can be time-sensitive. The platform is designed to make requests and donor availability easier to discover, while encouraging people to connect directly and confirm details with the relevant medical facility.</p>
+    </section>
+    <section class="public-info-section">
+      <h2>Use with care</h2>
+      <p>Information on this site is not medical advice and donor availability is not guaranteed. Confirm blood group, eligibility, timing, and arrangements with qualified healthcare professionals. In a life-threatening emergency, contact emergency services.</p>
+    </section>
+    <a class="public-info-action" href="/contact">Contact the team</a>
+  </main>
+  {% include "partials/public_footer.html" %}
+</body>
+</html>
