@@ -38,6 +38,7 @@
         {% endif %}
 
         <form class="search-panel" method="post" action="/login">
+          {% if next_url %}<input type="hidden" name="next_url" value="{{ next_url }}" />{% endif %}
           <label>
             Phone Number (+880 format)
             <input type="tel" name="phone_number" placeholder="+8801712345678" required />
@@ -67,6 +68,7 @@
           {% else %}
             <a href="/login?admin_console=1">Switch to Administrative Console sign-in</a>
           {% endif %}
+          <p>New to the network? <a href="/auth/register?role=donor">Register as a donor</a></p>
         </div>
       </section>
     </div>
