@@ -132,8 +132,145 @@ function initLiveTicker() {
   setInterval(fetchTickerUpdates, 60000);
 }
 
+function initUrgentBoard() {
+  const requestList = document.getElementById("urgent-request-list");
+  const status = document.getElementById("urgent-board-status");
+  const emptyState = document.getElementById("urgent-board-empty");
+  const bloodFilter = document.getElementById("urgent-blood-filter");
+  const districtFilter = document.getElementById("urgent-district-filter");
+  if (!requestList || !status || !emptyState || !bloodFilter || !districtFilter) return;
+
+  let requests = [];
+  let refreshInProgress = false;
+
+  function textElement(tagName, className, text) {
+    const element = document.createElement(tagName);
+    element.className = className;
+    element.textContent = text;
+    return element;
+  }
+
+  function countdownText(expiry) {
+    const remaining = Date.parse(expiry) - Date.now();
+    if (Number.isNaN(remaining)) return "Time unavailable";
+    if (remaining <= 0) return "Expired";
+    const secondsRemaining = Math.floor(remaining / 1000);
+    const hours = Math.floor(secondsRemaining / 3600);
+    const minutes = Math.floor((secondsRemaining % 3600) / 60);
+    const seconds = secondsRemaining % 60;
+    return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+  }
+
+  function updateDistrictOptions() {
+    const selectedDistrict = districtFilter.value;
+    districtFilter.replaceChildren(new Option("All districts", ""));
+    const districts = [...new Set(requests.map((request) => request.district).filter(Boolean))].sort();
+    districts.forEach((district) => districtFilter.add(new Option(district, district)));
+    districtFilter.value = districts.includes(selectedDistrict) ? selectedDistrict : "";
+  }
+
+  function renderRequests() {
+    const visibleRequests = requests.filter((request) =>
+      (!bloodFilter.value || request.blood_group === bloodFilter.value) &&
+      (!districtFilter.value || request.district === districtFilter.value)
+    );
+    requestList.replaceChildren();
+    emptyState.hidden = visibleRequests.length > 0;
+    status.textContent = `${visibleRequests.length} active emergency ${visibleRequests.length === 1 ? "request" : "requests"}`;
+
+    visibleRequests.forEach((request) => {
+      const card = textElement("article", "urgent-request-card", "");
+      const cardTop = textElement("div", "urgent-request-card-top", "");
+      cardTop.append(
+        textElement("span", "urgent-blood-pill", request.blood_group),
+        textElement("span", "urgent-priority", "Critical")
+      );
+      const facility = textElement("h2", "urgent-facility", request.hospital_name);
+      const locationParts = [request.area, request.district].filter(Boolean);
+      if (request.distance_km !== null && request.distance_km !== undefined && Number.isFinite(Number(request.distance_km))) {
+        locationParts.push(`${Number(request.distance_km).toFixed(1)} km away`);
+      }
+      const location = textElement("p", "urgent-location", locationParts.join(" · "));
+      const countdownLabel = textElement("span", "urgent-countdown-label", "Time remaining");
+      const countdown = textElement("time", "urgent-countdown", countdownText(request.expires_at));
+      countdown.dateTime = request.expires_at;
+      countdown.dataset.expiresAt = request.expires_at;
+
+      const connect = document.createElement("a");
+      connect.className = "urgent-connect";
+      connect.textContent = "Connect";
+      const phone = String(request.contact_phone || "").replace(/[^\d+]/g, "");
+      if (/^\+?\d{6,15}$/.test(phone)) {
+        connect.href = `tel:${phone}`;
+      } else {
+        connect.setAttribute("aria-disabled", "true");
+        connect.title = "Contact details unavailable";
+        connect.addEventListener("click", (event) => event.preventDefault());
+      }
+      card.append(cardTop, facility, location, countdownLabel, countdown, connect);
+      requestList.append(card);
+    });
+  }
+
+  async function refreshRequests() {
+    if (refreshInProgress) return;
+    refreshInProgress = true;
+    try {
+      const response = await fetch("/api/v1/requests/urgent", { cache: "no-store" });
+      if (!response.ok) throw new Error("Emergency requests are temporarily unavailable.");
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error("Unexpected emergency request response.");
+      requests = data;
+      updateDistrictOptions();
+      renderRequests();
+    } catch (error) {
+      status.textContent = error.message || "Emergency requests are temporarily unavailable.";
+      emptyState.textContent = "Emergency requests are temporarily unavailable.";
+      emptyState.hidden = false;
+    } finally {
+      refreshInProgress = false;
+    }
+  }
+
+  bloodFilter.addEventListener("change", renderRequests);
+  districtFilter.addEventListener("change", renderRequests);
+  setInterval(() => {
+    requestList.querySelectorAll(".urgent-countdown[data-expires-at]").forEach((countdown) => {
+      countdown.textContent = countdownText(countdown.dataset.expiresAt);
+    });
+    if (requests.some((request) => Date.parse(request.expires_at) <= Date.now())) refreshRequests();
+  }, 1000);
+  setInterval(refreshRequests, 15000);
+  refreshRequests();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initLiveTicker();
+  initUrgentBoard();
+
+  const contactForm = document.getElementById("public-contact-form");
+  if (contactForm) {
+    contactForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const status = document.getElementById("contact-form-status");
+      const contactEmail = contactForm.dataset.contactEmail;
+      if (!contactEmail) {
+        status.textContent = "Email delivery is not configured yet. Your message has not been sent.";
+        return;
+      }
+
+      const formData = new FormData(contactForm);
+      const subject = `[Smart Blood Donor System] ${formData.get("subject")}`;
+      const body = [
+        `Name: ${formData.get("name")}`,
+        `Reply email: ${formData.get("email")}`,
+        "",
+        formData.get("message"),
+      ].join("\n");
+      window.location.href = `mailto:${contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      status.textContent = "Your email app should open with a draft. Review it and send it from there.";
+    });
+  }
 
   const loginForm = document.getElementById("login-form");
   const loginStatus = document.getElementById("login-status");
