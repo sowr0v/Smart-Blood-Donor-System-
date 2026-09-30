@@ -1,39 +1,54 @@
 <footer class="public-footer">
   <div class="public-footer-main">
     <div class="public-footer-brand">
-      <a href="/" class="public-footer-logo">রক্ত লাগবে?</a>
-      <p>Connecting people who need blood with people ready to help.</p>
+      <a href="/" class="public-footer-logo">
+        <svg class="drop-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
+        </svg>
+        Smart Blood
+      </a>
+      <p class="public-footer-desc">A modern network connecting life-saving donors with critical patients in real-time. Fast, secure, and always free.</p>
     </div>
 
-    <nav class="public-footer-column" aria-label="For patients">
-      <h2>For Patients</h2>
-      <a href="/#urgent-board">Urgent blood requests</a>
-      <a href="/contact">Get support</a>
+    <nav class="public-footer-column">
+      <h2>Platform</h2>
+      <a href="/find-blood">Urgent Requests</a>
+      <a href="/auth/register?role=donor">Become a Donor</a>
+      <a href="/login">Sign In</a>
+      <a href="/">Live Ticker</a>
     </nav>
 
-    <nav class="public-footer-column" aria-label="For donors">
-      <h2>For Donors</h2>
-      <a href="/auth/register">Register as a donor</a>
-      <a href="/about">How the platform works</a>
-    </nav>
-
-    <nav class="public-footer-column" aria-label="Support and safety">
-      <h2>Support &amp; Safety</h2>
+    <nav class="public-footer-column">
+      <h2>Support & Safety</h2>
       <a href="/about">About Us</a>
-      <a href="/contact">Contact Us</a>
-      <a href="/terms">Terms of Use</a>
-      <a href="/privacy">Privacy Notice</a>
-      <a href="/admin/login">Admin Sign In</a>
+      <a href="/contact">Contact Support</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
     </nav>
 
     <div class="public-footer-column public-footer-hotlines">
-      <h2>Official Helplines</h2>
-      <a href="tel:10666"><span>10666</span><small>Health support</small></a>
-      <a href="tel:999"><span>999</span><small>Emergency services</small></a>
+      <h2>Emergency Hotlines</h2>
+      <a href="tel:10666" class="hotline-card">
+        <div class="hotline-card-icon">📞</div>
+        <div class="hotline-card-text">
+          <strong>10666</strong>
+          <small>National Health</small>
+        </div>
+      </a>
+      <a href="tel:999" class="hotline-card">
+        <div class="hotline-card-icon">🚑</div>
+        <div class="hotline-card-text">
+          <strong>999</strong>
+          <small>Emergency Services</small>
+        </div>
+      </a>
     </div>
   </div>
+  
   <div class="public-footer-bottom">
-    <p>© 2026 Smart Blood Donor System. All rights reserved.</p>
-    <p class="public-footer-disclaimer">Independent platform; not affiliated with any hospital or government agency. Not a substitute for emergency services or medical advice. Confirm hotline availability with the relevant authorities.</p>
+    <div class="public-footer-bottom-inner">
+      <p>&copy; 2026 Smart Blood Donor System. All rights reserved.</p>
+      <p class="public-footer-disclaimer">Independent platform; not affiliated with any hospital or government agency. Not a substitute for emergency services or medical advice.</p>
+    </div>
   </div>
 </footer>

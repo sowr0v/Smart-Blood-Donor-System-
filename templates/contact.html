@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contact</title>
+  <title>Contact Us</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,17 +21,90 @@
           <span class="brand-sub">Donor Network</span>
         </div>
       </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link active">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="/auth/login" class="btn btn-outline">Login</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      </div>
     </div>
   </header>
+
   <main class="main-shell">
-    <div class="container narrow-container">
-      <section class="page-panel form-panel">
-        <span class="eyebrow">Contact</span>
-        <h1>Need support?</h1>
-        <p class="hero-subtext">Reach out for partnerships, emergency response, or platform support.</p>
+    <div class="container">
+      <section class="page-panel">
+        <span class="eyebrow">Get in Touch</span>
+        <h1>We're Here to Help.</h1>
+        <p class="hero-subtext">Whether you need technical support, want to partner with us, or have general inquiries, reach out anytime.</p>
+        
+        <div class="contact-grid">
+          <div class="contact-info-block">
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📧</div>
+              <div class="contact-method-details">
+                <h3>Email Support</h3>
+                <a href="mailto:support@smartblood.org">support@smartblood.org</a>
+              </div>
+            </div>
+            
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📞</div>
+              <div class="contact-method-details">
+                <h3>Call Us (Non-Emergency)</h3>
+                <a href="tel:+8809611223344">+880 9611 223 344</a>
+              </div>
+            </div>
+
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📍</div>
+              <div class="contact-method-details">
+                <h3>Headquarters</h3>
+                <p>House 42, Road 7, Banani<br>Dhaka 1213, Bangladesh</p>
+              </div>
+            </div>
+
+            <div class="alert-box">
+              <strong>Emergency?</strong>
+              <p>If you need blood urgently, please use the <a href="/find-blood" style="text-decoration: underline; color: inherit;">Urgent Requests Board</a> instead of this contact form.</p>
+            </div>
+          </div>
+
+          <div class="contact-form-block">
+            <form action="/contact" method="GET" onsubmit="event.preventDefault(); alert('Message sent successfully!');">
+              <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required placeholder="John Doe">
+              </div>
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="john@example.com">
+              </div>
+              <div class="form-group">
+                <label for="subject">Subject</label>
+                <input type="text" id="subject" name="subject" required placeholder="How can we help?">
+              </div>
+              <div class="form-group">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" rows="4" required placeholder="Your message here..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full">Send Message</button>
+            </form>
+          </div>
+        </div>
+
       </section>
     </div>
   </main>
+
   {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
 </body>
 </html>
