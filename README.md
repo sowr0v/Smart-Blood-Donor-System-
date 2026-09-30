@@ -56,6 +56,14 @@ The public landing page introduces the platform and provides quick access to imp
 * About Public Page
 * Contact Public Page
 
+### Public Footer and Information Pages
+
+The public footer is shared by the landing, registration, About, Contact, Terms of Use, and Privacy Notice pages. It links to patient and donor actions, support and safety information, and the official helpline numbers 10666 and 999. The platform is independent and is not affiliated with hospitals or government emergency services.
+
+The About page describes the platform's purpose and limitations. The Contact page form opens an email draft in the visitor's email application when `PUBLIC_CONTACT_EMAIL` is configured. Without that environment variable, the page clearly explains that messages cannot be delivered; it does not store or submit the form. Emergency services should not be contacted through this form.
+
+The landing page's critical blood board reads from `/api/v1/requests/urgent` and displays only unexpired rows with `is_emergency = 1`. The app creates `urgent_requests.db` on startup by default; set `SBDS_DATABASE_PATH` to use another SQLite file. The board refreshes every 15 seconds and updates countdowns every second. Request records need a blood group, hospital name, district, area, expiry timestamp, and emergency flag; `distance_km` and `contact_phone` are optional.
+
 ---
 
 # 02 — Authentication
@@ -71,6 +79,12 @@ The authentication module manages user registration, login, verification, and ac
 * Password Recovery
 * Password Reset
 * Role-Based Login Redirection
+
+### Password Recovery Setup
+
+Password recovery uses the SQLite database at `auth.db` by default; set `SBDS_AUTH_DATABASE_PATH` to use another file. Configure `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` before enabling SMS delivery. The recovery code expires after 10 minutes, allows up to five verification attempts, and can be reissued once per minute per registered number.
+
+Passwords are stored as PBKDF2 hashes. New passwords must have at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. A successful reset updates `auth_users` and deletes every persisted session for that account. The existing registration page is still a UI-only stub; an account-registration/authentication provider must provision `auth_users` with an E.164 Bangladesh phone number and a password hash before login or recovery is available.
 
 ### Authentication Flow
 

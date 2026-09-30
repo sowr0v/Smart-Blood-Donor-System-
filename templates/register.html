@@ -3,124 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register | Smart Blood Donor System</title>
+  <title>Register</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="registration-page">
-  <nav class="registration-nav" aria-label="Registration navigation">
-    <a href="/" class="brand-logo" aria-label="Rokto Lagbe home">
-      <span class="logo-icon-wrap" aria-hidden="true">
-        <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
-        </svg>
-      </span>
-      <span class="brand-text">
-        <span class="brand-name">রক্ত লাগবে?</span>
-        <span class="brand-sub">Smart Blood Donor</span>
-      </span>
-    </a>
-    <a href="/">Back to home</a>
-  </nav>
+<body>
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+    </div>
+  </header>
 
-  <main class="registration-layout">
-    <section class="registration-intro" aria-labelledby="registration-heading">
-      <span class="registration-kicker">Smart Blood Donor System</span>
-      <h1 id="registration-heading">Your one registration can become someone’s second chance at life.</h1>
-      <p>Register to connect with large networks of donors, seekers, and Blood Bank or hospitals.</p>
-    </section>
+  <main class="main-shell">
+    <div class="container narrow-container">
+      <section class="page-panel form-panel">
+        <span class="eyebrow">Join the network</span>
+        <h1>Register as a {{ selected_role|title }}</h1>
+        <p class="hero-subtext">Create your account to help save lives and respond to local emergencies.</p>
 
-    <section class="registration-form-wrap" aria-labelledby="form-heading">
-      <h2 id="form-heading">Create your account</h2>
-      <p class="registration-subtitle">Choose an account type to get started.</p>
-
-      <form class="registration-form" id="registration-form">
-        <div class="registration-field full-width">
-          <label for="register-role">Register as</label>
-          <select id="register-role" name="role" required>
-            <option value="donor">Blood donor</option>
-            <option value="seeker">Blood seeker</option>
-            <option value="blood_bank">Blood bank</option>
-            <option value="hospital">Hospital</option>
-          </select>
+        <div class="role-switcher">
+          <button class="role-chip {% if selected_role == 'donor' %}active{% endif %}">Donor</button>
+          <button class="role-chip {% if selected_role == 'seeker' %}active{% endif %}">Seeker</button>
+          <button class="role-chip">Hospital</button>
         </div>
 
-        <div id="personal-fields" class="registration-form">
-          <div class="registration-field full-width">
-            <label for="full-name">Full name</label>
-            <input id="full-name" name="full_name" type="text" autocomplete="name" placeholder="Your full name" required>
-          </div>
-          <div class="registration-field">
-            <label for="nid">National ID (NID)</label>
-            <input id="nid" name="nid" type="text" inputmode="numeric" pattern="(?:[0-9]{10}|[0-9]{17})" title="Enter a 10 or 17 digit NID" placeholder="10 or 17 digit NID" required>
-          </div>
-          <div class="registration-field">
-            <label for="blood-group">Blood group</label>
-            <select id="blood-group" name="blood_group" required>
-              <option value="" selected disabled>Select blood group</option>
-              <option>O+</option><option>O-</option><option>A+</option><option>A-</option>
-              <option>B+</option><option>B-</option><option>AB+</option><option>AB-</option>
-            </select>
-          </div>
-          <div class="registration-field full-width">
-            <label for="personal-address">Present address</label>
-            <input id="personal-address" name="address" type="text" autocomplete="street-address" placeholder="Street, area, city" required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="personal-phone">Phone number</label>
-            <input id="personal-phone" name="phone" type="tel" inputmode="tel" pattern="01[3-9][0-9]{8}" title="Enter a valid 11 digit Bangladesh mobile number" placeholder="01XXXXXXXXX" autocomplete="tel" required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="personal-password">Password</label>
-            <input id="personal-password" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="Create strong password" required>
-          </div>
-          <label class="registration-location" for="personal-location">
-            <input id="personal-location" name="allow_location" type="checkbox">
-            <span>Allow live location<small>Share your location to help connect with nearby requests.</small></span>
+        <form class="search-panel">
+          <label>
+            Full name
+            <input type="text" placeholder="Your name" />
           </label>
-        </div>
-
-        <div id="organization-fields" class="registration-form" hidden>
-          <div class="registration-field full-width">
-            <label for="organization-name">Organization name</label>
-            <input id="organization-name" name="organization_name" type="text" placeholder="Organization name" disabled required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="manager-name">Manager name</label>
-            <input id="manager-name" name="manager_name" type="text" autocomplete="name" placeholder="Manager full name" disabled required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="organization-phone">Phone number</label>
-            <input id="organization-phone" name="organization_phone" type="tel" inputmode="tel" pattern="01[3-9][0-9]{8}" title="Enter a valid 11 digit Bangladesh mobile number" placeholder="01XXXXXXXXX" autocomplete="tel" disabled required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="organization-address">Address</label>
-            <input id="organization-address" name="organization_address" type="text" placeholder="Organization address" disabled required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="government-registration">Government registration number</label>
-            <input id="government-registration" name="government_registration" type="text" placeholder="Government registration number" disabled required>
-          </div>
-          <div class="registration-field full-width">
-            <label for="organization-password">Password</label>
-            <input id="organization-password" name="password" type="password" minlength="8" autocomplete="new-password" placeholder="Create strong password" disabled required>
-          </div>
-          <label class="registration-location" for="organization-location">
-            <input id="organization-location" name="allow_location" type="checkbox" disabled>
-            <span>Allow live location<small>Share your organization location with people searching nearby.</small></span>
+          <label>
+            Email
+            <input type="email" placeholder="you@example.com" />
           </label>
-        </div>
-
-        <p class="registration-status" id="registration-status" role="status" hidden></p>
-        <button class="registration-submit" type="submit">Create account</button>
-      </form>
-
-      <p class="registration-login">Already registered? <a href="/auth/login">Log in</a></p>
-    </section>
+          <label>
+            Phone number
+            <input type="tel" placeholder="+8801..." />
+          </label>
+          <button type="button" class="btn btn-primary btn-cta">Create account</button>
+        </form>
+      </section>
+    </div>
   </main>
-
-  <script src="/static/js/main.js"></script>
 </body>
 </html>
