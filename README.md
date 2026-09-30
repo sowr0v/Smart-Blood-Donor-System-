@@ -62,6 +62,8 @@ The public footer is shared by the landing, registration, About, Contact, Terms 
 
 The About page describes the platform's purpose and limitations. The Contact page form opens an email draft in the visitor's email application when `PUBLIC_CONTACT_EMAIL` is configured. Without that environment variable, the page clearly explains that messages cannot be delivered; it does not store or submit the form. Emergency services should not be contacted through this form.
 
+The landing page's critical blood board reads from `/api/v1/requests/urgent` and displays only unexpired rows with `is_emergency = 1`. The app creates `urgent_requests.db` on startup by default; set `SBDS_DATABASE_PATH` to use another SQLite file. The board refreshes every 15 seconds and updates countdowns every second. Request records need a blood group, hospital name, district, area, expiry timestamp, and emergency flag; `distance_km` and `contact_phone` are optional.
+
 ---
 
 # 02 — Authentication
