@@ -2096,12 +2096,17 @@ img {
   height: 24px;
   flex-shrink: 0;
   margin-bottom: 0 !important;
+  display: inline-block !important;
 }
 
 .toggle-switch input {
   opacity: 0;
-  width: 0;
-  height: 0;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 2;
 }
 
 .toggle-switch .slider {
