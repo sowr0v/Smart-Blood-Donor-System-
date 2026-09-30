@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 AUTH_DATABASE_PATH = Path(
     os.environ.get("SBDS_AUTH_DATABASE_PATH", str(Path(__file__).resolve().with_name("auth.db")))
 )
+DATABASE_PATH = Path(
+    os.environ.get("SBDS_DATABASE_PATH", str(Path(__file__).resolve().with_name("urgent_requests.db")))
+)
 SESSION_COOKIE = "sbds_session"
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60
 OTP_TTL_SECONDS = 10 * 60
@@ -37,9 +40,38 @@ PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
 
 
+def initialize_urgent_database():
+    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS blood_requests (
+                    id INTEGER PRIMARY KEY,
+                    blood_group TEXT NOT NULL,
+                    hospital_name TEXT NOT NULL,
+                    district TEXT,
+                    area TEXT,
+                    distance_km REAL,
+                    expires_at TEXT NOT NULL,
+                    contact_phone TEXT,
+                    is_emergency INTEGER DEFAULT 0
+                );
+                """
+            )
+            count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
+            if count == 0:
+                now = datetime.now(timezone.utc)
+                connection.executescript(f"""
+                    INSERT INTO blood_requests (blood_group, hospital_name, district, area, distance_km, expires_at, contact_phone, is_emergency) VALUES 
+                    ('A+', 'Dhaka Medical College', 'Dhaka', 'Shahbagh', 2.5, '{(now + timedelta(hours=2)).isoformat()}', '+8801700000000', 1),
+                    ('O-', 'Square Hospital', 'Dhaka', 'Panthapath', 4.1, '{(now + timedelta(hours=1)).isoformat()}', '+8801700000001', 1);
+                """)
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     initialize_auth_database()
+    initialize_urgent_database()
     yield
 
 
