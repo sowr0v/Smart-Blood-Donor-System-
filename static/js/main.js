@@ -420,16 +420,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ================= SBDS-10: Multi-Role User Registration =================
-  const roleSwitcher = document.getElementById("role-switcher");
+  const roleSelect = document.getElementById("role-select");
   const formIndividual = document.getElementById("form-individual");
   const formOrganization = document.getElementById("form-organization");
   
-  if (roleSwitcher && formIndividual && formOrganization) {
-    const roleSelect = document.getElementById("role-select");
+  if (roleSelect && formIndividual && formOrganization) {
     
     const updateForms = () => {
       const role = roleSelect.value;
       const roleName = roleSelect.options[roleSelect.selectedIndex].text;
+      
+      // Update H1 title
+      const h1Title = document.querySelector(".form-panel h1");
+      if (h1Title) {
+        h1Title.textContent = "Register as a " + roleName;
+      }
       
       if (role === "donor" || role === "seeker") {
         formIndividual.style.display = "block";
@@ -444,10 +449,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    if (roleSelect) {
-      roleSelect.addEventListener("change", updateForms);
-      updateForms();
-    }
+    roleSelect.addEventListener("change", updateForms);
+    updateForms();
     
     // Default mock submit prevention
     document.querySelectorAll(".multi-role-form").forEach(form => {
