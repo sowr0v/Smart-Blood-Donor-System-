@@ -1,4 +1,3 @@
-__pycache__/
-venv/
-.venv/
-*.pyc
+auth.db
+auth.db-shm
+auth.db-wal
