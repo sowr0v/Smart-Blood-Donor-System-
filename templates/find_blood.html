@@ -30,31 +30,52 @@
 
   <main class="main-shell">
     <div class="container">
-      <section class="page-panel">
-        <span class="eyebrow">Find Blood</span>
-        <h1>Locate nearby donors fast</h1>
-        <p class="hero-subtext">Search by blood type, area, and urgency to find verified matches in minutes.</p>
-
-        <form class="search-panel">
-          <div class="field-row">
-            <label>
-              Blood group
-              <select>
-                <option>O+</option>
-                <option>A+</option>
-                <option>B+</option>
-                <option>AB+</option>
+      <section class="urgent-board-section" aria-labelledby="urgent-board-heading">
+        <div class="urgent-board-header">
+          <div>
+            <span class="eyebrow">Critical Needs</span>
+            <h1 id="urgent-board-heading">Urgent Blood Board</h1>
+            <p class="hero-subtext">Real-time emergency requests requiring immediate donor response.</p>
+          </div>
+          
+          <div class="urgent-board-filters">
+            <label class="filter-label">
+              <span>Blood Group</span>
+              <select id="urgent-blood-filter">
+                <option value="">All Groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
               </select>
             </label>
-            <label>
-              Location
-              <input type="text" value="Dhaka" />
+            <label class="filter-label">
+              <span>District</span>
+              <select id="urgent-district-filter">
+                <option value="">All Districts</option>
+              </select>
             </label>
           </div>
-          <button type="button" class="btn btn-primary btn-cta">Search donors</button>
-        </form>
+        </div>
+
+        <div class="urgent-board-status-bar">
+          <span id="urgent-board-status" role="status" aria-live="polite">Loading active emergency requests...</span>
+        </div>
+
+        <div class="urgent-request-list" id="urgent-request-list" aria-live="polite">
+          <!-- Populated by main.js -->
+        </div>
+
+        <div class="urgent-board-empty" id="urgent-board-empty" hidden>
+          <p>No critical requests found matching your criteria right now.</p>
+        </div>
       </section>
     </div>
   </main>
+  <script src="/static/js/main.js"></script>
 </body>
 </html>
