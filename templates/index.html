@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,14 +12,16 @@
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
+
   <header class="global-navbar" id="global-navbar">
     <div class="nav-container">
       <a href="/" class="brand-logo" aria-label="Smart Blood Donor Home">
         <div class="logo-icon-wrap">
           <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
+            <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.510.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
           </svg>
         </div>
+
         <div class="brand-text">
           <span class="brand-name">Smart Blood</span>
           <span class="brand-sub">Donor Network</span>
@@ -53,58 +56,75 @@
         <li><a href="/about" class="mobile-nav-link">About</a></li>
         <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
       </ul>
+
       <div class="mobile-auth-actions">
         <a href="/auth/login" class="btn btn-outline btn-full">Login</a>
         <a href="/auth/register?role=donor" class="btn btn-primary btn-full">Register</a>
       </div>
     </div>
   </header>
-<!-- ================= SBDS-02: VERIFIED DONOR LIVE TICKER ================= -->
+
+
+  <!-- ================= SBDS-02: VERIFIED DONOR LIVE TICKER ================= -->
   <section class="ticker-wrapper" aria-label="Live Verified Donors Ticker">
     <div class="ticker-container">
-      
-      <!-- Static Highlight Badge -->
+
       <div class="ticker-badge">
         <span class="pulse-dot"></span>
         <span class="ticker-badge-text">10,482 VERIFIED DONORS ACTIVE TODAY</span>
       </div>
 
-      <!-- Scrolling Ticker Track -->
       <div class="ticker-track-container" id="ticker-track-container">
         <div class="ticker-track" id="ticker-track">
-          
+
           <span class="ticker-item">
             <strong class="blood-group">O+</strong> Mijanur R. verified in Farmgate, Dhaka (Just now)
           </span>
+
           <span class="ticker-divider">•</span>
+
           <span class="ticker-item">
             <strong class="blood-group">A-</strong> Farhana Y. completed donation at DMCH (15 mins ago)
           </span>
+
           <span class="ticker-divider">•</span>
+
           <span class="ticker-item">
             <strong class="blood-group">B+</strong> Anisur R. verified in Dhanmondi (25 mins ago)
           </span>
+
           <span class="ticker-divider">•</span>
+
           <span class="ticker-item">
             <strong class="blood-group">AB+</strong> Tanvir A. available in Mirpur-10 (40 mins ago)
           </span>
+
           <span class="ticker-divider">•</span>
+
           <span class="ticker-item">
             <strong class="blood-group">O-</strong> Sultana K. responded to emergency request (1 hour ago)
           </span>
+
         </div>
       </div>
 
     </div>
   </section>
 
+
   <!-- ================= MAIN BODY SHELL CONTAINER ================= -->
   <main class="main-shell" id="main-content">
+
     <div class="container">
+
+      <!-- ================= HERO SECTION ================= -->
       <section class="hero-section">
+
         <div class="hero-copy">
           <span class="eyebrow">Fast, free, verified donor matching</span>
+
           <h1>When Every Second Matters</h1>
+
           <p class="hero-subtext">
             100% free and middleman-free. Connect with nearby donors, hospitals, and community volunteers when urgent blood support is needed most.
           </p>
@@ -121,24 +141,30 @@
           </div>
         </div>
 
+
         <div class="hero-panel" aria-label="Network metrics panel">
+
           <div class="info-card highlight-card">
             <span class="card-label">Average response</span>
             <strong>12 minutes</strong>
           </div>
 
           <div class="mini-grid">
+
             <div class="info-card">
               <span class="card-label">Nearby donors</span>
               <strong>2,480</strong>
             </div>
+
             <div class="info-card">
               <span class="card-label">Lives supported</span>
               <strong>9.4k</strong>
             </div>
+
           </div>
 
           <div class="activity-list">
+
             <div class="activity-item">
               <span class="status-dot urgent"></span>
               <div>
@@ -146,6 +172,7 @@
                 <small>Dhaka Medical - 15 mins ago</small>
               </div>
             </div>
+
             <div class="activity-item">
               <span class="status-dot ready"></span>
               <div>
@@ -153,35 +180,366 @@
                 <small>Within 5km radius</small>
               </div>
             </div>
+
           </div>
         </div>
+
       </section>
 
+
+      <!-- ================= EXISTING METRICS ================= -->
       <section class="metrics-row" aria-label="Fast response metrics">
+
         <article class="metric-card">
           <strong>2.4k+</strong>
           <span>Verified donors</span>
         </article>
+
         <article class="metric-card">
           <strong>93%</strong>
           <span>Requests matched within 30 min</span>
         </article>
+
         <article class="metric-card">
           <strong>4.8/5</strong>
           <span>Community trust rating</span>
         </article>
+
       </section>
 
-      <section class="requests-section" id="blood-requests" aria-labelledby="requests-heading">
+
+      <!-- ================= PLATFORM LIVE IMPACT STATISTICS ================= -->
+      <section
+        class="impact-stats-section"
+        id="impact-statistics"
+        aria-labelledby="impact-stats-title"
+      >
+
+        <div class="impact-stats-header">
+
+          <span class="eyebrow">Our Community Impact</span>
+
+          <h2 id="impact-stats-title">
+            Platform Live Impact Statistics
+          </h2>
+
+          <p>
+            Verified metrics showing the impact of our blood donor community.
+          </p>
+
+        </div>
+
+
+        <div class="impact-stats-grid">
+
+          <!-- Total Registered Donors -->
+          <article class="impact-stat-card">
+
+            <div class="impact-stat-icon" aria-hidden="true">
+              ♥
+            </div>
+
+            <strong
+              class="impact-stat-number"
+              data-target="10000"
+              data-display="10K+"
+            >
+              0
+            </strong>
+
+            <span class="impact-stat-label">
+              Total Registered Donors
+            </span>
+
+          </article>
+
+
+          <!-- Successful Connections -->
+          <article class="impact-stat-card">
+
+            <div class="impact-stat-icon" aria-hidden="true">
+              ✓
+            </div>
+
+            <strong
+              class="impact-stat-number"
+              data-target="5000"
+              data-display="5K+"
+            >
+              0
+            </strong>
+
+            <span class="impact-stat-label">
+              Successful Connections
+            </span>
+
+          </article>
+
+
+          <!-- Average Response Rate -->
+          <article class="impact-stat-card">
+
+            <div class="impact-stat-icon" aria-hidden="true">
+              ⚡
+            </div>
+
+            <strong
+              class="impact-stat-number"
+              data-target="95"
+              data-display="95%"
+            >
+              0
+            </strong>
+
+            <span class="impact-stat-label">
+              Average Response Rate
+            </span>
+
+            <small class="impact-stat-note">
+              Under 15 mins
+            </small>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- ================= HOW ROKTO LAGBE WORKS ================= -->
+      <section
+        class="workflow-section"
+        id="how-it-works"
+        aria-labelledby="workflow-title"
+      >
+
+        <div class="workflow-header">
+
+          <span class="eyebrow">
+            Simple. Fast. Life-saving.
+          </span>
+
+          <h2 id="workflow-title">
+            How Rokto Lagbe Works
+          </h2>
+
+          <p>
+            Follow four simple steps to find blood, connect with the right people, and help save a life.
+          </p>
+
+        </div>
+
+
+        <div class="workflow-steps">
+
+          <!-- STEP 01 -->
+          <article class="workflow-step">
+
+            <div class="workflow-icon-wrap">
+              <div class="workflow-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                  <line x1="19" y1="8" x2="19" y2="14"/>
+                  <line x1="22" y1="11" x2="16" y2="11"/>
+                </svg>
+              </div>
+
+              <span class="workflow-number">
+                01
+              </span>
+            </div>
+
+            <div class="workflow-content">
+
+              <h3>
+                Register Account
+              </h3>
+
+              <p>
+                Create your account quickly and provide the basic information needed to get started.
+              </p>
+
+            </div>
+
+          </article>
+
+
+          <!-- CONNECTOR 01 -->
+          <div class="workflow-connector" aria-hidden="true">
+            <span>→</span>
+          </div>
+
+
+          <!-- STEP 02 -->
+          <article class="workflow-step">
+
+            <div class="workflow-icon-wrap">
+              <div class="workflow-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="11" cy="11" r="7"/>
+                  <line x1="20" y1="20" x2="16.1" y2="16.1"/>
+                  <path d="M8 11h6"/>
+                  <path d="M11 8v6"/>
+                </svg>
+              </div>
+
+              <span class="workflow-number">
+                02
+              </span>
+            </div>
+
+            <div class="workflow-content">
+
+              <h3>
+                Search Demands
+              </h3>
+
+              <p>
+                Find active blood requests based on blood group and location.
+              </p>
+
+            </div>
+
+          </article>
+
+
+          <!-- CONNECTOR 02 -->
+          <div class="workflow-connector" aria-hidden="true">
+            <span>→</span>
+          </div>
+
+
+          <!-- STEP 03 -->
+          <article class="workflow-step">
+
+            <div class="workflow-icon-wrap">
+              <div class="workflow-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <path d="M8 9h8"/>
+                  <path d="M8 13h5"/>
+                </svg>
+              </div>
+
+              <span class="workflow-number">
+                03
+              </span>
+            </div>
+
+            <div class="workflow-content">
+
+              <h3>
+                Connect Instantly
+              </h3>
+
+              <p>
+                Connect with the requester or donor and respond quickly when help is needed.
+              </p>
+
+            </div>
+
+          </article>
+
+
+          <!-- CONNECTOR 03 -->
+          <div class="workflow-connector" aria-hidden="true">
+            <span>→</span>
+          </div>
+
+
+          <!-- STEP 04 -->
+          <article class="workflow-step">
+
+            <div class="workflow-icon-wrap">
+              <div class="workflow-icon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+              </div>
+
+              <span class="workflow-number">
+                04
+              </span>
+            </div>
+
+            <div class="workflow-content">
+
+              <h3>
+                Save a Life
+              </h3>
+
+              <p>
+                Complete the donation process and make a meaningful difference in someone's life.
+              </p>
+
+            </div>
+
+          </article>
+
+        </div>
+
+      </section>
+
+
+      <!-- ================= BLOOD REQUESTS ================= -->
+      <section
+        class="requests-section"
+        id="blood-requests"
+        aria-labelledby="requests-heading"
+      >
+
         <div class="requests-heading-row">
+
           <div>
             <span class="eyebrow">Regional requests</span>
-            <h2 id="requests-heading">Blood needed right now</h2>
-            <p>Open requisitions from hospitals across Dhaka.</p>
+
+            <h2 id="requests-heading">
+              Blood needed right now
+            </h2>
+
+            <p>
+              Open requisitions from hospitals across Dhaka.
+            </p>
           </div>
+
+
           <label class="blood-group-filter">
+
             <span>Blood group</span>
-            <select id="blood-group-filter" aria-label="Filter requests by blood group">
+
+            <select
+              id="blood-group-filter"
+              aria-label="Filter requests by blood group"
+            >
               <option value="ALL">All groups</option>
               <option value="A+">A+</option>
               <option value="A-">A-</option>
@@ -192,76 +550,178 @@
               <option value="O+">O+</option>
               <option value="O-">O-</option>
             </select>
+
           </label>
+
         </div>
 
-        <div class="request-feed" id="request-feed" aria-live="polite" aria-busy="false">
+
+        <div
+          class="request-feed"
+          id="request-feed"
+          aria-live="polite"
+          aria-busy="false"
+        >
+
           {% for item in blood_requests %}
+
           <article class="request-card">
+
             <div class="request-card-top">
-              <span class="request-blood-group">{{ item.blood_group }}</span>
-              <span class="request-status status-{{ item.status|lower }}">{{ item.status }}</span>
+              <span class="request-blood-group">
+                {{ item.blood_group }}
+              </span>
+
+              <span class="request-status status-{{ item.status|lower }}">
+                {{ item.status }}
+              </span>
             </div>
-            <h3>{{ item.hospital }}</h3>
-            <p class="request-area">{{ item.area }}</p>
-            <p class="request-units">{{ item.units }} unit{% if item.units != 1 %}s{% endif %} required</p>
+
+            <h3>
+              {{ item.hospital }}
+            </h3>
+
+            <p class="request-area">
+              {{ item.area }}
+            </p>
+
+            <p class="request-units">
+              {{ item.units }} unit{% if item.units != 1 %}s{% endif %} required
+            </p>
+
             <div class="request-card-footer">
-              <time datetime="{{ item.posted_at }}">Just posted</time>
-              <a class="connect-button" href="/requests/{{ item.id }}/connect">Connect</a>
+
+              <time datetime="{{ item.posted_at }}">
+                Just posted
+              </time>
+
+              <a
+                class="connect-button"
+                href="/requests/{{ item.id }}/connect"
+              >
+                Connect
+              </a>
+
             </div>
+
           </article>
+
           {% endfor %}
+
         </div>
-        <p class="feed-message" id="feed-message" role="status" hidden></p>
-        <p class="feed-updated">Updates automatically every 30 seconds</p>
+
+        <p
+          class="feed-message"
+          id="feed-message"
+          role="status"
+          hidden
+        ></p>
+
+        <p class="feed-updated">
+          Updates automatically every 30 seconds
+        </p>
+
       </section>
+
     </div>
 
+
     <!-- ================= SBDS-08: CALL-TO-ACTION JOIN BANNER ================= -->
-    <section class="join-banner-section" aria-labelledby="join-banner-title">
+    <section
+      class="join-banner-section"
+      aria-labelledby="join-banner-title"
+    >
+
       <div class="join-banner-container">
+
         <div class="join-banner-card">
-          
+
           <!-- Decorative Blood Drop Watermark Icon -->
           <div class="banner-watermark" aria-hidden="true">
+
             <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
+
+              <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.510.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
+
             </svg>
+
           </div>
 
+
           <div class="join-banner-content">
-            <span class="banner-badge">JOIN THE LIFESAVING NETWORK</span>
+
+            <span class="banner-badge">
+              JOIN THE LIFESAVING NETWORK
+            </span>
+
             <h2 id="join-banner-title" class="banner-heading">
               Ready to make a difference? Join us today.
             </h2>
+
             <p class="banner-subtext">
               Your simple decision to register as a donor could be the lifeline someone's family is desperately praying for. Join thousands of verified heroes across Bangladesh.
             </p>
-            
+
+
             <div class="banner-action-group">
-              <a href="/auth/register?role=donor" class="btn btn-banner-primary">
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+
+              <a
+                href="/auth/register?role=donor"
+                class="btn btn-banner-primary"
+              >
+
+                <svg
+                  class="btn-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
                   <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="8.5" cy="7.5" r="4"/>
                   <line x1="20" y1="8" x2="20" y2="14"/>
                   <line x1="23" y1="11" x2="17" y2="11"/>
                 </svg>
+
                 Register as a Donor
+
               </a>
-              <a href="tel:10666" class="btn btn-banner-secondary">
-                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+
+
+              <a
+                href="tel:10666"
+                class="btn btn-banner-secondary"
+              >
+
+                <svg
+                  class="btn-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 1 2.81.7A2 2 0 0 1 22 16.92z"/>
                 </svg>
+
                 Contact US
+
               </a>
+
             </div>
+
           </div>
 
         </div>
+
       </div>
+
     </section>
+
   </main>
 
+
   <script src="/static/js/main.js"></script>
+
 </body>
 </html>
+```
