@@ -56,6 +56,14 @@ The public landing page introduces the platform and provides quick access to imp
 * About Public Page
 * Contact Public Page
 
+## Urgent Blood Board
+
+The public landing page reads active emergency requests from `/api/v1/requests/urgent`. The endpoint returns only rows where `is_emergency = 1` and `expires_at` is in the future. The browser refreshes the feed every 15 seconds and updates countdowns every second.
+
+On first startup, the app creates a SQLite database at `urgent_requests.db` in the project directory. Set `SBDS_DATABASE_PATH` to use a different database file. The `blood_requests` table uses these fields for board entries: `id`, `blood_group`, `hospital_name`, `district`, `area`, optional `distance_km`, UTC ISO-8601 `expires_at`, optional `contact_phone`, and `is_emergency`. Requests without a valid contact phone remain visible, but their Connect action is disabled.
+
+The board API is read-only; a request-submission workflow is not currently implemented in this project. A request workflow or trusted database integration must write emergency requests to this table for them to appear.
+
 ---
 
 # 02 — Authentication
