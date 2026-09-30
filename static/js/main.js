@@ -425,14 +425,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const formOrganization = document.getElementById("form-organization");
   
   if (roleSwitcher && formIndividual && formOrganization) {
-    const roleButtons = roleSwitcher.querySelectorAll(".role-chip");
+    const roleSelect = document.getElementById("role-select");
     
-    const updateForms = (button) => {
-      roleButtons.forEach(btn => btn.classList.remove("active"));
-      button.classList.add("active");
-      
-      const role = button.getAttribute("data-role");
-      const roleName = button.textContent;
+    const updateForms = () => {
+      const role = roleSelect.value;
+      const roleName = roleSelect.options[roleSelect.selectedIndex].text;
       
       if (role === "donor" || role === "seeker") {
         formIndividual.style.display = "block";
@@ -447,13 +444,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     };
 
-    roleButtons.forEach(button => {
-      button.addEventListener("click", () => updateForms(button));
-    });
-    
-    // Initialize on load
-    const activeBtn = roleSwitcher.querySelector(".role-chip.active");
-    if (activeBtn) updateForms(activeBtn);
+    if (roleSelect) {
+      roleSelect.addEventListener("change", updateForms);
+      updateForms();
+    }
     
     // Default mock submit prevention
     document.querySelectorAll(".multi-role-form").forEach(form => {
