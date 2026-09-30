@@ -427,29 +427,33 @@ document.addEventListener("DOMContentLoaded", () => {
   if (roleSwitcher && formIndividual && formOrganization) {
     const roleButtons = roleSwitcher.querySelectorAll(".role-chip");
     
+    const updateForms = (button) => {
+      roleButtons.forEach(btn => btn.classList.remove("active"));
+      button.classList.add("active");
+      
+      const role = button.getAttribute("data-role");
+      const roleName = button.textContent;
+      
+      if (role === "donor" || role === "seeker") {
+        formIndividual.style.display = "block";
+        formOrganization.style.display = "none";
+        document.getElementById("individual-role-input").value = role;
+        document.getElementById("btn-text-individual").textContent = roleName;
+      } else {
+        formIndividual.style.display = "none";
+        formOrganization.style.display = "block";
+        document.getElementById("organization-role-input").value = role;
+        document.getElementById("btn-text-organization").textContent = roleName;
+      }
+    };
+
     roleButtons.forEach(button => {
-      button.addEventListener("click", () => {
-        // Remove active class from all
-        roleButtons.forEach(btn => btn.classList.remove("active"));
-        // Add active class to clicked
-        button.classList.add("active");
-        
-        const role = button.getAttribute("data-role");
-        const roleName = button.textContent;
-        
-        if (role === "donor" || role === "seeker") {
-          formIndividual.style.display = "block";
-          formOrganization.style.display = "none";
-          document.getElementById("individual-role-input").value = role;
-          document.getElementById("btn-text-individual").textContent = roleName;
-        } else {
-          formIndividual.style.display = "none";
-          formOrganization.style.display = "block";
-          document.getElementById("organization-role-input").value = role;
-          document.getElementById("btn-text-organization").textContent = roleName;
-        }
-      });
+      button.addEventListener("click", () => updateForms(button));
     });
+    
+    // Initialize on load
+    const activeBtn = roleSwitcher.querySelector(".role-chip.active");
+    if (activeBtn) updateForms(activeBtn);
     
     // Default mock submit prevention
     document.querySelectorAll(".multi-role-form").forEach(form => {
