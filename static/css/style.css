@@ -2141,3 +2141,82 @@ img {
 .toggle-switch input:checked + .slider:before {
   transform: translateX(20px);
 }
+
+/* ==========================================================================
+   LEGAL AND INFO PAGES (Privacy, Terms)
+   ========================================================================== */
+.public-info-page {
+  background-color: var(--bg-page);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.public-info-main {
+  flex: 1;
+  max-width: 800px;
+  margin: 4rem auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.legal-main {
+  padding: 3rem 4rem;
+}
+
+@media (max-width: 760px) {
+  .legal-main {
+    padding: 2rem;
+  }
+}
+
+.public-info-eyebrow {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--primary-red);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.public-info-main h1 {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.public-info-lede {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 2rem;
+}
+
+.public-info-section {
+  margin-bottom: 2.5rem;
+}
+
+.public-info-section h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.public-info-section p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+
+.legal-updated {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
