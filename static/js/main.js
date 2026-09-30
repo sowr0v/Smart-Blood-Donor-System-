@@ -501,6 +501,23 @@ document.addEventListener("DOMContentLoaded", () => {
       updateIcon(newTheme);
     });
     
-    document.body.appendChild(btn);
+    // Inject button into the navbar right side
+    const navActions = document.querySelector('.nav-auth-actions') || document.querySelector('.nav-container');
+    if (navActions) {
+      if (navActions.classList.contains('nav-auth-actions')) {
+        navActions.style.display = 'flex';
+        navActions.style.alignItems = 'center';
+        navActions.insertBefore(btn, navActions.firstChild);
+      } else {
+        navActions.appendChild(btn);
+      }
+    } else {
+      // Fallback if no navbar
+      btn.style.position = 'fixed';
+      btn.style.top = '15px';
+      btn.style.right = '20px';
+      btn.style.zIndex = '9999';
+      document.body.appendChild(btn);
+    }
   });
 })();

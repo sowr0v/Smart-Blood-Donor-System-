@@ -2246,31 +2246,29 @@ img {
   background-color: rgba(30, 30, 30, 0.94);
 }
 
-/* Floating Theme Toggle */
+/* Navbar Theme Toggle */
 .theme-toggle-btn {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: var(--bg-card);
+  background-color: transparent;
   border: 1px solid var(--border-color);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 9999;
   transition: all var(--transition-speed);
   color: var(--text-primary);
+  margin-right: 10px;
 }
 .theme-toggle-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+  background-color: rgba(0,0,0,0.05);
+}
+[data-theme="dark"] .theme-toggle-btn:hover {
+  background-color: rgba(255,255,255,0.1);
 }
 .theme-toggle-btn svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   fill: currentColor;
 }
