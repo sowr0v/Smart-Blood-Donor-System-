@@ -3,23 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Notice | Smart Blood Donor System</title>
+  <title>Privacy Policy</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="public-info-page">
-  {% include "partials/public_info_header.html" %}
-  <main class="public-info-main legal-main">
-    <p class="public-info-eyebrow">Legal</p>
-    <h1>Privacy Notice</h1>
-    <p class="public-info-lede">Use care when sharing personal or health-related information online.</p>
-    <section class="public-info-section"><h2>Information you provide</h2><p>Information entered into forms may include contact and health-related details. Do not submit information about another person unless you are authorized to do so.</p></section>
-    <section class="public-info-section"><h2>Contact form</h2><p>The contact form does not transmit or store messages on this site. If a contact email is configured, submitting the form opens a draft in your email application; you control whether it is sent and what it contains.</p></section>
-    <section class="public-info-section"><h2>Third-party services</h2><p>When you follow a telephone or external link, the destination service may process information under its own privacy terms. This platform cannot control those services.</p></section>
-    <p class="legal-updated">Last updated: September 2026</p>
+<body>
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="/auth/login" class="btn btn-outline">Login</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <div class="container">
+      <section class="page-panel">
+        <span class="eyebrow">Data Security</span>
+        <h1>Privacy Policy</h1>
+        <p class="hero-subtext">Your data is safe with us.</p>
+        
+        <div class="info-content-prose">
+          <h2>1. Information Collection</h2>
+          <p>We collect information necessary to operate the blood donation platform. This includes your name, contact information (phone number), blood group, and location data when you interact with the service.</p>
+          
+          <h2>2. How We Use Information</h2>
+          <p>Your information is used solely for the purpose of connecting blood donors with those in need. We do not sell your personal data to third parties or marketing agencies.</p>
+
+          <h2>3. Data Visibility</h2>
+          <p>When you post a blood request, your contact information may be visible to registered donors. If you register as a donor, your contact details are kept secure and are only shared when you explicitly agree to fulfill a request.</p>
+
+          <h2>4. Security</h2>
+          <p>We take security seriously and use industry-standard encryption for passwords and sensitive data to protect your information.</p>
+        </div>
+      </section>
+    </div>
   </main>
+
   {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About</title>
+  <title>About Us</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,17 +21,79 @@
           <span class="brand-sub">Donor Network</span>
         </div>
       </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link active">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="/auth/login" class="btn btn-outline">Login</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      </div>
     </div>
   </header>
-  <main class="main-shell">
-    <div class="container">
-      <section class="page-panel">
-        <span class="eyebrow">About us</span>
-        <h1>Building a faster, safer donor response network.</h1>
-        <p class="hero-subtext">Our mission is to make blood donation and emergency response more immediate, transparent, and community-led.</p>
+
+  <main class="main-shell" style="padding-bottom: 0;">
+    <div class="container" style="max-width: 1100px;">
+      
+      <!-- New Beautiful Super CTA Banner as the Hero! -->
+      <div class="cta-banner-super" style="margin-top: 20px;">
+        <h2>Ready to Save a Life Today?</h2>
+        <p>Join thousands of verified donors in our real-time network. When emergencies strike, you could be the only match in your area.</p>
+        <div class="cta-buttons-wrap">
+          <a href="/auth/register?role=donor" class="btn-cta-primary">Be a Hero &mdash; Join Now</a>
+          <a href="/find-blood" class="btn-cta-secondary">View Urgent Requests</a>
+        </div>
+      </div>
+
+      <section class="page-panel" style="padding: 56px 48px; border-top-left-radius: 0; border-top-right-radius: 0; border-top: none; margin-top: -30px; padding-top: 80px;">
+        
+        <div class="about-hero-grid">
+          <div class="about-hero-text">
+            <span class="eyebrow" style="margin-bottom: 16px;">Our Mission</span>
+            <h1>Connecting Lifesavers, <br><span class="gradient-text">Instantly.</span></h1>
+            <p class="about-hero-subtext">Every day, thousands face life-threatening situations due to a lack of available blood. We built this platform to eliminate the critical time gap between those who need blood and those willing to give.</p>
+          </div>
+          <div class="about-stats-container" style="margin-top: 0; flex-direction: column; gap: 16px;">
+              <div class="stat-card-modern" style="padding: 20px; display: flex; align-items: center; justify-content: space-between; text-align: left;">
+                <strong style="margin:0; font-size: 2rem;">10k+</strong>
+                <span>Verified Donors</span>
+              </div>
+              <div class="stat-card-modern" style="padding: 20px; display: flex; align-items: center; justify-content: space-between; text-align: left;">
+                <strong style="margin:0; font-size: 2rem;">12m</strong>
+                <span>Avg Response</span>
+              </div>
+          </div>
+        </div>
+
+        <div class="about-features-grid" style="margin-top: 40px;">
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Lightning Fast</h3>
+            <p>In emergencies, time is everything. Our system leverages real-time location data to notify nearby donors instantly.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🛡️</div>
+            <h3>100% Free & Transparent</h3>
+            <p>No middlemen, no hidden fees. Just a direct connection between the patient's family and the generous donor.</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">🤝</div>
+            <h3>Community Led</h3>
+            <p>Built by the people, for the people. A community-driven effort bringing humanity together to save lives.</p>
+          </div>
+        </div>
+
       </section>
     </div>
   </main>
+
   {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
 </body>
 </html>
