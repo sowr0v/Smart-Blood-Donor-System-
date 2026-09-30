@@ -2,3 +2,6 @@ auth.db
 auth.db-shm
 auth.db-wal
 .venv/
+
+__pycache__/
+*.pyc
