@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In | Smart Blood Donor System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="registration-page">
+  <nav class="registration-nav" aria-label="Sign in navigation">
+    <a href="/" class="brand-logo" aria-label="Rokto Lagbe home">
+      <span class="brand-text"><span class="brand-name">রক্ত লাগবে?</span><span class="brand-sub">Smart Blood Donor</span></span>
+    </a>
+    <a href="/">Back to home</a>
+  </nav>
+  <main class="registration-layout auth-layout">
+    <section class="registration-intro" aria-labelledby="login-heading">
+      <span class="registration-kicker">Welcome back</span>
+      <h1 id="login-heading">Sign in to your account.</h1>
+      <p>Use the phone number registered to your account.</p>
+    </section>
+    <section class="registration-form-wrap" aria-labelledby="login-form-heading">
+      <h2 id="login-form-heading">Sign in</h2>
+      <form class="registration-form auth-form" id="login-form">
+        <div class="registration-field full-width">
+          <label for="login-phone">Phone number</label>
+          <input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="01XXXXXXXXX" required>
+        </div>
+        <div class="registration-field full-width">
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+        <p id="login-status" class="registration-status" role="status" aria-live="polite" hidden></p>
+        <button class="registration-submit" type="submit">Sign In</button>
+      </form>
+      <p class="registration-login"><a href="/auth/password-recovery">Forgot Password?</a></p>
+      <p class="registration-login">New to the system? <a href="/auth/register">Create an account</a></p>
+    </section>
+  </main>
+  <script src="/static/js/main.js"></script>
+</body>
+</html>

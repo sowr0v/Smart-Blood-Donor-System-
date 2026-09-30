@@ -915,3 +915,43 @@ body {
     justify-content: center;
   }
 }
+
+/* ================= ACCOUNT ACCESS ================= */
+.auth-layout {
+  max-width: 1000px;
+}
+
+.auth-form {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.auth-form input:focus-visible,
+.auth-form button:focus-visible,
+.registration-login a:focus-visible {
+  outline: 3px solid rgba(211, 47, 47, 0.24);
+  outline-offset: 2px;
+}
+
+.auth-form button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.password-rules {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.registration-status.is-success {
+  color: #205c33;
+  background: #eef8f0;
+  border-color: #b9ddc2;
+}
+
+@media (max-width: 760px) {
+  .auth-layout .registration-form-wrap {
+    padding: 26px 22px;
+  }
+}
