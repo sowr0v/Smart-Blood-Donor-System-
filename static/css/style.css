@@ -18,6 +18,8 @@
   --heading-color: var(--secondary-navy);
   --heading-dark: #1f1f1f;
   --bg-glass-heavy: rgba(255, 255, 255, 0.9);
+  --bg-grad-start: #fff9f9;
+  --bg-grad-end: #ffffff;
   --bg-glass-medium: rgba(255, 255, 255, 0.72);
   --text-muted: #6b7280;
 }
@@ -33,7 +35,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(180deg, #fff9f9 0%, var(--bg-page) 100%);
+  background: linear-gradient(180deg, var(--bg-grad-start) 0%, var(--bg-page) 100%);
   color: var(--text-primary);
   line-height: 1.5;
 }
@@ -353,7 +355,7 @@ img {
 /* ================= HERO PANEL ================= */
 
 .hero-panel {
-  background: linear-gradient(180deg, #ffffff 0%, #fff8f8 100%);
+  background: linear-gradient(180deg, var(--bg-grad-end) 0%, var(--bg-grad-start) 100%);
   border: 1px solid rgba(211, 47, 47, 0.08);
   border-radius: 28px;
   padding: 22px;
@@ -1579,8 +1581,8 @@ border-color: #000000;
 
 .urgent-board-section {
   padding: 42px 20px 52px;
-  background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
-  border-bottom: 1px solid #f1dddd;
+  background: linear-gradient(180deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
+  border-bottom: 1px solid var(--border-color);
   scroll-margin-top: calc(var(--nav-height) + 16px);
 }
 
@@ -2388,6 +2390,8 @@ font-size: 14px;
 --heading-color: var(--text-primary);
   --heading-dark: var(--text-primary);
   --bg-glass-heavy: rgba(30, 30, 30, 0.9);
+  --bg-grad-start: #1e1e1e;
+  --bg-grad-end: #121212;
   --bg-glass-medium: rgba(30, 30, 30, 0.72);
   --text-muted: var(--text-secondary);
 }
@@ -2806,7 +2810,7 @@ font-size: 14px;
 }
 
 .feature-card {
-  background: linear-gradient(180deg, #fff9f9 0%, #fff 100%);
+  background: linear-gradient(180deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
   border: 1px solid rgba(211, 47, 47, 0.08);
   border-radius: 20px;
   padding: 32px 24px;
@@ -2815,7 +2819,7 @@ font-size: 14px;
 
 .feature-card:hover {
   border-color: rgba(211, 47, 47, 0.2);
-  background: linear-gradient(180deg, #fff4f4 0%, #fff 100%);
+  background: linear-gradient(180deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
 }
 
 .feature-icon {
@@ -2848,7 +2852,7 @@ font-size: 14px;
   width: 100%;
   height: 100%;
   min-height: 300px;
-  background: linear-gradient(135deg, #fff0f0 0%, #ffe6e6 100%);
+  background: linear-gradient(135deg, var(--bg-grad-start) 0%, var(--bg-grad-end) 100%);
   border-radius: 24px;
   display: flex;
   align-items: center;
