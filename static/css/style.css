@@ -17,6 +17,8 @@
   --transition-speed: 0.25s;
   --heading-color: var(--secondary-navy);
   --heading-dark: #1f1f1f;
+  --bg-glass-heavy: rgba(255, 255, 255, 0.9);
+  --bg-glass-medium: rgba(255, 255, 255, 0.72);
   --text-muted: #6b7280;
 }
 
@@ -405,7 +407,7 @@ img {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass-heavy);
   border: 1px solid rgba(0, 0, 0, 0.04);
   border-radius: 14px;
   padding: 12px 14px;
@@ -451,7 +453,7 @@ img {
 }
 
 .metric-card {
-  background: rgba(255, 255, 255, 0.72);
+  background: var(--bg-glass-medium);
   border: 1px solid rgba(18, 22, 35, 0.06);
   border-radius: 18px;
   padding: 22px 18px;
@@ -722,7 +724,7 @@ font-size: 13px;
 .page-panel {
   max-width: 980px;
   margin: 0 auto;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--bg-glass-heavy);
   border: 1px solid rgba(18, 22, 35, 0.06);
   border-radius: 28px;
   padding: 42px 28px;
@@ -1998,7 +2000,7 @@ font-size: 14px;
    PUBLIC FOOTER (SBDS-09)
    ========================================================================== */
 .public-footer {
-  background-color: var(--heading-color);
+  background-color: var(--secondary-navy);
   color: #E0E0E0;
   padding: 4rem 1rem 2rem;
   font-size: 0.875rem;
@@ -2385,6 +2387,8 @@ font-size: 14px;
   --border-color: #333333;
 --heading-color: var(--text-primary);
   --heading-dark: var(--text-primary);
+  --bg-glass-heavy: rgba(30, 30, 30, 0.9);
+  --bg-glass-medium: rgba(30, 30, 30, 0.72);
   --text-muted: var(--text-secondary);
 }
 
@@ -2426,7 +2430,7 @@ font-size: 14px;
 
 /* ================= REFINED MULTI-COLUMN FOOTER ================= */
 .public-footer {
-  background-color: var(--heading-color);
+  background-color: var(--secondary-navy);
   color: #fff;
   padding-top: 64px;
   border-top: 1px solid var(--border-color);
