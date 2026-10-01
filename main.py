@@ -355,11 +355,7 @@ def send_recovery_sms(phone: str, code: str):
 
 @app.get("/auth/login", response_class=HTMLResponse)
 async def serve_login(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={"request": request},
-    )
+    return await login_page(request)
 
 
 @app.get("/auth/password-recovery", response_class=HTMLResponse)
@@ -646,11 +642,12 @@ async def serve_privacy(request: Request):
 
 
 @app.get("/auth/register", response_class=HTMLResponse)
-async def serve_registration(request: Request):
+async def serve_registration(request: Request, role: str = "donor"):
+    selected_role = role.lower() if role else "donor"
     return templates.TemplateResponse(
         request=request,
         name="register.html",
-        context={"request": request, "current_year": datetime.now(timezone.utc).year},
+        context={"request": request, "current_year": datetime.now(timezone.utc).year, "selected_role": selected_role},
     )
 
 @app.get("/api/v1/requests/urgent")
@@ -739,34 +736,12 @@ async def login_submit(
     return response
 
 
-@app.get("/auth/login", response_class=HTMLResponse)
-async def auth_login(request: Request):
-    return await login_page(request)
 
 
-@app.get("/auth/register", response_class=HTMLResponse)
-async def register(request: Request, role: str = "donor"):
-    selected_role = role.lower() if role else "donor"
+@app.get("/otp-verification", response_class=HTMLResponse)
+async def otp_verification(request: Request):
     return templates.TemplateResponse(
         request=request,
-        name="register.html",
-        context={"request": request, "selected_role": selected_role},
-    )
-
-
-@app.get("/about", response_class=HTMLResponse)
-async def about(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="about.html",
-        context={"request": request},
-    )
-
-
-@app.get("/contact", response_class=HTMLResponse)
-async def contact(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="contact.html",
+        name="otp_verification.html",
         context={"request": request},
     )
