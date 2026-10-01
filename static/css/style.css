@@ -1,27 +1,27 @@
 /* ================= FIGMA DESIGN TOKENS ================= */
 :root {
-  --primary-red: #D32F2F;
-  --primary-dark: #B71C1C;
-  --secondary-blue: #1976D2;
-  --secondary-navy: #0E1B3D;
-  --success-green: #2E7D32;
-  --warning-amber: #F9A825;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  --bg-page: #F8F9FA;
+  --primary-red: #E11D48;
+  --primary-dark: #BE123C;
+  --secondary-blue: #3B82F6;
+  --secondary-navy: #0F172A;
+  --success-green: #10B981;
+  --warning-amber: #F59E0B;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --bg-page: #F8FAFC;
   --bg-card: #FFFFFF;
-  --bg-soft-red: #FFF5F5;
-  --bg-soft-amber: #fff4df;
-  --border-color: #E0E0E0;
+  --bg-soft-red: #FFF1F2;
+  --bg-soft-amber: #FEF3C7;
+  --border-color: #E2E8F0;
   --nav-height: 72px;
   --transition-speed: 0.25s;
   --heading-color: var(--secondary-navy);
-  --heading-dark: #1f1f1f;
-  --bg-glass-heavy: rgba(255, 255, 255, 0.9);
-  --bg-grad-start: #fff9f9;
-  --bg-grad-end: #ffffff;
-  --bg-glass-medium: rgba(255, 255, 255, 0.72);
-  --text-muted: #6b7280;
+  --heading-dark: #0F172A;
+  --bg-glass-heavy: rgba(255, 255, 255, 0.85);
+  --bg-grad-start: #FFF1F2;
+  --bg-grad-end: #F8FAFC;
+  --bg-glass-medium: rgba(255, 255, 255, 0.65);
+  --text-muted: #64748B;
 }
 
 
