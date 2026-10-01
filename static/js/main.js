@@ -1052,15 +1052,35 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll(".multi-role-form").forEach(form => {
       form.addEventListener("submit", (e) => {
         e.preventDefault();
-        // Hide forms
-        formIndividual.style.display = "none";
-        formOrganization.style.display = "none";
-        document.querySelector(".role-switcher").style.display = "none";
-        
-        // Show success message
-        const successMsg = document.getElementById("registration-success-msg");
-        if (successMsg) {
-          successMsg.style.display = "block";
+
+        // Require real-time location before successful registration
+        if (navigator.geolocation) {
+          const submitBtn = form.querySelector('button[type="submit"]');
+          const originalBtnText = submitBtn.innerHTML;
+          submitBtn.innerHTML = "Getting Location...";
+          submitBtn.disabled = true;
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              // Hide forms on success
+              formIndividual.style.display = "none";
+              formOrganization.style.display = "none";
+              document.querySelector(".role-switcher").style.display = "none";
+              
+              // Show success message
+              const successMsg = document.getElementById("registration-success-msg");
+              if (successMsg) {
+                successMsg.style.display = "block";
+              }
+            },
+            (error) => {
+              alert("Real-time location is required to register. Please allow location access in your browser.");
+              submitBtn.innerHTML = originalBtnText;
+              submitBtn.disabled = false;
+            }
+          );
+        } else {
+          alert("Geolocation is not supported by this browser.");
         }
       });
     });
