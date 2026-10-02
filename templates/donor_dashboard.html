@@ -330,7 +330,137 @@
       <section class="dashboard-content-section" id="section-request-details"></section>
 
       <!-- ================= SECTION 7: IN-APP CHAT ================= -->
-      <section class="dashboard-content-section" id="section-chat"></section>
+      <section class="dashboard-content-section" id="section-chat">
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 20px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">💬</span>
+              <div>
+                <h2>Donor In-App Chat & Live Communication</h2>
+                <div class="card-subtitle">Direct, secure coordination between registered donors, hospital blood banks, and verified emergency seekers.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="nav-pill-badge pill-green">
+                <span class="pulse-dot"></span> Real-Time Messaging Active
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Module Main Grid (Threads Sidebar + Active Chat Pane) -->
+        <div class="chat-module-shell">
+          <!-- Left: Conversation Threads List -->
+          <aside class="chat-threads-sidebar" aria-label="Chat Conversations">
+            <div class="chat-search-header">
+              <input type="text" id="chatSearchInput" class="chat-search-input" placeholder="🔍 Search conversations..." aria-label="Search chats">
+            </div>
+
+            <div class="chat-threads-list" id="chatThreadsList">
+              <!-- Thread 1 (Default Active) -->
+              <div class="chat-thread-item active" data-thread-id="thread-square" data-name="Square Hospital - Blood Desk" data-avatar="🏥" data-status="● Online · Request #REQ-001 (A+ Emergency)" data-phone="+8801700000001">
+                <div class="thread-avatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Square Hospital - Blood Desk</span>
+                    <span class="thread-time">10:14 AM</span>
+                  </div>
+                  <div class="thread-preview-snippet">Please report to 2nd Floor, Blood Bank...</div>
+                </div>
+              </div>
+
+              <!-- Thread 2 -->
+              <div class="chat-thread-item" data-thread-id="thread-dmc" data-name="Dhaka Medical College Desk" data-avatar="🏛️" data-status="● Active Coordinator · Donation Rest Gap" data-phone="+8801700000002">
+                <div class="thread-avatar" style="background: rgba(59, 130, 246, 0.15); color: var(--secondary-blue);">🏛️</div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Dhaka Medical Desk</span>
+                    <span class="thread-time">Yesterday</span>
+                  </div>
+                  <div class="thread-preview-snippet">Your donor certificate is ready to download.</div>
+                </div>
+              </div>
+
+              <!-- Thread 3 -->
+              <div class="chat-thread-item" data-thread-id="thread-nabil" data-name="Nabil Hasan (Emergency Seeker)" data-avatar="👨" data-status="● Matched Recipient Guardian" data-phone="+8801723456789">
+                <div class="thread-avatar" style="background: rgba(16, 185, 129, 0.15); color: var(--success-green);">👨</div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Nabil Hasan (Seeker)</span>
+                    <span class="thread-time">2d ago</span>
+                  </div>
+                  <div class="thread-preview-snippet">Thank you sister Ayesha! Patient is stable now.</div>
+                </div>
+              </div>
+
+              <!-- Thread 4 -->
+              <div class="chat-thread-item" data-thread-id="thread-support" data-name="SBDS Volunteer Support Desk" data-avatar="🛡️" data-status="● 24/7 Platform Assistance" data-phone="+8801700000000">
+                <div class="thread-avatar" style="background: rgba(245, 158, 11, 0.15); color: var(--warning-amber);">🛡️</div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">SBDS Support Desk</span>
+                    <span class="thread-time">18 Jan</span>
+                  </div>
+                  <div class="thread-preview-snippet">Gold Tier donor badge has been credited.</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Right: Active Chat Conversation Pane -->
+          <section class="chat-window-pane" aria-label="Active Conversation">
+            <!-- Chat Pane Header -->
+            <div class="chat-pane-header">
+              <div class="chat-header-user">
+                <div class="thread-avatar" id="activeChatAvatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                <div>
+                  <strong id="currentChatUserTitle" style="font-size: 0.95rem; color: var(--text-primary); display: block;">Square Hospital - Blood Desk</strong>
+                  <div id="currentChatUserSub" style="font-size: 0.78rem; color: var(--success-green); display: flex; align-items: center; gap: 5px;">
+                    <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--success-green);"></span>
+                    <span>Online · Request #REQ-001 (A+ Emergency)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <a href="tel:+8801700000001" id="chatCallBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem; text-decoration: none;">
+                  📞 Call Desk
+                </a>
+              </div>
+            </div>
+
+            <!-- Messages Stream Area -->
+            <div class="chat-messages-container" id="chatMessages">
+              <div style="text-align: center; font-size: 0.74rem; color: var(--text-muted); margin: 4px 0 10px;">
+                Today · Encrypted Emergency Donation Channel
+              </div>
+
+              <div class="chat-bubble bubble-received">
+                <div>Hello Ayesha, we saw you accepted the urgent A+ requirement at Square Hospital (Panthapath, Dhaka).</div>
+                <div class="chat-bubble-time">10:08 AM · Coordinator</div>
+              </div>
+
+              <div class="chat-bubble bubble-sent">
+                <div>Yes, I am available and preparing to come. Is the patient at Cabin 402 or the Blood Bank unit?</div>
+                <div class="chat-bubble-time">10:10 AM · You</div>
+              </div>
+
+              <div class="chat-bubble bubble-received">
+                <div>Please report directly to 2nd Floor, Blood Transfusion Dept. Coordinator Dr. Farhan is on duty and waiting.</div>
+                <div class="chat-bubble-time">10:12 AM · Coordinator</div>
+              </div>
+            </div>
+
+            <!-- Bottom Chat Input Bar -->
+            <form class="chat-input-bar" id="chatSendForm" onsubmit="event.preventDefault(); window.sendChatMessage();">
+              <input type="text" id="chatInput" class="chat-input-box" placeholder="Type a message to coordinator... (Press Enter to send)" autocomplete="off">
+              <button type="submit" id="sendChatBtn" class="btn-donor-primary" style="border-radius: 24px; padding: 8px 20px; font-weight: 600;">
+                Send
+              </button>
+            </form>
+          </section>
+        </div>
+      </section>
 
       <!-- ================= SECTION 8: REVIEWS ================= -->
       <section class="dashboard-content-section" id="section-reviews"></section>
