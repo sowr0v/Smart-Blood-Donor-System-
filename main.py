@@ -918,4 +918,237 @@ async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest
         "action": payload.action,
         "eta": payload.eta,
         "message": f"Blood request {request_id} {payload.action}ed successfully.",
-    }
+    }
+
+
+class DonorSettingsPreferences(BaseModel):
+    sms_alerts: bool = True
+    inapp_notifications: bool = True
+    gap_reminders: bool = True
+    quiet_hours: bool = False
+    radius_km: int = 15
+    donation_types: list[str] = ["Whole Blood"]
+    preferred_zones: list[str] = ["Dhanmondi / Panthapath"]
+    phone_visibility: str = "hospital_only"
+    public_directory: bool = True
+    show_badges: bool = True
+    two_factor_auth: bool = True
+
+
+@app.post("/api/v1/donor/settings")
+async def update_donor_settings(payload: DonorSettingsPreferences, request: Request):
+    return {
+        "status": "success",
+        "message": "Donor preferences and portal settings updated successfully.",
+        "settings": payload.model_dump(),
+    }
+
+
+# ======================================================================
+# SBDS-89: Donor In-App Chat List Data Models & API Endpoints
+# ======================================================================
+
+DONOR_CHAT_THREADS = [
+    {
+        "id": "thread-square",
+        "name": "Square Hospital - Blood Desk",
+        "category": "hospital",
+        "avatar": "🏥",
+        "avatar_bg": "rgba(225, 29, 72, 0.15)",
+        "avatar_color": "#E11D48",
+        "status": "● Online · Request #REQ-001 (A+ Emergency)",
+        "is_online": True,
+        "phone": "+8801700000001",
+        "request_id": "REQ-001",
+        "blood_group": "A+",
+        "urgency": "Immediate",
+        "patient_name": "Rafiqul Islam (Cabin 402)",
+        "last_message": "Please report to 2nd Floor, Blood Transfusion Dept.",
+        "last_time": "10:14 AM",
+        "unread_count": 1,
+        "is_emergency": True,
+    },
+    {
+        "id": "thread-dmc",
+        "name": "Dhaka Medical College Desk",
+        "category": "hospital",
+        "avatar": "🏛️",
+        "avatar_bg": "rgba(59, 130, 246, 0.15)",
+        "avatar_color": "#3B82F6",
+        "status": "● Active Coordinator · Rest Gap Completed",
+        "is_online": True,
+        "phone": "+8801700000002",
+        "request_id": "REQ-003",
+        "blood_group": "A+",
+        "urgency": "Scheduled",
+        "patient_name": "Donor Verification Unit",
+        "last_message": "You completed your 56-day gap and are officially eligible right now!",
+        "last_time": "Yesterday",
+        "unread_count": 0,
+        "is_emergency": False,
+    },
+    {
+        "id": "thread-nabil",
+        "name": "Nabil Hasan (Emergency Seeker)",
+        "category": "seeker",
+        "avatar": "👨",
+        "avatar_bg": "rgba(16, 185, 129, 0.15)",
+        "avatar_color": "#10B981",
+        "status": "● Matched Recipient Guardian",
+        "is_online": False,
+        "phone": "+8801723456789",
+        "request_id": "REQ-004",
+        "blood_group": "A+",
+        "urgency": "Resolved",
+        "patient_name": "Begum Rokeya (Discharged)",
+        "last_message": "Thank you sister Ayesha! Patient is stable now.",
+        "last_time": "2d ago",
+        "unread_count": 1,
+        "is_emergency": False,
+    },
+    {
+        "id": "thread-support",
+        "name": "SBDS Volunteer Support Desk",
+        "category": "support",
+        "avatar": "🛡️",
+        "avatar_bg": "rgba(245, 158, 11, 0.15)",
+        "avatar_color": "#F59E0B",
+        "status": "● 24/7 Platform Assistance",
+        "is_online": True,
+        "phone": "+8801700000000",
+        "request_id": "",
+        "blood_group": "",
+        "urgency": "Standard",
+        "patient_name": "System Help & Gold Tier Badge",
+        "last_message": "Gold Tier donor badge has been credited.",
+        "last_time": "18 Jan",
+        "unread_count": 0,
+        "is_emergency": False,
+    },
+]
+
+DONOR_CHAT_MESSAGES = {
+    "thread-square": [
+        {"id": "msg-1", "sender": "coordinator", "text": "Hello Ayesha, we saw you accepted the urgent A+ requirement at Square Hospital (Panthapath, Dhaka).", "time": "10:08 AM", "status": "read"},
+        {"id": "msg-2", "sender": "you", "text": "Yes, I am available and preparing to come. Is the patient at Cabin 402 or the Blood Bank unit?", "time": "10:10 AM", "status": "read"},
+        {"id": "msg-3", "sender": "coordinator", "text": "Please report directly to 2nd Floor, Blood Transfusion Dept. Coordinator Dr. Farhan is on duty and waiting.", "time": "10:12 AM", "status": "read"},
+    ],
+    "thread-dmc": [
+        {"id": "msg-4", "sender": "coordinator", "text": "Warm greetings from Dhaka Medical College Blood Bank.", "time": "Yesterday 3:15 PM", "status": "read"},
+        {"id": "msg-5", "sender": "coordinator", "text": "Your whole blood donation certificate from Jan 14 has been verified and registered on your national donor card.", "time": "Yesterday 3:16 PM", "status": "read"},
+        {"id": "msg-6", "sender": "you", "text": "Thank you! When will I be eligible to donate whole blood again?", "time": "Yesterday 3:45 PM", "status": "read"},
+        {"id": "msg-7", "sender": "coordinator", "text": "You completed your 56-day gap and are officially eligible right now!", "time": "Yesterday 4:00 PM", "status": "read"},
+    ],
+    "thread-nabil": [
+        {"id": "msg-8", "sender": "coordinator", "text": "Assalamu Alaikum Ayesha apu, I am Nabil. You donated blood for my mother last month.", "time": "2 days ago", "status": "read"},
+        {"id": "msg-9", "sender": "coordinator", "text": "I just wanted to let you know she was discharged today and is healthy. We cannot thank you enough for saving her life.", "time": "2 days ago", "status": "read"},
+        {"id": "msg-10", "sender": "you", "text": "Alhamdulillah, so relieved to hear this news! Praying for her continued strength and health.", "time": "2 days ago", "status": "read"},
+    ],
+    "thread-support": [
+        {"id": "msg-11", "sender": "coordinator", "text": "Welcome to the Smart Blood Donor System Donor Support channel.", "time": "18 Jan", "status": "read"},
+        {"id": "msg-12", "sender": "coordinator", "text": "Congratulations on reaching your 8th verified donation! Your account has been upgraded to Gold Tier.", "time": "18 Jan", "status": "read"},
+        {"id": "msg-13", "sender": "you", "text": "Thank you SBDS team! Appreciate the fast verification.", "time": "18 Jan", "status": "read"},
+    ],
+}
+
+
+class SendChatMessagePayload(BaseModel):
+    text: str
+    sender: str = "you"
+
+
+@app.get("/api/v1/donor/chat/threads")
+async def get_donor_chat_threads(category: str | None = None, unread_only: bool = False):
+    threads = DONOR_CHAT_THREADS
+    if category and category.lower() != "all":
+        threads = [t for t in threads if t["category"].lower() == category.lower()]
+    if unread_only:
+        threads = [t for t in threads if t["unread_count"] > 0]
+    total_unread = sum(t["unread_count"] for t in DONOR_CHAT_THREADS)
+    return {
+        "status": "success",
+        "threads": threads,
+        "total_unread": total_unread,
+        "count": len(threads),
+    }
+
+
+@app.get("/api/v1/donor/chat/{thread_id}/messages")
+async def get_donor_chat_messages(thread_id: str):
+    messages = DONOR_CHAT_MESSAGES.get(thread_id, [])
+    thread_meta = next((t for t in DONOR_CHAT_THREADS if t["id"] == thread_id), None)
+    return {
+        "status": "success",
+        "thread_id": thread_id,
+        "thread": thread_meta,
+        "messages": messages,
+    }
+
+
+@app.post("/api/v1/donor/chat/{thread_id}/send")
+async def send_donor_chat_message(thread_id: str, payload: SendChatMessagePayload):
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    now_str = datetime.now(timezone.utc).strftime("%I:%M %p")
+    new_msg = {
+        "id": f"msg-{secrets.token_hex(4)}",
+        "sender": payload.sender,
+        "text": text,
+        "time": now_str,
+        "status": "sent",
+    }
+    if thread_id not in DONOR_CHAT_MESSAGES:
+        DONOR_CHAT_MESSAGES[thread_id] = []
+    DONOR_CHAT_MESSAGES[thread_id].append(new_msg)
+
+    # Update thread last message
+    for thread in DONOR_CHAT_THREADS:
+        if thread["id"] == thread_id:
+            thread["last_message"] = text
+            thread["last_time"] = "Just now"
+            break
+
+    # Automated coordinator reply based on context
+    replies_map = {
+        "thread-square": "Coordinator Dr. Farhan (Square Hospital): \"Received your update! Attendants are waiting at Transfusion Desk, 2nd floor.\"",
+        "thread-dmc": "Desk Officer (DMCH): \"Thank you Ayesha! Your record has been flagged for prioritized scheduling.\"",
+        "thread-nabil": "Nabil (Seeker): \"Thank you so much Ayesha apu, truly indebted to donors like you!\"",
+        "thread-support": "SBDS Support: \"Your message has been logged. A support coordinator will assist you shortly if needed.\"",
+    }
+    auto_reply_text = replies_map.get(
+        thread_id,
+        "Coordinator: \"Message received! Our on-duty blood bank supervisor has been notified.\"",
+    )
+    reply_msg = {
+        "id": f"msg-{secrets.token_hex(4)}",
+        "sender": "coordinator",
+        "text": auto_reply_text,
+        "time": now_str,
+        "status": "delivered",
+    }
+    DONOR_CHAT_MESSAGES[thread_id].append(reply_msg)
+
+    return {
+        "status": "success",
+        "sent": new_msg,
+        "reply": reply_msg,
+    }
+
+
+@app.post("/api/v1/donor/chat/{thread_id}/read")
+async def mark_donor_chat_read(thread_id: str):
+    for thread in DONOR_CHAT_THREADS:
+        if thread["id"] == thread_id:
+            thread["unread_count"] = 0
+            break
+    total_unread = sum(t["unread_count"] for t in DONOR_CHAT_THREADS)
+    return {
+        "status": "success",
+        "thread_id": thread_id,
+        "unread_count": 0,
+        "total_unread": total_unread,
+    }
+
+
