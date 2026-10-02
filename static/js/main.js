@@ -37,6 +37,30 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================================================
+  // AUTH STATE SYNCHRONIZATION (Keep logged in across all pages)
+  // =========================================================
+  fetch("/api/v1/auth/status")
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data && data.is_authenticated) {
+        const dashUrl = data.dashboard_url || "/donor/dashboard";
+        document.querySelectorAll(".nav-auth-actions").forEach((el) => {
+          el.innerHTML = `
+            <a href="${dashUrl}" class="btn btn-outline">Dashboard</a>
+            <a href="/logout" class="btn btn-primary">Logout</a>
+          `;
+        });
+        document.querySelectorAll(".mobile-auth-actions").forEach((el) => {
+          el.innerHTML = `
+            <a href="${dashUrl}" class="btn btn-outline btn-full">Dashboard</a>
+            <a href="/logout" class="btn btn-primary btn-full">Logout</a>
+          `;
+        });
+      }
+    })
+    .catch(() => {});
+
+  // =========================================================
   // BLOOD REQUEST FEED
   // =========================================================
 
