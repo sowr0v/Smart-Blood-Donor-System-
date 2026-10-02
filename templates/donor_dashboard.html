@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Donor Personal Dashboard - Smart Blood Donor System" }}</title>
+  <meta name="description" content="Personal portal for registered blood donors to manage availability, matched requests, donation history, and direct communication.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/donor_dashboard.css">
+</head>
+<body>
+  <!-- Global Top Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <button class="theme-toggle-btn" aria-label="Toggle Dark Mode"></button>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Drawer for global nav -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+      <div class="mobile-auth-actions">
+        <a href="/logout" class="btn btn-outline btn-full">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Donor App Shell -->
+  <div class="donor-dashboard-wrapper">
+    <!-- LEFT SIDEBAR -->
+    <aside class="donor-sidebar" id="donorSidebar" aria-label="Donor Dashboard Sidebar">
+      <!-- Donor Profile Quick Widget -->
+      <div class="donor-profile-card-mini">
+        <div class="donor-avatar-wrap">
+          <div class="donor-avatar-circle">
+            {{ user.name[0] if user and user.name else "A" }}
+          </div>
+          <span class="donor-blood-badge">A+</span>
+        </div>
+        <div class="donor-meta-info">
+          <div class="donor-name-text">
+            <span>{{ user.name if user and user.name else "Ayesha Rahman" }}</span>
+            <svg class="verified-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div class="donor-badge-sub">
+            <span>Verified Donor</span> · <span>Gold Tier</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="donor-sidebar-nav">
+        <div class="sidebar-section-title">Overview</div>
+
+        <!-- 0. Donor Personal Dashboard -->
+        <button type="button" class="donor-nav-item active" data-target="section-personal-dashboard" id="nav-item-dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="nav-item-title">Personal Dashboard</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Donor Operations</div>
+
+        <!-- 1. Donor Availability -->
+        <button type="button" class="donor-nav-item" data-target="section-availability" id="nav-item-availability">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+          <span class="nav-item-title">Donor Availability</span>
+        </button>
+
+        <!-- 2. Donor Profile & Medical Info Management -->
+        <button type="button" class="donor-nav-item" data-target="section-profile" id="nav-item-profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span class="nav-item-title">Donor Profile & Medical Info</span>
+        </button>
+
+        <!-- 3. Donation History -->
+        <button type="button" class="donor-nav-item" data-target="section-history" id="nav-item-history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span class="nav-item-title">Donation History</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Matching & Actions</div>
+
+        <!-- 4. Matched Blood Requests Feed & Filter -->
+        <button type="button" class="donor-nav-item" data-target="section-matched-requests" id="nav-item-matched">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          <span class="nav-item-title">Matched Blood Requests</span>
+        </button>
+
+        <!-- 5. Accept & Decline Blood Request Flow -->
+        <button type="button" class="donor-nav-item" data-target="section-request-flow" id="nav-item-flow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <polyline points="16 11 18 13 22 9"/>
+          </svg>
+          <span class="nav-item-title">Accept & Decline Flow</span>
+        </button>
+
+        <!-- 6. Blood Request Detailed View & Directions -->
+        <button type="button" class="donor-nav-item" data-target="section-request-details" id="nav-item-details">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span class="nav-item-title">Request Details & Directions</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Communication & Community</div>
+
+        <!-- 7. Donor In-App Chat List -->
+        <button type="button" class="donor-nav-item" data-target="section-chat" id="nav-item-chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="nav-item-title">Donor In-App Chat</span>
+          <span class="nav-badge-count" id="sidebarChatBadge">2</span>
+        </button>
+
+        <!-- 8. Donor Reviews -->
+        <button type="button" class="donor-nav-item" data-target="section-reviews" id="nav-item-reviews">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span class="nav-item-title">Donor Reviews</span>
+        </button>
+
+        <!-- 9. Donor Portal Settings & Preferences -->
+        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="nav-item-title">Settings & Preferences</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Emergency Assistance Card -->
+      <div class="sidebar-help-card">
+        <div class="help-card-title">
+          <span>🆘</span>
+          <span>Emergency Assistance</span>
+        </div>
+        <p class="help-card-desc">Need urgent assistance or have questions during donation transit?</p>
+        <a href="tel:+8801700000000" class="help-card-hotline">📞 +880 1700-000000</a>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN VIEWPORT -->
+    <main class="donor-main-viewport">
+      <!-- Mobile Sidebar Toggle -->
+      <button type="button" class="mobile-sidebar-toggle-btn" id="mobileSidebarToggle" aria-label="Open Donor Navigation Menu">
+        <span>☰</span>
+        <span>Dashboard Menu</span>
+      </button>
+
+      <!-- ================= SECTION 0: DONOR PERSONAL DASHBOARD (ACTIVE) ================= -->
+      <section class="dashboard-content-section active-section" id="section-personal-dashboard">
+        <!-- Welcome Banner -->
+        <div class="donor-banner-header">
+          <div class="banner-welcome-text">
+            <h1>Welcome back, {{ user.name if user and user.name else "Ayesha" }}! 👋</h1>
+            <p>Your blood group <strong>A+</strong> can help <strong>A+ and AB+</strong> patients in Dhaka today.</p>
+          </div>
+
+          <div class="banner-controls-group">
+            <span class="nav-pill-badge pill-green" style="padding: 6px 14px; font-size: 0.88rem; font-weight: 700;">
+              ● Account Verified
+            </span>
+          </div>
+        </div>
+
+        <!-- Quick Metrics Summary Bar (4 Cards) -->
+        <div class="metrics-grid-4">
+          <!-- Metric 1: Blood Group -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-red">
+              <span style="font-weight: 800; font-size: 1.1rem;">A+</span>
+            </div>
+            <div>
+              <div class="metric-value-text">Blood A+</div>
+              <div class="metric-title-text">Verified Lab Tested</div>
+            </div>
+          </article>
+
+          <!-- Metric 2: Lives Saved -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-green">
+              <span>❤️</span>
+            </div>
+            <div>
+              <div class="metric-value-text">24 Lives</div>
+              <div class="metric-title-text">Saved Across 8 Donations</div>
+            </div>
+          </article>
+
+          <!-- Metric 3: Next Eligibility -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-blue">
+              <span>✅</span>
+            </div>
+            <div>
+              <div class="metric-value-text">Eligible</div>
+              <div class="metric-title-text">Ready for Whole Blood</div>
+            </div>
+          </article>
+
+          <!-- Metric 4: Community Rating -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-amber">
+              <span>⭐</span>
+            </div>
+            <div>
+              <div class="metric-value-text">4.9 / 5.0</div>
+              <div class="metric-title-text">18 Recipient Reviews</div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Personal Dashboard Overview Details Card -->
+        <div class="donor-card" style="margin-top: 24px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.4rem;">📊</span>
+              <div>
+                <h2>Donor Personal Dashboard Overview</h2>
+                <div class="card-subtitle">Summary of your personal donor account standing and quick information</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">👤 Donor Profile Summary</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                <strong>Name:</strong> {{ user.name if user and user.name else "Ayesha Rahman" }}<br>
+                <strong>Phone:</strong> {{ user.phone if user and user.phone else "+880 1712345678" }}<br>
+                <strong>Location:</strong> Dhanmondi, Dhaka<br>
+                <strong>Tier:</strong> Gold Tier Donor
+              </p>
+            </div>
+
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">🩺 Health & Eligibility</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">Active & Ready</span><br>
+                <strong>Rest Window:</strong> 56-day gap completed<br>
+                <strong>Hemoglobin:</strong> Normal (13.5 g/dL)<br>
+                <strong>Last Donation:</strong> 14 Jan 2026
+              </p>
+            </div>
+
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">📋 Quick Actions</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                Select options from the left sidebar to manage availability, requests, and profile settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
+      <section class="dashboard-content-section" id="section-availability"></section>
+
+      <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
+      <section class="dashboard-content-section" id="section-profile">
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 24px;">
+          <div class="card-header-flex" style="margin-bottom: 18px;">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🩺</span>
+              <div>
+                <h2>Donor Profile & Medical Information</h2>
+                <div class="card-subtitle">Review and update your personal, location, and medical details used for safe donor matching.</div>
+              </div>
+            </div>
+            <span class="nav-pill-badge pill-red">Blood Group: {{ profile.blood_group if profile and profile.blood_group else 'A+' }}</span>
+          </div>
+
+          <div class="profile-overview-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            <div class="detail-pill">
+              <span class="detail-label">Current status</span>
+              <strong>{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong>
+            </div>
+            <div class="detail-pill">
+              <span class="detail-label">Last donation</span>
+              <strong>{{ profile.last_donation if profile and profile.last_donation else '2026-01-14' }}</strong>
+            </div>
+            <div class="detail-pill">
+              <span class="detail-label">Location</span>
+              <strong>{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong>
+            </div>
+          </div>
+
+          <form id="donorProfileForm" class="donor-profile-form">
+            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+              <label class="field-block">
+                <span>Full name</span>
+                <input type="text" name="name" value="{{ profile.name if profile and profile.name else 'Ayesha Rahman' }}" required>
+              </label>
+
+              <label class="field-block">
+                <span>Phone number</span>
+                <input type="tel" name="phone" value="{{ profile.phone if profile and profile.phone else user.phone if user and user.phone else '+8801712345678' }}" required>
+              </label>
+
+              <label class="field-block">
+                <span>Email address</span>
+                <input type="email" name="email" value="{{ profile.email if profile and profile.email else 'ayesha.rahman@gmail.com' }}">
+              </label>
+
+              <label class="field-block">
+                <span>Gender</span>
+                <select name="gender">
+                  <option value="Female" {% if profile and profile.gender == 'Female' %}selected{% endif %}>Female</option>
+                  <option value="Male" {% if profile and profile.gender == 'Male' %}selected{% endif %}>Male</option>
+                  <option value="Other" {% if profile and profile.gender == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+              </label>
+
+              <label class="field-block">
+                <span>Blood group</span>
+                <select name="blood_group" required>
+                  {% set groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+                  {% for group in groups %}
+                    <option value="{{ group }}" {% if profile and profile.blood_group == group %}selected{% endif %}>{{ group }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+
+              <label class="field-block">
+                <span>Date of birth</span>
+                <input type="date" name="date_of_birth" value="{{ profile.date_of_birth if profile and profile.date_of_birth else '1992-02-14' }}">
+              </label>
+
+              <label class="field-block">
+                <span>District</span>
+                <input type="text" name="district" value="{{ profile.district if profile and profile.district else 'Dhaka' }}" required>
+              </label>
+
+              <label class="field-block">
+                <span>Area</span>
+                <input type="text" name="area" value="{{ profile.area if profile and profile.area else 'Dhanmondi' }}" required>
+              </label>
+
+              <label class="field-block" style="grid-column: 1 / -1;">
+                <span>Address</span>
+                <input type="text" name="address" value="{{ profile.address if profile and profile.address else 'House 18, Road 7, Dhanmondi, Dhaka' }}" required>
+              </label>
+
+              <label class="field-block">
+                <span>Last donation date</span>
+                <input type="date" name="last_donation" value="{{ profile.last_donation if profile and profile.last_donation else '2026-01-14' }}">
+              </label>
+
+              <label class="field-block">
+                <span>Fitness status</span>
+                <select name="fitness_status">
+                  <option value="Eligible" {% if profile and profile.fitness_status == 'Eligible' %}selected{% endif %}>Eligible</option>
+                  <option value="Temporary Hold" {% if profile and profile.fitness_status == 'Temporary Hold' %}selected{% endif %}>Temporary Hold</option>
+                  <option value="Deferred" {% if profile and profile.fitness_status == 'Deferred' %}selected{% endif %}>Deferred</option>
+                </select>
+              </label>
+
+              <label class="field-block">
+                <span>Preferred donation type</span>
+                <select name="preferred_donation_types">
+                  <option value="Whole Blood" {% if profile and profile.preferred_donation_types == 'Whole Blood' %}selected{% endif %}>Whole Blood</option>
+                  <option value="Platelets" {% if profile and profile.preferred_donation_types == 'Platelets' %}selected{% endif %}>Platelets</option>
+                  <option value="Plasma" {% if profile and profile.preferred_donation_types == 'Plasma' %}selected{% endif %}>Plasma</option>
+                </select>
+              </label>
+
+              <label class="field-block" style="grid-column: 1 / -1;">
+                <span>Medical conditions</span>
+                <textarea name="medical_conditions" rows="3" placeholder="Note any relevant medical conditions">{{ profile.medical_conditions if profile and profile.medical_conditions else 'No major medical issues' }}</textarea>
+              </label>
+
+              <label class="field-block" style="grid-column: 1 / -1;">
+                <span>Medications</span>
+                <textarea name="medications" rows="2" placeholder="List current medications or none">{{ profile.medications if profile and profile.medications else 'None' }}</textarea>
+              </label>
+
+              <label class="field-block" style="grid-column: 1 / -1;">
+                <span>Allergies</span>
+                <textarea name="allergies" rows="2" placeholder="Document allergies if any">{{ profile.allergies if profile and profile.allergies else 'Penicillin' }}</textarea>
+              </label>
+            </div>
+
+            <div class="profile-form-actions" style="display:flex; justify-content:flex-end; gap:12px; margin-top: 20px; flex-wrap: wrap;">
+              <div id="profileFormMessage" class="status-message" aria-live="polite" style="margin-right:auto; min-height:24px;"></div>
+              <button type="reset" class="secondary-button">Reset</button>
+              <button type="submit" id="profileSaveBtn" class="primary-button">Save profile</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 3: DONATION HISTORY ================= -->
+      <section class="dashboard-content-section" id="section-history"></section>
+
+      <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
+      <section class="dashboard-content-section" id="section-matched-requests"></section>
+
+      <!-- ================= SECTION 5: ACCEPT & DECLINE FLOW ================= -->
+      <section class="dashboard-content-section" id="section-request-flow"></section>
+
+      <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
+      <section class="dashboard-content-section" id="section-request-details"></section>
+
+      <!-- ================= SECTION 7: IN-APP CHAT ================= -->
+      <section class="dashboard-content-section" id="section-chat">
+        <!-- Chat Overview Header Card -->
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 20px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">💬</span>
+              <div>
+                <h2>Donor In-App Chat & Live Communication</h2>
+                <div class="card-subtitle">Direct, secure coordination between registered donors, hospital blood banks, and verified emergency seekers.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span class="nav-pill-badge pill-green">
+                <span class="pulse-dot"></span> Real-Time Messaging Active
+              </span>
+              <span class="nav-pill-badge pill-red" id="headerUnreadBadge">
+                <span style="font-weight: 700;">2</span> Unread
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Module Main Grid (Threads Sidebar + Active Chat Pane) -->
+        <div class="chat-module-shell">
+          <!-- Left: Conversation Threads List -->
+          <aside class="chat-threads-sidebar" aria-label="Chat Conversations">
+            <!-- Search & Filters -->
+            <div class="chat-search-header">
+              <div class="chat-search-wrapper">
+                <input type="text" id="chatSearchInput" class="chat-search-input" placeholder="🔍 Search conversations..." aria-label="Search chats">
+                <button type="button" id="clearChatSearch" class="chat-search-clear-btn" title="Clear search" style="display: none;">&times;</button>
+              </div>
+
+              <!-- Category Filter Tabs -->
+              <div class="chat-category-tabs" id="chatCategoryTabs">
+                <button type="button" class="chat-tab-pill active" data-filter="all">All (<span id="countAll">4</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="hospital">🏥 Hospitals (<span id="countHospital">2</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="seeker">👨 Seekers (<span id="countSeeker">1</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="support">🛡️ Support (<span id="countSupport">1</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="unread">🔴 Unread (<span id="countUnread">2</span>)</button>
+              </div>
+            </div>
+
+            <div class="chat-threads-list" id="chatThreadsList">
+              <!-- Thread 1 (Default Active) -->
+              <div class="chat-thread-item active" data-thread-id="thread-square" data-category="hospital" data-name="Square Hospital - Blood Desk" data-avatar="🏥" data-status="● Online · Request #REQ-001 (A+ Emergency)" data-phone="+8801700000001" data-request="REQ-001" data-patient="Rafiqul Islam (Cabin 402)" data-hospital="Square Hospital, Panthapath" data-blood="A+ Whole Blood">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Square Hospital - Blood Desk</span>
+                    <span class="thread-time">10:14 AM</span>
+                  </div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-emergency">🚨 A+ Emergency</span>
+                    <span class="thread-badge badge-hospital">Verified Hospital</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Please report to 2nd Floor, Blood Bank...</span>
+                    <span class="chat-unread-count" id="unread-thread-square">1</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thread 2 -->
+              <div class="chat-thread-item" data-thread-id="thread-dmc" data-category="hospital" data-name="Dhaka Medical College Desk" data-avatar="🏛️" data-status="● Active Coordinator · Donation Rest Gap" data-phone="+8801700000002" data-request="REQ-003" data-patient="Donor Verification Unit" data-hospital="Dhaka Medical College Hospital" data-blood="A+">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(59, 130, 246, 0.15); color: var(--secondary-blue);">🏛️</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Dhaka Medical Desk</span>
+                    <span class="thread-time">Yesterday</span>
+                  </div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-verified">Verified Hospital</span>
+                    <span class="thread-badge badge-info">Certificate Ready</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Your donor certificate is ready to download.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thread 3 -->
+              <div class="chat-thread-item" data-thread-id="thread-nabil" data-category="seeker" data-name="Nabil Hasan (Emergency Seeker)" data-avatar="👨" data-status="● Matched Recipient Guardian" data-phone="+8801723456789" data-request="REQ-004" data-patient="Begum Rokeya (Discharged)" data-hospital="National Heart Institute" data-blood="A+">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(16, 185, 129, 0.15); color: var(--success-green);">👨</div>
+                </div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">Nabil Hasan (Seeker)</span>
+                    <span class="thread-time">2d ago</span>
+                  </div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-seeker">Patient Relative</span>
+                    <span class="thread-badge badge-resolved">Match Completed</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Thank you sister Ayesha! Patient is stable now.</span>
+                    <span class="chat-unread-count" id="unread-thread-nabil">1</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thread 4 -->
+              <div class="chat-thread-item" data-thread-id="thread-support" data-category="support" data-name="SBDS Volunteer Support Desk" data-avatar="🛡️" data-status="● 24/7 Platform Assistance" data-phone="+8801700000000" data-request="" data-patient="Account Support" data-hospital="SBDS Central HQ" data-blood="">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(245, 158, 11, 0.15); color: var(--warning-amber);">🛡️</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
+                <div class="thread-content-wrap">
+                  <div class="thread-title-line">
+                    <span class="thread-name">SBDS Support Desk</span>
+                    <span class="thread-time">18 Jan</span>
+                  </div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-support">Platform Official</span>
+                    <span class="thread-badge badge-gold">Gold Tier</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Gold Tier donor badge has been credited.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty search results notice -->
+              <div id="noThreadsNotice" class="no-threads-notice" style="display: none;">
+                <span>🔍 No conversation found matching your search.</span>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Right: Active Chat Conversation Pane -->
+          <section class="chat-window-pane" aria-label="Active Conversation">
+            <!-- Chat Pane Header -->
+            <div class="chat-pane-header">
+              <div class="chat-header-user">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" id="activeChatAvatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                  <span class="avatar-online-dot" id="activeChatOnlineDot"></span>
+                </div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <strong id="currentChatUserTitle" style="font-size: 0.96rem; color: var(--text-primary); display: block;">Square Hospital - Blood Desk</strong>
+                    <span class="badge-role-tag" id="currentChatRoleTag">Hospital</span>
+                  </div>
+                  <div id="currentChatUserSub" style="font-size: 0.78rem; color: var(--success-green); display: flex; align-items: center; gap: 5px;">
+                    <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--success-green);"></span>
+                    <span>Online · Request #REQ-001 (A+ Emergency)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <a href="tel:+8801700000001" id="chatCallBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem; text-decoration: none;">
+                  📞 Call Desk
+                </a>
+                <button type="button" id="chatLocationBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem;">
+                  📍 Hospital Location
+                </button>
+                <button type="button" id="chatClearBtn" class="btn-donor-outline" style="padding: 6px 10px; font-size: 0.8rem;" title="Clear conversation history">
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            <!-- Linked Emergency Blood Request Banner -->
+            <div class="chat-request-banner" id="chatRequestBanner">
+              <div class="banner-icon">🩸</div>
+              <div class="banner-text">
+                <strong>Linked Match: <span id="bannerReqId">#REQ-001</span></strong> · Patient: <span id="bannerPatient">Rafiqul Islam (Cabin 402)</span> · Location: <span id="bannerHospital">Square Hospital, Panthapath</span> · Group: <span id="bannerBlood" style="color: var(--primary-red); font-weight: 700;">A+ Whole Blood</span>
+              </div>
+              <span class="badge-urgency-high" id="bannerUrgency">Immediate</span>
+            </div>
+
+            <!-- Messages Stream Area -->
+            <div class="chat-messages-container" id="chatMessages">
+              <div style="text-align: center; font-size: 0.74rem; color: var(--text-muted); margin: 4px 0 10px;">
+                Today · 256-bit Encrypted Emergency Blood Coordination Channel
+              </div>
+
+              <div class="chat-bubble bubble-received">
+                <div>Hello Ayesha, we saw you accepted the urgent A+ requirement at Square Hospital (Panthapath, Dhaka).</div>
+                <div class="chat-bubble-time">10:08 AM · Coordinator</div>
+              </div>
+
+              <div class="chat-bubble bubble-sent">
+                <div>Yes, I am available and preparing to come. Is the patient at Cabin 402 or the Blood Bank unit?</div>
+                <div class="chat-bubble-time">10:10 AM · You <span class="read-receipt">✓✓</span></div>
+              </div>
+
+              <div class="chat-bubble bubble-received">
+                <div>Please report directly to 2nd Floor, Blood Transfusion Dept. Coordinator Dr. Farhan is on duty and waiting.</div>
+                <div class="chat-bubble-time">10:12 AM · Coordinator</div>
+              </div>
+
+              <!-- Typing indicator inside messages container -->
+              <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <span class="typing-text">Coordinator is typing</span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+              </div>
+            </div>
+
+            <!-- Quick Action Reply Bar -->
+            <div class="quick-reply-bar" id="quickReplyBar">
+              <span class="quick-reply-label">⚡ Quick replies:</span>
+              <button type="button" class="quick-reply-chip" data-text="🚑 I'm on my way! Estimated arrival in 20 minutes.">🚑 On my way (20 mins)</button>
+              <button type="button" class="quick-reply-chip" data-text="📍 I have arrived at the Blood Bank reception.">📍 Arrived at reception</button>
+              <button type="button" class="quick-reply-chip" data-text="🧪 Please confirm if screening tests are ready.">🧪 Screening test ready?</button>
+              <button type="button" class="quick-reply-chip" data-text="📞 Please call my registered phone number directly.">📞 Call my number</button>
+            </div>
+
+            <!-- Bottom Chat Input Bar -->
+            <form class="chat-input-bar" id="chatSendForm" onsubmit="event.preventDefault(); window.sendChatMessage();">
+              <button type="button" class="chat-action-btn" id="chatShareLocationBtn" title="Share current location ETA" aria-label="Share location">
+                📍
+              </button>
+              <input type="text" id="chatInput" class="chat-input-box" placeholder="Type a message to coordinator... (Press Enter to send)" autocomplete="off">
+              <button type="submit" id="sendChatBtn" class="btn-donor-primary" style="border-radius: 24px; padding: 8px 22px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span>Send</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </form>
+          </section>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 8: REVIEWS ================= -->
+      <section class="dashboard-content-section" id="section-reviews"></section>
+
+      <!-- ================= SECTION 9: SETTINGS ================= -->
+      <section class="dashboard-content-section" id="section-settings">
+        <!-- Settings Header Card -->
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 20px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">⚙️</span>
+              <div>
+                <h2>Donor Portal Settings & Preferences</h2>
+                <div class="card-subtitle">Configure real-time emergency match alerts, travel radius, identity privacy, and account security.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="nav-pill-badge pill-green" id="settingsBadgeStatus">
+                <span class="pulse-dot"></span> Preferences Synced
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Settings Grid -->
+        <div class="settings-grid-2">
+          <!-- CARD 1: Emergency & Notification Preferences -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🔔</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Emergency Alerts & Notifications</h3>
+                  <div class="card-subtitle">Manage how you are alerted during urgent blood requests</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- Setting 1: SMS Broadcasts -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Critical SMS Match Broadcasts</div>
+                  <div class="setting-desc">Instant SMS to {{ user.phone if user and user.phone else "+880 1712345678" }} for Code Red A+ emergency requirements nearby.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle SMS Match Broadcasts">
+                  <input type="checkbox" id="settingSmsAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 2: Live In-App Alerts -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Live In-App Push & Chime</div>
+                  <div class="setting-desc">Audible chime and push notification for chat messages and urgent patient broadcasts.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle In-App Push Notifications">
+                  <input type="checkbox" id="settingInAppPush" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 3: Recovery Gap Reminders -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">56-Day Recovery Eligibility Reminders</div>
+                  <div class="setting-desc">Automated alert when your whole blood resting window ends and you are ready to donate again.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Recovery Reminders">
+                  <input type="checkbox" id="settingGapReminders" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 4: Quiet Hours -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Nighttime Quiet Hours (11 PM – 7 AM)</div>
+                  <div class="setting-desc">Mute non-urgent notifications during sleep hours. Life-critical hospital alarms still notify.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Quiet Hours">
+                  <input type="checkbox" id="settingQuietHours">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: Matching Discovery & Travel Radius -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🎯</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Matching Discovery & Travel Radius</h3>
+                  <div class="card-subtitle">Set geographic boundary and donation formats</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Radius Range Slider -->
+            <div class="range-slider-wrapper" style="margin-bottom: 20px;">
+              <div class="range-header-info">
+                <span>Maximum Response Travel Distance:</span>
+                <span id="radiusValueDisplay" style="color: var(--primary-red); font-size: 1rem; font-weight: 700;">15 km</span>
+              </div>
+              <input type="range" min="2" max="50" step="1" value="15" class="distance-range-input" id="settingRadiusRange" aria-label="Donation Travel Radius">
+              <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--text-muted); margin-top: 6px;">
+                <span>2 km (Local)</span>
+                <span>15 km (Recommended)</span>
+                <span>50 km (Greater Dhaka)</span>
+              </div>
+            </div>
+
+            <!-- Donation Types Chips -->
+            <div style="margin-bottom: 20px;">
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Willing Donation Formats:
+              </div>
+              <div class="check-chips-wrap" id="donationTypesWrap">
+                <label class="check-chip selected">
+                  <input type="checkbox" id="typeWholeBlood" checked>
+                  <span>🩸 Whole Blood</span>
+                </label>
+                <label class="check-chip selected">
+                  <input type="checkbox" id="typePlatelets" checked>
+                  <span>🧪 Platelets (Apheresis)</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" id="typePlasma">
+                  <span>💉 Plasma</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" id="typeDoubleRed">
+                  <span>🔴 Double Red Cells</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Preferred Zones -->
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Preferred Hospital Clusters (Click to toggle):
+              </div>
+              <div class="zones-pills-wrap" id="preferredZonesWrap">
+                <button type="button" class="zone-chip selected" data-zone="Dhanmondi / Panthapath">Dhanmondi / Panthapath (Square, BRB)</button>
+                <button type="button" class="zone-chip selected" data-zone="Shahbagh">Shahbagh (BSMMU, BIRDEM)</button>
+                <button type="button" class="zone-chip selected" data-zone="Bakshibazar">Bakshibazar (Dhaka Medical)</button>
+                <button type="button" class="zone-chip" data-zone="Mohakhali">Mohakhali (National Chest, ICDDR,B)</button>
+                <button type="button" class="zone-chip" data-zone="Kurmitola">Kurmitola / Cantonment Area</button>
+                <button type="button" class="zone-chip" data-zone="Bashundhara">Bashundhara (Evercare)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 3: Privacy & Contact Visibility Controls -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🛡️</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Privacy & Contact Visibility</h3>
+                  <div class="card-subtitle">Control who sees your personal phone number and status</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- Setting 1: Hospital direct call -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Direct Phone Calls from Verified Hospitals</div>
+                  <div class="setting-desc">Permit official hospital transfusion units to place immediate phone calls for critical patient matches.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Hospital Direct Calls">
+                  <input type="checkbox" id="settingAllowHospitalCall" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 2: Number Masking -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Number Masking for Public Seekers</div>
+                  <div class="setting-desc">Seekers connect with you via In-App Chat. Your mobile number remains masked until you accept.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Phone Number Masking">
+                  <input type="checkbox" id="settingMaskPublicPhone" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 3: Public Directory -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Show in Verified Donor Directory</div>
+                  <div class="setting-desc">Allow authorized doctors and patient relatives to discover your readiness when searching A+ blood.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Public Directory Visibility">
+                  <input type="checkbox" id="settingPublicDirectory" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 4: Badges & Milestones -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Public Donor Badges & Lives Saved Counter</div>
+                  <div class="setting-desc">Showcase your Gold Tier badge, 8 verified donations, and 4.9 rating on your public donor card.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Badges Visibility">
+                  <input type="checkbox" id="settingShowBadges" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: Security, Authentication & Session Control -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🔐</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Security & Account Credentials</h3>
+                  <div class="card-subtitle">Manage 2-Factor authentication, password, and active devices</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- 2FA Toggle -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Two-Factor Authentication (SMS OTP)</div>
+                  <div class="setting-desc">Require a secure 6-digit one-time code sent to your registered phone on logins from new browsers.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Two Factor Authentication">
+                  <input type="checkbox" id="settingTwoFactor" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Change Password Section -->
+              <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-page);">
+                <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔑</span> Change Password
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <input type="password" id="inputCurrentPass" class="form-control-custom" placeholder="Current password">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="password" id="inputNewPass" class="form-control-custom" placeholder="New password (min 8 chars)">
+                    <input type="password" id="inputConfirmPass" class="form-control-custom" placeholder="Confirm new password">
+                  </div>
+                  <button type="button" class="btn-donor-outline" id="btnUpdatePassword" style="align-self: flex-start; margin-top: 4px;">
+                    Update Password
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active Device & Session Info -->
+              <div class="session-device-card">
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span>💻</span> Chrome on Windows (Current Session)
+                  </div>
+                  <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 2px;">
+                    Dhaka, Bangladesh · IP: 103.114.xxx.xx · <span style="color: var(--success-green); font-weight: 600;">Active Now</span>
+                  </div>
+                </div>
+                <button type="button" class="btn-donor-danger" id="btnRevokeSessions" style="padding: 6px 12px; font-size: 0.78rem;">
+                  Log Out Others
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Settings Action Bar -->
+        <div class="settings-action-bar">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button type="button" class="btn-donor-primary" id="saveSettingsBtn">
+              💾 Save All Preferences
+            </button>
+            <button type="button" class="btn-donor-outline" id="resetSettingsBtn">
+              ↺ Reset to Defaults
+            </button>
+          </div>
+          <div style="font-size: 0.84rem; color: var(--text-secondary);" id="settingsStatusText">
+            All preferences synced with server
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="dashboard-toast" id="dashboardToast">
+    <span style="font-size: 1.1rem;">🔔</span>
+    <span id="toastText">Action completed</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/donor_dashboard.js"></script>
+</body>
+</html>
