@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Donor Personal Dashboard - Smart Blood Donor System" }}</title>
+  <meta name="description" content="Personal portal for registered blood donors to manage availability, matched requests, donation history, and direct communication.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/donor_dashboard.css">
+</head>
+<body>
+  <!-- Global Top Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <button id="themeToggleBtn" class="theme-toggle-btn" aria-label="Toggle Dark Mode" style="background: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 10px; cursor: pointer; color: var(--text-primary);">
+          🌓
+        </button>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Drawer for global nav -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+      <div class="mobile-auth-actions">
+        <a href="/logout" class="btn btn-outline btn-full">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Donor App Shell -->
+  <div class="donor-dashboard-wrapper">
+    <!-- LEFT SIDEBAR -->
+    <aside class="donor-sidebar" id="donorSidebar" aria-label="Donor Dashboard Sidebar">
+      <!-- Donor Profile Quick Widget -->
+      <div class="donor-profile-card-mini">
+        <div class="donor-avatar-wrap">
+          <div class="donor-avatar-circle">
+            {{ user.name[0] if user and user.name else "A" }}
+          </div>
+          <span class="donor-blood-badge">A+</span>
+        </div>
+        <div class="donor-meta-info">
+          <div class="donor-name-text">
+            <span>{{ user.name if user and user.name else "Ayesha Rahman" }}</span>
+            <svg class="verified-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div class="donor-badge-sub">
+            <span>Verified Donor</span> · <span>Gold Tier</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="donor-sidebar-nav">
+        <div class="sidebar-section-title">Overview</div>
+
+        <!-- 0. Donor Personal Dashboard -->
+        <button type="button" class="donor-nav-item active" data-target="section-personal-dashboard" id="nav-item-dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="nav-item-title">Personal Dashboard</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Donor Operations</div>
+
+        <!-- 1. Donor Availability -->
+        <button type="button" class="donor-nav-item" data-target="section-availability" id="nav-item-availability">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+          <span class="nav-item-title">Donor Availability</span>
+        </button>
+
+        <!-- 2. Donor Profile & Medical Info Management -->
+        <button type="button" class="donor-nav-item" data-target="section-profile" id="nav-item-profile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span class="nav-item-title">Donor Profile & Medical Info</span>
+        </button>
+
+        <!-- 3. Donation History -->
+        <button type="button" class="donor-nav-item" data-target="section-history" id="nav-item-history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span class="nav-item-title">Donation History</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Matching & Actions</div>
+
+        <!-- 4. Matched Blood Requests Feed & Filter -->
+        <button type="button" class="donor-nav-item" data-target="section-matched-requests" id="nav-item-matched">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          <span class="nav-item-title">Matched Blood Requests</span>
+        </button>
+
+        <!-- 5. Accept & Decline Blood Request Flow -->
+        <button type="button" class="donor-nav-item" data-target="section-request-flow" id="nav-item-flow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <polyline points="16 11 18 13 22 9"/>
+          </svg>
+          <span class="nav-item-title">Accept & Decline Flow</span>
+        </button>
+
+        <!-- 6. Blood Request Detailed View & Directions -->
+        <button type="button" class="donor-nav-item" data-target="section-request-details" id="nav-item-details">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span class="nav-item-title">Request Details & Directions</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 10px;">Communication & Community</div>
+
+        <!-- 7. Donor In-App Chat List -->
+        <button type="button" class="donor-nav-item" data-target="section-chat" id="nav-item-chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="nav-item-title">Donor In-App Chat</span>
+        </button>
+
+        <!-- 8. Donor Reviews -->
+        <button type="button" class="donor-nav-item" data-target="section-reviews" id="nav-item-reviews">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span class="nav-item-title">Donor Reviews</span>
+        </button>
+
+        <!-- 9. Donor Portal Settings & Preferences -->
+        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="nav-item-title">Settings & Preferences</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Emergency Assistance Card -->
+      <div class="sidebar-help-card">
+        <div class="help-card-title">
+          <span>🆘</span>
+          <span>Emergency Assistance</span>
+        </div>
+        <p class="help-card-desc">Need urgent assistance or have questions during donation transit?</p>
+        <a href="tel:+8801700000000" class="help-card-hotline">📞 +880 1700-000000</a>
+      </div>
+    </aside>
+
+    <!-- RIGHT MAIN VIEWPORT -->
+    <main class="donor-main-viewport">
+      <!-- Mobile Sidebar Toggle -->
+      <button type="button" class="mobile-sidebar-toggle-btn" id="mobileSidebarToggle" aria-label="Open Donor Navigation Menu">
+        <span>☰</span>
+        <span>Dashboard Menu</span>
+      </button>
+
+      <!-- ================= SECTION 0: DONOR PERSONAL DASHBOARD (ACTIVE) ================= -->
+      <section class="dashboard-content-section active-section" id="section-personal-dashboard">
+        <!-- Welcome Banner -->
+        <div class="donor-banner-header">
+          <div class="banner-welcome-text">
+            <h1>Welcome back, {{ user.name if user and user.name else "Ayesha" }}! 👋</h1>
+            <p>Your blood group <strong>A+</strong> can help <strong>A+ and AB+</strong> patients in Dhaka today.</p>
+          </div>
+
+          <div class="banner-controls-group">
+            <span class="nav-pill-badge pill-green" style="padding: 6px 14px; font-size: 0.88rem; font-weight: 700;">
+              ● Account Verified
+            </span>
+          </div>
+        </div>
+
+        <!-- Quick Metrics Summary Bar (4 Cards) -->
+        <div class="metrics-grid-4">
+          <!-- Metric 1: Blood Group -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-red">
+              <span style="font-weight: 800; font-size: 1.1rem;">A+</span>
+            </div>
+            <div>
+              <div class="metric-value-text">Blood A+</div>
+              <div class="metric-title-text">Verified Lab Tested</div>
+            </div>
+          </article>
+
+          <!-- Metric 2: Lives Saved -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-green">
+              <span>❤️</span>
+            </div>
+            <div>
+              <div class="metric-value-text">24 Lives</div>
+              <div class="metric-title-text">Saved Across 8 Donations</div>
+            </div>
+          </article>
+
+          <!-- Metric 3: Next Eligibility -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-blue">
+              <span>✅</span>
+            </div>
+            <div>
+              <div class="metric-value-text">Eligible</div>
+              <div class="metric-title-text">Ready for Whole Blood</div>
+            </div>
+          </article>
+
+          <!-- Metric 4: Community Rating -->
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-amber">
+              <span>⭐</span>
+            </div>
+            <div>
+              <div class="metric-value-text">4.9 / 5.0</div>
+              <div class="metric-title-text">18 Recipient Reviews</div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Personal Dashboard Overview Details Card -->
+        <div class="donor-card" style="margin-top: 24px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.4rem;">📊</span>
+              <div>
+                <h2>Donor Personal Dashboard Overview</h2>
+                <div class="card-subtitle">Summary of your personal donor account standing and quick information</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 16px;">
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">👤 Donor Profile Summary</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                <strong>Name:</strong> {{ user.name if user and user.name else "Ayesha Rahman" }}<br>
+                <strong>Phone:</strong> {{ user.phone if user and user.phone else "+880 1712345678" }}<br>
+                <strong>Location:</strong> Dhanmondi, Dhaka<br>
+                <strong>Tier:</strong> Gold Tier Donor
+              </p>
+            </div>
+
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">🩺 Health & Eligibility</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">Active & Ready</span><br>
+                <strong>Rest Window:</strong> 56-day gap completed<br>
+                <strong>Hemoglobin:</strong> Normal (13.5 g/dL)<br>
+                <strong>Last Donation:</strong> 14 Jan 2026
+              </p>
+            </div>
+
+            <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">📋 Quick Actions</h4>
+              <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
+                Select options from the left sidebar to manage availability, requests, and profile settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
+      <section class="dashboard-content-section" id="section-availability"></section>
+
+      <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
+      <section class="dashboard-content-section" id="section-profile"></section>
+
+      <!-- ================= SECTION 3: DONATION HISTORY ================= -->
+      <section class="dashboard-content-section" id="section-history"></section>
+
+      <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
+      <section class="dashboard-content-section" id="section-matched-requests"></section>
+
+      <!-- ================= SECTION 5: ACCEPT & DECLINE FLOW ================= -->
+      <section class="dashboard-content-section" id="section-request-flow"></section>
+
+      <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
+      <section class="dashboard-content-section" id="section-request-details"></section>
+
+      <!-- ================= SECTION 7: IN-APP CHAT ================= -->
+      <section class="dashboard-content-section" id="section-chat"></section>
+
+      <!-- ================= SECTION 8: REVIEWS ================= -->
+      <section class="dashboard-content-section" id="section-reviews"></section>
+
+      <!-- ================= SECTION 9: SETTINGS ================= -->
+      <section class="dashboard-content-section" id="section-settings"></section>
+    </main>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div class="dashboard-toast" id="dashboardToast">
+    <span style="font-size: 1.1rem;">🔔</span>
+    <span id="toastText">Action completed</span>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/donor_dashboard.js"></script>
+</body>
+</html>
