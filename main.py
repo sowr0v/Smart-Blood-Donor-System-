@@ -879,6 +879,33 @@ async def donor_dashboard(request: Request):
     )
 
 
+@app.get("/seeker/dashboard", response_class=HTMLResponse)
+async def seeker_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Seeker", "title": "Seeker Dashboard"},
+    )
+
+
+@app.get("/hospital/dashboard", response_class=HTMLResponse)
+async def hospital_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Hospital", "title": "Hospital Dashboard"},
+    )
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Admin", "title": "Admin Console"},
+    )
+
+
 @app.get("/logout")
 async def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
