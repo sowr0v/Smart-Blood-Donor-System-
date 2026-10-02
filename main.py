@@ -101,10 +101,13 @@ REQUESTS = [
     {
         "id": "req-001",
         "blood_group": "A+",
+        "district": "Dhaka",
         "hospital": "Square Hospital",
         "area": "Farmgate",
         "units": 2,
         "status": "Critical",
+        "urgency": "Critical",
+        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat(),
         "contact_name": "Blood Desk",
         "contact_phone": "+8801700000001",
@@ -112,10 +115,13 @@ REQUESTS = [
     {
         "id": "req-002",
         "blood_group": "O-",
+        "district": "Dhaka",
         "hospital": "Green Life Hospital",
         "area": "Panthapath",
         "units": 1,
         "status": "Urgent",
+        "urgency": "Urgent",
+        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(minutes=24)).isoformat(),
         "contact_name": "Emergency Desk",
         "contact_phone": "+8801700000002",
@@ -123,10 +129,13 @@ REQUESTS = [
     {
         "id": "req-003",
         "blood_group": "B+",
+        "district": "Dhaka",
         "hospital": "Ibn Sina Hospital",
         "area": "Dhanmondi",
         "units": 3,
         "status": "Open",
+        "urgency": "Standard",
+        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(hours=1, minutes=12)).isoformat(),
         "contact_name": "Transfusion Unit",
         "contact_phone": "+8801700000003",
@@ -134,15 +143,94 @@ REQUESTS = [
     {
         "id": "req-004",
         "blood_group": "A+",
+        "district": "Dhaka",
         "hospital": "Dhaka Medical College Hospital",
         "area": "Shahbagh",
         "units": 2,
         "status": "Urgent",
+        "urgency": "Urgent",
+        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
         "contact_name": "Blood Bank",
         "contact_phone": "+8801700000004",
     },
 ]
+
+
+DONOR_MATCH_COMPATIBILITY = {
+    "A+": {"A+", "AB+"},
+    "A-": {"A+", "A-", "AB+", "AB-"},
+    "B+": {"B+", "AB+"},
+    "B-": {"B+", "B-", "AB+", "AB-"},
+    "AB+": {"AB+"},
+    "AB-": {"AB+", "AB-"},
+    "O+": {"O+", "A+", "B+", "AB+"},
+    "O-": {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"},
+}
+
+
+def _normalized_request_urgency(request: dict) -> str:
+    urgency = str(request.get("urgency") or request.get("status") or "Standard").strip().title()
+    if urgency in {"Critical", "Urgent", "Open", "Standard"}:
+        return urgency
+    if urgency.lower() in {"critical", "emergency"}:
+        return "Critical"
+    if urgency.lower() in {"urgent", "high"}:
+        return "Urgent"
+    return "Standard"
+
+
+def _request_is_active(request: dict) -> bool:
+    if request.get("is_active") is False:
+        return False
+    status = str(request.get("status") or "").lower()
+    if status in {"inactive", "closed", "resolved", "completed"}:
+        return False
+    posted_at = request.get("posted_at")
+    if posted_at:
+        try:
+            created = datetime.fromisoformat(str(posted_at).replace("Z", "+00:00"))
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if created < datetime.now(timezone.utc) - timedelta(days=7):
+                return False
+        except ValueError:
+            pass
+    return True
+
+
+def _build_donor_match_requests(profile: dict) -> list[dict]:
+    donor_group = (profile.get("blood_group") or "A+").upper()
+    donor_district = (profile.get("district") or "Dhaka").strip().lower()
+    donor_area = (profile.get("area") or "").strip().lower()
+    match_target_groups = DONOR_MATCH_COMPATIBILITY.get(donor_group, {donor_group})
+
+    matches: list[dict] = []
+    for request in REQUESTS:
+        if not _request_is_active(request):
+            continue
+        request_group = (request.get("blood_group") or "").upper()
+        if request_group not in match_target_groups:
+            continue
+
+        request_district = (request.get("district") or "Dhaka").strip().lower()
+        request_area = (request.get("area") or "").strip().lower()
+        if donor_district and donor_area and request_district != donor_district and request_area != donor_area:
+            # Keep the match relevant when the donor is in the same city but a nearby zone is requested.
+            if request_district != donor_district and request_district != "dhaka":
+                continue
+
+        urgency = _normalized_request_urgency(request)
+        request_data = dict(request)
+        request_data["district"] = request.get("district") or "Dhaka"
+        request_data["urgency"] = urgency
+        request_data["is_active"] = True
+        request_data["location"] = f"{request.get('area') or 'Dhaka'}, {request.get('district') or 'Dhaka'}"
+        matches.append(request_data)
+
+    order = {"Critical": 3, "Urgent": 2, "Open": 1, "Standard": 1}
+    matches.sort(key=lambda item: (order.get(_normalized_request_urgency(item), 0), item.get("posted_at", "")), reverse=True)
+    return matches
 
 
 def _b64url_encode(value: bytes) -> str:
@@ -1100,6 +1188,43 @@ async def donor_dashboard(request: Request):
             "title": "Donor Personal Dashboard - Smart Blood Donor System",
         },
     )
+
+
+@app.get("/api/v1/donor/matches")
+async def donor_matching_requests(
+    request: Request,
+    blood_group: str = Query(default="all"),
+    urgency: str = Query(default="all"),
+    district: str = Query(default="all"),
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        raise HTTPException(status_code=401, detail="Sign in required to access matched requests.")
+
+    profile = _get_donor_profile(phone)
+    matches = _build_donor_match_requests(profile)
+
+    blood_group_value = (blood_group or "all").strip()
+    urgency_value = (urgency or "all").strip()
+    district_value = (district or "all").strip()
+
+    if blood_group_value.lower() != "all":
+        matches = [item for item in matches if (item.get("blood_group") or "").upper() == blood_group_value.upper()]
+    if urgency_value.lower() != "all":
+        normalized = _normalized_request_urgency({"urgency": urgency_value})
+        matches = [item for item in matches if _normalized_request_urgency(item) == normalized]
+    if district_value.lower() != "all":
+        matches = [item for item in matches if (item.get("district") or "Dhaka").lower() == district_value.lower()]
+
+    return {
+        "status": "success",
+        "count": len(matches),
+        "requests": matches,
+        "profile": profile,
+    }
 
 
 @app.get("/logout")

@@ -136,6 +136,131 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Matched blood requests feed and filters
+  const matchedFeed = document.getElementById('matched-request-feed');
+  const matchedEmptyState = document.getElementById('matched-request-empty');
+  const bloodGroupFilter = document.getElementById('matched-blood-group-filter');
+  const urgencyFilter = document.getElementById('matched-urgency-filter');
+  const locationFilter = document.getElementById('matched-location-filter');
+
+  if (matchedFeed && bloodGroupFilter && urgencyFilter && locationFilter) {
+    function normalizeUrgency(urgency) {
+      const value = String(urgency || 'Standard').toLowerCase();
+      if (value.includes('critical') || value.includes('emergency')) return 'Critical';
+      if (value.includes('urgent')) return 'Urgent';
+      return 'Standard';
+    }
+
+    function badgeClassForUrgency(urgency) {
+      switch (normalizeUrgency(urgency)) {
+        case 'Critical': return 'urgency-critical';
+        case 'Urgent': return 'urgency-urgent';
+        default: return 'urgency-standard';
+      }
+    }
+
+    function renderMatchedRequestCard(request) {
+      const card = document.createElement('article');
+      const urgency = normalizeUrgency(request.urgency || request.status);
+      card.className = `match-request-card ${urgency === 'Critical' || urgency === 'Urgent' ? 'urgent-border' : ''}`;
+
+      const topMeta = document.createElement('div');
+      topMeta.className = 'card-top-meta';
+
+      const bloodGroup = document.createElement('span');
+      bloodGroup.className = 'nav-pill-badge pill-red';
+      bloodGroup.textContent = request.blood_group || 'A+';
+
+      const urgencyFlag = document.createElement('span');
+      urgencyFlag.className = `urgency-flag ${badgeClassForUrgency(urgency)}`;
+      urgencyFlag.textContent = urgency;
+
+      topMeta.appendChild(bloodGroup);
+      topMeta.appendChild(urgencyFlag);
+
+      const hospital = document.createElement('div');
+      hospital.className = 'hospital-headline';
+      hospital.textContent = request.hospital || 'Hospital request';
+
+      const locationRow = document.createElement('div');
+      locationRow.className = 'location-distance-row';
+      const locationText = document.createElement('span');
+      const area = request.area || 'Dhaka';
+      const district = request.district || 'Dhaka';
+      locationText.textContent = `${area}, ${district}`;
+
+      const distance = document.createElement('span');
+      distance.textContent = `${request.distance_km || '5'} km away`;
+
+      locationRow.appendChild(locationText);
+      locationRow.appendChild(distance);
+
+      const details = document.createElement('div');
+      details.className = 'patient-note-box';
+      details.textContent = `${request.units || 1} unit${(request.units || 1) === 1 ? '' : 's'} needed • ${request.status || 'Open'} request`;
+
+      const actionRow = document.createElement('div');
+      actionRow.className = 'action-buttons-flex';
+
+      const acceptBtn = document.createElement('button');
+      acceptBtn.type = 'button';
+      acceptBtn.className = 'primary-button';
+      acceptBtn.textContent = 'Accept';
+
+      const viewBtn = document.createElement('button');
+      viewBtn.type = 'button';
+      viewBtn.className = 'secondary-button';
+      viewBtn.textContent = 'Details';
+
+      actionRow.appendChild(acceptBtn);
+      actionRow.appendChild(viewBtn);
+
+      card.appendChild(topMeta);
+      card.appendChild(hospital);
+      card.appendChild(locationRow);
+      card.appendChild(details);
+      card.appendChild(actionRow);
+
+      return card;
+    }
+
+    async function refreshMatchedRequests() {
+      const params = new URLSearchParams();
+      params.set('blood_group', bloodGroupFilter.value || 'all');
+      params.set('urgency', urgencyFilter.value || 'all');
+      params.set('district', locationFilter.value || 'all');
+
+      const response = await fetch(`/api/v1/donor/matches?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Unable to load matched requests');
+      }
+
+      const payload = await response.json();
+      const requests = Array.isArray(payload.requests) ? payload.requests : [];
+
+      matchedFeed.replaceChildren();
+      if (!requests.length) {
+        matchedEmptyState.style.display = 'block';
+        matchedEmptyState.textContent = 'No active requests match your filters at the moment.';
+        return;
+      }
+
+      matchedEmptyState.style.display = 'none';
+      requests.forEach((request) => {
+        matchedFeed.appendChild(renderMatchedRequestCard(request));
+      });
+    }
+
+    [bloodGroupFilter, urgencyFilter, locationFilter].forEach((filterInput) => {
+      filterInput.addEventListener('change', refreshMatchedRequests);
+    });
+
+    refreshMatchedRequests().catch(() => {
+      matchedEmptyState.style.display = 'block';
+      matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
+    });
+  }
+
   // =========================================================
   // DONOR IN-APP CHAT MODULE (SBDS-89)
   // =========================================================

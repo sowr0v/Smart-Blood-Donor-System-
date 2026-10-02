@@ -452,7 +452,62 @@
       <section class="dashboard-content-section" id="section-history"></section>
 
       <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
-      <section class="dashboard-content-section" id="section-matched-requests"></section>
+      <section class="dashboard-content-section" id="section-matched-requests">
+        <div class="donor-card" style="padding: 24px;">
+          <div class="card-header-flex" style="margin-bottom: 18px;">
+            <div class="card-title-combo">
+              <span style="font-size: 1.6rem;">🎯</span>
+              <div>
+                <h2>Matched Blood Requests</h2>
+                <div class="card-subtitle">Relevant opportunities based on your blood group, district, and availability.</div>
+              </div>
+            </div>
+            <span class="nav-pill-badge pill-green">
+                <span class="pulse-dot"></span> Live matching feed
+            </span>
+          </div>
+
+          <div class="filters-bar-flex matched-request-filters" id="matched-request-filters">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
+              Blood group
+              <select id="matched-blood-group-filter" class="form-control-custom" style="min-width: 130px;">
+                <option value="all">All</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
+              Urgency
+              <select id="matched-urgency-filter" class="form-control-custom" style="min-width: 130px;">
+                <option value="all">All</option>
+                <option value="Critical">Critical</option>
+                <option value="Urgent">Urgent</option>
+                <option value="Standard">Standard</option>
+              </select>
+            </label>
+
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
+              Location
+              <select id="matched-location-filter" class="form-control-custom" style="min-width: 160px;">
+                <option value="all">All locations</option>
+                <option value="Dhaka">Dhaka</option>
+                <option value="Chattogram">Chattogram</option>
+                <option value="Sylhet">Sylhet</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="matched-request-feed" class="requests-cards-stack" aria-live="polite"></div>
+          <div id="matched-request-empty" class="status-message" style="display:none; margin-top:16px; color: var(--text-secondary);">No active requests match your filters at the moment.</div>
+        </div>
+      </section>
 
       <!-- ================= SECTION 5: ACCEPT & DECLINE FLOW ================= -->
       <section class="dashboard-content-section" id="section-request-flow"></section>
