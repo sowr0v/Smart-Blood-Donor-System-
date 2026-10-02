@@ -166,6 +166,7 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           <span class="nav-item-title">Donor In-App Chat</span>
+          <span class="nav-badge-count" id="sidebarChatBadge">2</span>
         </button>
 
         <!-- 8. Donor Reviews -->
@@ -331,6 +332,7 @@
 
       <!-- ================= SECTION 7: IN-APP CHAT ================= -->
       <section class="dashboard-content-section" id="section-chat">
+        <!-- Chat Overview Header Card -->
         <div class="donor-card" style="padding: 20px 24px; margin-bottom: 20px;">
           <div class="card-header-flex">
             <div class="card-title-combo">
@@ -340,9 +342,12 @@
                 <div class="card-subtitle">Direct, secure coordination between registered donors, hospital blood banks, and verified emergency seekers.</div>
               </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
               <span class="nav-pill-badge pill-green">
                 <span class="pulse-dot"></span> Real-Time Messaging Active
+              </span>
+              <span class="nav-pill-badge pill-red" id="headerUnreadBadge">
+                <span style="font-weight: 700;">2</span> Unread
               </span>
             </div>
           </div>
@@ -352,57 +357,112 @@
         <div class="chat-module-shell">
           <!-- Left: Conversation Threads List -->
           <aside class="chat-threads-sidebar" aria-label="Chat Conversations">
+            <!-- Search & Filters -->
             <div class="chat-search-header">
-              <input type="text" id="chatSearchInput" class="chat-search-input" placeholder="🔍 Search conversations..." aria-label="Search chats">
+              <div class="chat-search-wrapper">
+                <input type="text" id="chatSearchInput" class="chat-search-input" placeholder="🔍 Search conversations..." aria-label="Search chats">
+                <button type="button" id="clearChatSearch" class="chat-search-clear-btn" title="Clear search" style="display: none;">&times;</button>
+              </div>
+
+              <!-- Category Filter Tabs -->
+              <div class="chat-category-tabs" id="chatCategoryTabs">
+                <button type="button" class="chat-tab-pill active" data-filter="all">All (<span id="countAll">4</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="hospital">🏥 Hospitals (<span id="countHospital">2</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="seeker">👨 Seekers (<span id="countSeeker">1</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="support">🛡️ Support (<span id="countSupport">1</span>)</button>
+                <button type="button" class="chat-tab-pill" data-filter="unread">🔴 Unread (<span id="countUnread">2</span>)</button>
+              </div>
             </div>
 
             <div class="chat-threads-list" id="chatThreadsList">
               <!-- Thread 1 (Default Active) -->
-              <div class="chat-thread-item active" data-thread-id="thread-square" data-name="Square Hospital - Blood Desk" data-avatar="🏥" data-status="● Online · Request #REQ-001 (A+ Emergency)" data-phone="+8801700000001">
-                <div class="thread-avatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+              <div class="chat-thread-item active" data-thread-id="thread-square" data-category="hospital" data-name="Square Hospital - Blood Desk" data-avatar="🏥" data-status="● Online · Request #REQ-001 (A+ Emergency)" data-phone="+8801700000001" data-request="REQ-001" data-patient="Rafiqul Islam (Cabin 402)" data-hospital="Square Hospital, Panthapath" data-blood="A+ Whole Blood">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
                 <div class="thread-content-wrap">
                   <div class="thread-title-line">
                     <span class="thread-name">Square Hospital - Blood Desk</span>
                     <span class="thread-time">10:14 AM</span>
                   </div>
-                  <div class="thread-preview-snippet">Please report to 2nd Floor, Blood Bank...</div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-emergency">🚨 A+ Emergency</span>
+                    <span class="thread-badge badge-hospital">Verified Hospital</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Please report to 2nd Floor, Blood Bank...</span>
+                    <span class="chat-unread-count" id="unread-thread-square">1</span>
+                  </div>
                 </div>
               </div>
 
               <!-- Thread 2 -->
-              <div class="chat-thread-item" data-thread-id="thread-dmc" data-name="Dhaka Medical College Desk" data-avatar="🏛️" data-status="● Active Coordinator · Donation Rest Gap" data-phone="+8801700000002">
-                <div class="thread-avatar" style="background: rgba(59, 130, 246, 0.15); color: var(--secondary-blue);">🏛️</div>
+              <div class="chat-thread-item" data-thread-id="thread-dmc" data-category="hospital" data-name="Dhaka Medical College Desk" data-avatar="🏛️" data-status="● Active Coordinator · Donation Rest Gap" data-phone="+8801700000002" data-request="REQ-003" data-patient="Donor Verification Unit" data-hospital="Dhaka Medical College Hospital" data-blood="A+">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(59, 130, 246, 0.15); color: var(--secondary-blue);">🏛️</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
                 <div class="thread-content-wrap">
                   <div class="thread-title-line">
                     <span class="thread-name">Dhaka Medical Desk</span>
                     <span class="thread-time">Yesterday</span>
                   </div>
-                  <div class="thread-preview-snippet">Your donor certificate is ready to download.</div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-verified">Verified Hospital</span>
+                    <span class="thread-badge badge-info">Certificate Ready</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Your donor certificate is ready to download.</span>
+                  </div>
                 </div>
               </div>
 
               <!-- Thread 3 -->
-              <div class="chat-thread-item" data-thread-id="thread-nabil" data-name="Nabil Hasan (Emergency Seeker)" data-avatar="👨" data-status="● Matched Recipient Guardian" data-phone="+8801723456789">
-                <div class="thread-avatar" style="background: rgba(16, 185, 129, 0.15); color: var(--success-green);">👨</div>
+              <div class="chat-thread-item" data-thread-id="thread-nabil" data-category="seeker" data-name="Nabil Hasan (Emergency Seeker)" data-avatar="👨" data-status="● Matched Recipient Guardian" data-phone="+8801723456789" data-request="REQ-004" data-patient="Begum Rokeya (Discharged)" data-hospital="National Heart Institute" data-blood="A+">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(16, 185, 129, 0.15); color: var(--success-green);">👨</div>
+                </div>
                 <div class="thread-content-wrap">
                   <div class="thread-title-line">
                     <span class="thread-name">Nabil Hasan (Seeker)</span>
                     <span class="thread-time">2d ago</span>
                   </div>
-                  <div class="thread-preview-snippet">Thank you sister Ayesha! Patient is stable now.</div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-seeker">Patient Relative</span>
+                    <span class="thread-badge badge-resolved">Match Completed</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Thank you sister Ayesha! Patient is stable now.</span>
+                    <span class="chat-unread-count" id="unread-thread-nabil">1</span>
+                  </div>
                 </div>
               </div>
 
               <!-- Thread 4 -->
-              <div class="chat-thread-item" data-thread-id="thread-support" data-name="SBDS Volunteer Support Desk" data-avatar="🛡️" data-status="● 24/7 Platform Assistance" data-phone="+8801700000000">
-                <div class="thread-avatar" style="background: rgba(245, 158, 11, 0.15); color: var(--warning-amber);">🛡️</div>
+              <div class="chat-thread-item" data-thread-id="thread-support" data-category="support" data-name="SBDS Volunteer Support Desk" data-avatar="🛡️" data-status="● 24/7 Platform Assistance" data-phone="+8801700000000" data-request="" data-patient="Account Support" data-hospital="SBDS Central HQ" data-blood="">
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" style="background: rgba(245, 158, 11, 0.15); color: var(--warning-amber);">🛡️</div>
+                  <span class="avatar-online-dot"></span>
+                </div>
                 <div class="thread-content-wrap">
                   <div class="thread-title-line">
                     <span class="thread-name">SBDS Support Desk</span>
                     <span class="thread-time">18 Jan</span>
                   </div>
-                  <div class="thread-preview-snippet">Gold Tier donor badge has been credited.</div>
+                  <div class="thread-context-tags">
+                    <span class="thread-badge badge-support">Platform Official</span>
+                    <span class="thread-badge badge-gold">Gold Tier</span>
+                  </div>
+                  <div class="thread-preview-line">
+                    <span class="thread-preview-snippet">Gold Tier donor badge has been credited.</span>
+                  </div>
                 </div>
+              </div>
+
+              <!-- Empty search results notice -->
+              <div id="noThreadsNotice" class="no-threads-notice" style="display: none;">
+                <span>🔍 No conversation found matching your search.</span>
               </div>
             </div>
           </aside>
@@ -412,9 +472,15 @@
             <!-- Chat Pane Header -->
             <div class="chat-pane-header">
               <div class="chat-header-user">
-                <div class="thread-avatar" id="activeChatAvatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                <div class="thread-avatar-wrap">
+                  <div class="thread-avatar" id="activeChatAvatar" style="background: rgba(225, 29, 72, 0.15); color: var(--primary-red);">🏥</div>
+                  <span class="avatar-online-dot" id="activeChatOnlineDot"></span>
+                </div>
                 <div>
-                  <strong id="currentChatUserTitle" style="font-size: 0.95rem; color: var(--text-primary); display: block;">Square Hospital - Blood Desk</strong>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <strong id="currentChatUserTitle" style="font-size: 0.96rem; color: var(--text-primary); display: block;">Square Hospital - Blood Desk</strong>
+                    <span class="badge-role-tag" id="currentChatRoleTag">Hospital</span>
+                  </div>
                   <div id="currentChatUserSub" style="font-size: 0.78rem; color: var(--success-green); display: flex; align-items: center; gap: 5px;">
                     <span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--success-green);"></span>
                     <span>Online · Request #REQ-001 (A+ Emergency)</span>
@@ -422,17 +488,32 @@
                 </div>
               </div>
 
-              <div style="display: flex; gap: 8px; align-items: center;">
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                 <a href="tel:+8801700000001" id="chatCallBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem; text-decoration: none;">
                   📞 Call Desk
                 </a>
+                <button type="button" id="chatLocationBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem;">
+                  📍 Hospital Location
+                </button>
+                <button type="button" id="chatClearBtn" class="btn-donor-outline" style="padding: 6px 10px; font-size: 0.8rem;" title="Clear conversation history">
+                  🗑️
+                </button>
               </div>
+            </div>
+
+            <!-- Linked Emergency Blood Request Banner -->
+            <div class="chat-request-banner" id="chatRequestBanner">
+              <div class="banner-icon">🩸</div>
+              <div class="banner-text">
+                <strong>Linked Match: <span id="bannerReqId">#REQ-001</span></strong> · Patient: <span id="bannerPatient">Rafiqul Islam (Cabin 402)</span> · Location: <span id="bannerHospital">Square Hospital, Panthapath</span> · Group: <span id="bannerBlood" style="color: var(--primary-red); font-weight: 700;">A+ Whole Blood</span>
+              </div>
+              <span class="badge-urgency-high" id="bannerUrgency">Immediate</span>
             </div>
 
             <!-- Messages Stream Area -->
             <div class="chat-messages-container" id="chatMessages">
               <div style="text-align: center; font-size: 0.74rem; color: var(--text-muted); margin: 4px 0 10px;">
-                Today · Encrypted Emergency Donation Channel
+                Today · 256-bit Encrypted Emergency Blood Coordination Channel
               </div>
 
               <div class="chat-bubble bubble-received">
@@ -442,20 +523,41 @@
 
               <div class="chat-bubble bubble-sent">
                 <div>Yes, I am available and preparing to come. Is the patient at Cabin 402 or the Blood Bank unit?</div>
-                <div class="chat-bubble-time">10:10 AM · You</div>
+                <div class="chat-bubble-time">10:10 AM · You <span class="read-receipt">✓✓</span></div>
               </div>
 
               <div class="chat-bubble bubble-received">
                 <div>Please report directly to 2nd Floor, Blood Transfusion Dept. Coordinator Dr. Farhan is on duty and waiting.</div>
                 <div class="chat-bubble-time">10:12 AM · Coordinator</div>
               </div>
+
+              <!-- Typing indicator inside messages container -->
+              <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                <span class="typing-text">Coordinator is typing</span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+              </div>
+            </div>
+
+            <!-- Quick Action Reply Bar -->
+            <div class="quick-reply-bar" id="quickReplyBar">
+              <span class="quick-reply-label">⚡ Quick replies:</span>
+              <button type="button" class="quick-reply-chip" data-text="🚑 I'm on my way! Estimated arrival in 20 minutes.">🚑 On my way (20 mins)</button>
+              <button type="button" class="quick-reply-chip" data-text="📍 I have arrived at the Blood Bank reception.">📍 Arrived at reception</button>
+              <button type="button" class="quick-reply-chip" data-text="🧪 Please confirm if screening tests are ready.">🧪 Screening test ready?</button>
+              <button type="button" class="quick-reply-chip" data-text="📞 Please call my registered phone number directly.">📞 Call my number</button>
             </div>
 
             <!-- Bottom Chat Input Bar -->
             <form class="chat-input-bar" id="chatSendForm" onsubmit="event.preventDefault(); window.sendChatMessage();">
+              <button type="button" class="chat-action-btn" id="chatShareLocationBtn" title="Share current location ETA" aria-label="Share location">
+                📍
+              </button>
               <input type="text" id="chatInput" class="chat-input-box" placeholder="Type a message to coordinator... (Press Enter to send)" autocomplete="off">
-              <button type="submit" id="sendChatBtn" class="btn-donor-primary" style="border-radius: 24px; padding: 8px 20px; font-weight: 600;">
-                Send
+              <button type="submit" id="sendChatBtn" class="btn-donor-primary" style="border-radius: 24px; padding: 8px 22px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span>Send</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
               </button>
             </form>
           </section>
@@ -466,7 +568,296 @@
       <section class="dashboard-content-section" id="section-reviews"></section>
 
       <!-- ================= SECTION 9: SETTINGS ================= -->
-      <section class="dashboard-content-section" id="section-settings"></section>
+      <section class="dashboard-content-section" id="section-settings">
+        <!-- Settings Header Card -->
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 20px;">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">⚙️</span>
+              <div>
+                <h2>Donor Portal Settings & Preferences</h2>
+                <div class="card-subtitle">Configure real-time emergency match alerts, travel radius, identity privacy, and account security.</div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span class="nav-pill-badge pill-green" id="settingsBadgeStatus">
+                <span class="pulse-dot"></span> Preferences Synced
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-Column Settings Grid -->
+        <div class="settings-grid-2">
+          <!-- CARD 1: Emergency & Notification Preferences -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🔔</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Emergency Alerts & Notifications</h3>
+                  <div class="card-subtitle">Manage how you are alerted during urgent blood requests</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- Setting 1: SMS Broadcasts -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Critical SMS Match Broadcasts</div>
+                  <div class="setting-desc">Instant SMS to {{ user.phone if user and user.phone else "+880 1712345678" }} for Code Red A+ emergency requirements nearby.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle SMS Match Broadcasts">
+                  <input type="checkbox" id="settingSmsAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 2: Live In-App Alerts -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Live In-App Push & Chime</div>
+                  <div class="setting-desc">Audible chime and push notification for chat messages and urgent patient broadcasts.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle In-App Push Notifications">
+                  <input type="checkbox" id="settingInAppPush" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 3: Recovery Gap Reminders -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">56-Day Recovery Eligibility Reminders</div>
+                  <div class="setting-desc">Automated alert when your whole blood resting window ends and you are ready to donate again.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Recovery Reminders">
+                  <input type="checkbox" id="settingGapReminders" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 4: Quiet Hours -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Nighttime Quiet Hours (11 PM – 7 AM)</div>
+                  <div class="setting-desc">Mute non-urgent notifications during sleep hours. Life-critical hospital alarms still notify.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Quiet Hours">
+                  <input type="checkbox" id="settingQuietHours">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: Matching Discovery & Travel Radius -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🎯</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Matching Discovery & Travel Radius</h3>
+                  <div class="card-subtitle">Set geographic boundary and donation formats</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Radius Range Slider -->
+            <div class="range-slider-wrapper" style="margin-bottom: 20px;">
+              <div class="range-header-info">
+                <span>Maximum Response Travel Distance:</span>
+                <span id="radiusValueDisplay" style="color: var(--primary-red); font-size: 1rem; font-weight: 700;">15 km</span>
+              </div>
+              <input type="range" min="2" max="50" step="1" value="15" class="distance-range-input" id="settingRadiusRange" aria-label="Donation Travel Radius">
+              <div style="display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--text-muted); margin-top: 6px;">
+                <span>2 km (Local)</span>
+                <span>15 km (Recommended)</span>
+                <span>50 km (Greater Dhaka)</span>
+              </div>
+            </div>
+
+            <!-- Donation Types Chips -->
+            <div style="margin-bottom: 20px;">
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Willing Donation Formats:
+              </div>
+              <div class="check-chips-wrap" id="donationTypesWrap">
+                <label class="check-chip selected">
+                  <input type="checkbox" id="typeWholeBlood" checked>
+                  <span>🩸 Whole Blood</span>
+                </label>
+                <label class="check-chip selected">
+                  <input type="checkbox" id="typePlatelets" checked>
+                  <span>🧪 Platelets (Apheresis)</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" id="typePlasma">
+                  <span>💉 Plasma</span>
+                </label>
+                <label class="check-chip">
+                  <input type="checkbox" id="typeDoubleRed">
+                  <span>🔴 Double Red Cells</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Preferred Zones -->
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Preferred Hospital Clusters (Click to toggle):
+              </div>
+              <div class="zones-pills-wrap" id="preferredZonesWrap">
+                <button type="button" class="zone-chip selected" data-zone="Dhanmondi / Panthapath">Dhanmondi / Panthapath (Square, BRB)</button>
+                <button type="button" class="zone-chip selected" data-zone="Shahbagh">Shahbagh (BSMMU, BIRDEM)</button>
+                <button type="button" class="zone-chip selected" data-zone="Bakshibazar">Bakshibazar (Dhaka Medical)</button>
+                <button type="button" class="zone-chip" data-zone="Mohakhali">Mohakhali (National Chest, ICDDR,B)</button>
+                <button type="button" class="zone-chip" data-zone="Kurmitola">Kurmitola / Cantonment Area</button>
+                <button type="button" class="zone-chip" data-zone="Bashundhara">Bashundhara (Evercare)</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 3: Privacy & Contact Visibility Controls -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🛡️</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Privacy & Contact Visibility</h3>
+                  <div class="card-subtitle">Control who sees your personal phone number and status</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- Setting 1: Hospital direct call -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Direct Phone Calls from Verified Hospitals</div>
+                  <div class="setting-desc">Permit official hospital transfusion units to place immediate phone calls for critical patient matches.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Hospital Direct Calls">
+                  <input type="checkbox" id="settingAllowHospitalCall" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 2: Number Masking -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Number Masking for Public Seekers</div>
+                  <div class="setting-desc">Seekers connect with you via In-App Chat. Your mobile number remains masked until you accept.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Phone Number Masking">
+                  <input type="checkbox" id="settingMaskPublicPhone" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 3: Public Directory -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Show in Verified Donor Directory</div>
+                  <div class="setting-desc">Allow authorized doctors and patient relatives to discover your readiness when searching A+ blood.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Public Directory Visibility">
+                  <input type="checkbox" id="settingPublicDirectory" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Setting 4: Badges & Milestones -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Public Donor Badges & Lives Saved Counter</div>
+                  <div class="setting-desc">Showcase your Gold Tier badge, 8 verified donations, and 4.9 rating on your public donor card.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Badges Visibility">
+                  <input type="checkbox" id="settingShowBadges" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 4: Security, Authentication & Session Control -->
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">🔐</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Security & Account Credentials</h3>
+                  <div class="card-subtitle">Manage 2-Factor authentication, password, and active devices</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-group-stack">
+              <!-- 2FA Toggle -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Two-Factor Authentication (SMS OTP)</div>
+                  <div class="setting-desc">Require a secure 6-digit one-time code sent to your registered phone on logins from new browsers.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Two Factor Authentication">
+                  <input type="checkbox" id="settingTwoFactor" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Change Password Section -->
+              <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-page);">
+                <div style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                  <span>🔑</span> Change Password
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <input type="password" id="inputCurrentPass" class="form-control-custom" placeholder="Current password">
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <input type="password" id="inputNewPass" class="form-control-custom" placeholder="New password (min 8 chars)">
+                    <input type="password" id="inputConfirmPass" class="form-control-custom" placeholder="Confirm new password">
+                  </div>
+                  <button type="button" class="btn-donor-outline" id="btnUpdatePassword" style="align-self: flex-start; margin-top: 4px;">
+                    Update Password
+                  </button>
+                </div>
+              </div>
+
+              <!-- Active Device & Session Info -->
+              <div class="session-device-card">
+                <div>
+                  <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                    <span>💻</span> Chrome on Windows (Current Session)
+                  </div>
+                  <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 2px;">
+                    Dhaka, Bangladesh · IP: 103.114.xxx.xx · <span style="color: var(--success-green); font-weight: 600;">Active Now</span>
+                  </div>
+                </div>
+                <button type="button" class="btn-donor-danger" id="btnRevokeSessions" style="padding: 6px 12px; font-size: 0.78rem;">
+                  Log Out Others
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sticky Settings Action Bar -->
+        <div class="settings-action-bar">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <button type="button" class="btn-donor-primary" id="saveSettingsBtn">
+              💾 Save All Preferences
+            </button>
+            <button type="button" class="btn-donor-outline" id="resetSettingsBtn">
+              ↺ Reset to Defaults
+            </button>
+          </div>
+          <div style="font-size: 0.84rem; color: var(--text-secondary);" id="settingsStatusText">
+            All preferences synced with server
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
