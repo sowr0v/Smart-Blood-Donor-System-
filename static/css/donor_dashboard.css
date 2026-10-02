@@ -423,6 +423,176 @@ input:checked + .switch-slider:before {
   display: block;
 }
 
+.availability-page-header {
+  margin-bottom: 24px;
+}
+
+.availability-eyebrow {
+  margin-bottom: 6px;
+  color: var(--primary-red);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.availability-page-header h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.65rem;
+}
+
+.availability-page-header > p:last-child {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.availability-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 24px;
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-red);
+  background: var(--bg-card);
+}
+
+.availability-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.availability-label {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.availability-state {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+}
+
+.availability-state.is-available {
+  color: var(--success-green);
+}
+
+.availability-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.availability-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.availability-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.availability-switch-track {
+  display: flex;
+  align-items: center;
+  width: 48px;
+  height: 28px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--border-color);
+  transition: background-color 160ms ease;
+}
+
+.availability-switch-track span {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 160ms ease;
+}
+
+.availability-switch input:checked + .availability-switch-track {
+  background: var(--success-green);
+}
+
+.availability-switch input:checked + .availability-switch-track span {
+  transform: translateX(20px);
+}
+
+.availability-switch input:focus-visible + .availability-switch-track {
+  outline: 3px solid rgba(225, 29, 72, 0.28);
+  outline-offset: 2px;
+}
+
+.availability-switch input:disabled + .availability-switch-track {
+  opacity: 0.6;
+}
+
+.availability-save-status {
+  min-height: 1.3em;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.availability-preferences {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.availability-preferences h2 {
+  margin: 0 0 16px;
+  color: var(--text-primary);
+  font-size: 1.08rem;
+}
+
+.availability-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.availability-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--text-primary);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.availability-field[hidden] {
+  display: none;
+}
+
+.availability-save-button {
+  margin-top: 18px;
+}
+
+@media (max-width: 600px) {
+  .availability-panel {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }

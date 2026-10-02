@@ -312,7 +312,63 @@
       </section>
 
       <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
-      <section class="dashboard-content-section" id="section-availability"></section>
+      <section class="dashboard-content-section" id="section-availability">
+        <header class="availability-page-header">
+          <p class="availability-eyebrow">Donor Operations</p>
+          <h1>Donor Availability</h1>
+          <p>Choose whether you can receive blood donation requests.</p>
+        </header>
+
+        <div class="availability-panel">
+          <div class="availability-copy">
+            <span class="availability-label">Current status</span>
+            <strong class="availability-state{% if availability.is_matchable %} is-available{% endif %}" id="availability-state" aria-live="polite">
+              {{ availability.matching_status }}
+            </strong>
+            <p>Your status is used when donors are considered for matching.</p>
+          </div>
+          <label class="availability-switch" for="availability-toggle">
+            <span>Receive requests</span>
+            <input type="checkbox" id="availability-toggle" role="switch"{% if availability.is_available %} checked{% endif %}>
+            <span class="availability-switch-track" aria-hidden="true"><span></span></span>
+          </label>
+        </div>
+        <form class="availability-preferences" id="availability-preferences-form">
+          <h2>Temporary or scheduled unavailability</h2>
+          <div class="availability-form-grid">
+            <label class="availability-field" for="unavailability-mode">
+              <span>Unavailability</span>
+              <select id="unavailability-mode" class="form-control-custom">
+                <option value="none"{% if availability.unavailability_mode == "none" %} selected{% endif %}>No planned time off</option>
+                <option value="temporary"{% if availability.unavailability_mode == "temporary" %} selected{% endif %}>Unavailable through a date</option>
+                <option value="scheduled"{% if availability.unavailability_mode == "scheduled" %} selected{% endif %}>Schedule a date range</option>
+              </select>
+            </label>
+            <label class="availability-field" id="temporary-unavailable-field" for="temporary-unavailable-until">
+              <span>Unavailable through</span>
+              <input class="form-control-custom" type="date" id="temporary-unavailable-until" value="{{ availability.temporary_unavailable_until or '' }}">
+            </label>
+            <label class="availability-field" id="scheduled-start-field" for="scheduled-unavailable-start">
+              <span>Start date</span>
+              <input class="form-control-custom" type="date" id="scheduled-unavailable-start" value="{{ availability.scheduled_unavailable_start or '' }}">
+            </label>
+            <label class="availability-field" id="scheduled-end-field" for="scheduled-unavailable-end">
+              <span>End date</span>
+              <input class="form-control-custom" type="date" id="scheduled-unavailable-end" value="{{ availability.scheduled_unavailable_end or '' }}">
+            </label>
+            <label class="availability-field" for="emergency-contact-preference">
+              <span>Emergency contact preference</span>
+              <select id="emergency-contact-preference" class="form-control-custom">
+                <option value="sms"{% if availability.emergency_contact_preference == "sms" %} selected{% endif %}>Text message</option>
+                <option value="phone_call"{% if availability.emergency_contact_preference == "phone_call" %} selected{% endif %}>Phone call</option>
+                <option value="both"{% if availability.emergency_contact_preference == "both" %} selected{% endif %}>Call or text</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn btn-primary availability-save-button" type="submit">Save preferences</button>
+        </form>
+        <p class="availability-save-status" id="availability-save-status" role="status" aria-live="polite"></p>
+      </section>
 
       <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
       <section class="dashboard-content-section" id="section-profile"></section>

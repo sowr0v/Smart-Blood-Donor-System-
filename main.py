@@ -12,8 +12,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, closing
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Form, Query, Request
@@ -21,7 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 AUTH_DATABASE_PATH = Path(
@@ -267,8 +268,36 @@ def initialize_auth_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_reset_challenges_phone
                     ON password_reset_challenges(phone, created_at);
+                CREATE TABLE IF NOT EXISTS donor_availability (
+                    donor_phone TEXT PRIMARY KEY,
+                    is_available INTEGER NOT NULL DEFAULT 0,
+                    radius_km INTEGER NOT NULL DEFAULT 10,
+                    preferred_zones TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL,
+                    unavailability_mode TEXT NOT NULL DEFAULT 'none',
+                    temporary_unavailable_until TEXT,
+                    scheduled_unavailable_start TEXT,
+                    scheduled_unavailable_end TEXT,
+                    emergency_contact_preference TEXT NOT NULL DEFAULT 'sms'
+                );
                 """
             )
+            columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(donor_availability)")
+            }
+            migrations = {
+                "unavailability_mode": "TEXT NOT NULL DEFAULT 'none'",
+                "temporary_unavailable_until": "TEXT",
+                "scheduled_unavailable_start": "TEXT",
+                "scheduled_unavailable_end": "TEXT",
+                "emergency_contact_preference": "TEXT NOT NULL DEFAULT 'sms'",
+            }
+            for column, definition in migrations.items():
+                if column not in columns:
+                    connection.execute(
+                        f"ALTER TABLE donor_availability ADD COLUMN {column} {definition}"
+                    )
 
 
 def _connection():
@@ -580,6 +609,73 @@ def _get_current_user(request: Request) -> dict | None:
     return user
 
 
+def _require_donor_phone(request: Request) -> str:
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or not token.get("sub"):
+        raise HTTPException(status_code=401, detail="Sign in as a donor to manage availability.")
+    user = USERS.get(token["sub"])
+    if not user or user.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can manage availability.")
+    return token["sub"]
+
+
+def _read_donor_availability(donor_phone: str) -> dict:
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT is_available, radius_km, preferred_zones, updated_at,
+                      unavailability_mode, temporary_unavailable_until,
+                      scheduled_unavailable_start, scheduled_unavailable_end,
+                      emergency_contact_preference
+               FROM donor_availability WHERE donor_phone = ?""",
+            (donor_phone,),
+        ).fetchone()
+    if not row:
+        return {
+            "is_available": False,
+            "radius_km": 10,
+            "preferred_zones": [],
+            "updated_at": None,
+            "unavailability_mode": "none",
+            "temporary_unavailable_until": None,
+            "scheduled_unavailable_start": None,
+            "scheduled_unavailable_end": None,
+            "emergency_contact_preference": "sms",
+        }
+    availability = {
+        "is_available": bool(row["is_available"]),
+        "radius_km": row["radius_km"],
+        "preferred_zones": json.loads(row["preferred_zones"]),
+        "updated_at": row["updated_at"],
+        "unavailability_mode": row["unavailability_mode"],
+        "temporary_unavailable_until": row["temporary_unavailable_until"],
+        "scheduled_unavailable_start": row["scheduled_unavailable_start"],
+        "scheduled_unavailable_end": row["scheduled_unavailable_end"],
+        "emergency_contact_preference": row["emergency_contact_preference"],
+    }
+    today = datetime.now(timezone.utc).date().isoformat()
+    in_unavailability_window = (
+        availability["unavailability_mode"] == "temporary"
+        and availability["temporary_unavailable_until"]
+        and availability["temporary_unavailable_until"] >= today
+    ) or (
+        availability["unavailability_mode"] == "scheduled"
+        and availability["scheduled_unavailable_start"]
+        and availability["scheduled_unavailable_end"]
+        and availability["scheduled_unavailable_start"] <= today
+        <= availability["scheduled_unavailable_end"]
+    )
+    availability["is_matchable"] = availability["is_available"] and not in_unavailability_window
+    if not availability["is_available"]:
+        availability["matching_status"] = "Not available"
+    elif in_unavailability_window and availability["unavailability_mode"] == "temporary":
+        availability["matching_status"] = "Temporarily unavailable"
+    elif in_unavailability_window:
+        availability["matching_status"] = "Unavailable by schedule"
+    else:
+        availability["matching_status"] = "Available for requests"
+    return availability
+
+
 @app.get("/api/v1/auth/status")
 async def get_auth_status(request: Request):
     user = _get_current_user(request)
@@ -874,6 +970,7 @@ async def donor_dashboard(request: Request):
         context={
             "request": request,
             "user": user,
+            "availability": _read_donor_availability(phone or user.get("phone", "")),
             "title": "Donor Personal Dashboard - Smart Blood Donor System",
         },
     )
@@ -889,16 +986,103 @@ async def logout(request: Request):
 
 class DonorAvailabilityUpdate(BaseModel):
     is_available: bool
-    radius_km: int = 10
-    preferred_zones: list[str] = []
+    radius_km: int | None = Field(default=None, ge=1, le=100)
+    preferred_zones: list[str] | None = None
+    unavailability_mode: Literal["none", "temporary", "scheduled"] | None = None
+    temporary_unavailable_until: date | None = None
+    scheduled_unavailable_start: date | None = None
+    scheduled_unavailable_end: date | None = None
+    emergency_contact_preference: Literal["sms", "phone_call", "both"] | None = None
+
+
+@app.get("/api/v1/donor/availability")
+async def get_donor_availability(request: Request):
+    donor_phone = _require_donor_phone(request)
+    return {"status": "success", **_read_donor_availability(donor_phone)}
 
 
 @app.post("/api/v1/donor/availability")
 async def update_donor_availability(payload: DonorAvailabilityUpdate, request: Request):
+    donor_phone = _require_donor_phone(request)
+    current = _read_donor_availability(donor_phone)
+    radius_km = payload.radius_km if payload.radius_km is not None else current["radius_km"]
+    preferred_zones = payload.preferred_zones if payload.preferred_zones is not None else current["preferred_zones"]
+    unavailability_mode = payload.unavailability_mode or current["unavailability_mode"]
+    if payload.unavailability_mode is None:
+        temporary_until = current["temporary_unavailable_until"]
+        scheduled_start = current["scheduled_unavailable_start"]
+        scheduled_end = current["scheduled_unavailable_end"]
+    else:
+        temporary_until = payload.temporary_unavailable_until
+        scheduled_start = payload.scheduled_unavailable_start
+        scheduled_end = payload.scheduled_unavailable_end
+    if payload.unavailability_mode is not None:
+        today = datetime.now(timezone.utc).date()
+        if unavailability_mode == "temporary":
+            if not temporary_until or temporary_until < today:
+                raise HTTPException(status_code=422, detail="Choose today or a future date for temporary unavailability.")
+            scheduled_start = None
+            scheduled_end = None
+        elif unavailability_mode == "scheduled":
+            if not scheduled_start or not scheduled_end or scheduled_start < today or scheduled_end < scheduled_start:
+                raise HTTPException(status_code=422, detail="Choose a valid future unavailability date range.")
+            temporary_until = None
+        else:
+            temporary_until = None
+            scheduled_start = None
+            scheduled_end = None
+    emergency_contact_preference = (
+        payload.emergency_contact_preference
+        if payload.emergency_contact_preference is not None
+        else current["emergency_contact_preference"]
+    )
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_availability
+                   (donor_phone, is_available, radius_km, preferred_zones, updated_at,
+                    unavailability_mode, temporary_unavailable_until,
+                    scheduled_unavailable_start, scheduled_unavailable_end,
+                    emergency_contact_preference)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(donor_phone) DO UPDATE SET
+                       is_available = excluded.is_available,
+                       radius_km = excluded.radius_km,
+                       preferred_zones = excluded.preferred_zones,
+                       updated_at = excluded.updated_at,
+                       unavailability_mode = excluded.unavailability_mode,
+                       temporary_unavailable_until = excluded.temporary_unavailable_until,
+                       scheduled_unavailable_start = excluded.scheduled_unavailable_start,
+                       scheduled_unavailable_end = excluded.scheduled_unavailable_end,
+                       emergency_contact_preference = excluded.emergency_contact_preference""",
+                (
+                    donor_phone,
+                    int(payload.is_available),
+                    radius_km,
+                    json.dumps(preferred_zones),
+                    updated_at,
+                    unavailability_mode,
+                    temporary_until.isoformat() if temporary_until else None,
+                    scheduled_start.isoformat() if scheduled_start else None,
+                    scheduled_end.isoformat() if scheduled_end else None,
+                    emergency_contact_preference,
+                ),
+            )
+    saved = _read_donor_availability(donor_phone)
     return {
         "status": "success",
         "is_available": payload.is_available,
-        "radius_km": payload.radius_km,
+        "radius_km": radius_km,
+        "preferred_zones": preferred_zones,
+        "unavailability_mode": saved["unavailability_mode"],
+        "temporary_unavailable_until": saved["temporary_unavailable_until"],
+        "scheduled_unavailable_start": saved["scheduled_unavailable_start"],
+        "scheduled_unavailable_end": saved["scheduled_unavailable_end"],
+        "emergency_contact_preference": saved["emergency_contact_preference"],
+        "is_matchable": saved["is_matchable"],
+        "matching_status": saved["matching_status"],
+        "updated_at": updated_at,
         "message": "Availability updated successfully.",
     }
 
@@ -918,4 +1102,4 @@ async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest
         "action": payload.action,
         "eta": payload.eta,
         "message": f"Blood request {request_id} {payload.action}ed successfully.",
-    }
+    }

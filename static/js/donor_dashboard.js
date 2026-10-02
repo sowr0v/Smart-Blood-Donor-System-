@@ -5,6 +5,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const sections = document.querySelectorAll('.dashboard-content-section');
   const mobileSidebar = document.getElementById('donorSidebar');
   const mobileToggleBtn = document.getElementById('mobileSidebarToggle');
+  const availabilityToggle = document.getElementById('availability-toggle');
+  const availabilityState = document.getElementById('availability-state');
+  const availabilitySaveStatus = document.getElementById('availability-save-status');
+  const availabilityPreferencesForm = document.getElementById('availability-preferences-form');
+  const unavailabilityMode = document.getElementById('unavailability-mode');
+  const temporaryUntilField = document.getElementById('temporary-unavailable-field');
+  const scheduledStartField = document.getElementById('scheduled-start-field');
+  const scheduledEndField = document.getElementById('scheduled-end-field');
+
+  function updateUnavailabilityFields() {
+    if (!unavailabilityMode) return;
+    const mode = unavailabilityMode.value;
+    if (temporaryUntilField) temporaryUntilField.hidden = mode !== 'temporary';
+    if (scheduledStartField) scheduledStartField.hidden = mode !== 'scheduled';
+    if (scheduledEndField) scheduledEndField.hidden = mode !== 'scheduled';
+  }
+
+  if (unavailabilityMode) {
+    unavailabilityMode.addEventListener('change', updateUnavailabilityFields);
+    updateUnavailabilityFields();
+  }
+
+  function renderAvailabilityStatus(result) {
+    availabilityState.textContent = result.matching_status;
+    availabilityState.classList.toggle('is-available', result.is_matchable);
+  }
 
   function showToast(message, type = 'info') {
     const toast = document.getElementById('dashboardToast');
@@ -16,6 +42,73 @@ document.addEventListener('DOMContentLoaded', () => {
     window._toastTimeout = setTimeout(() => {
       toast.classList.remove('show');
     }, 3200);
+  }
+
+  if (availabilityToggle && availabilityState && availabilitySaveStatus) {
+    availabilityToggle.addEventListener('change', async () => {
+      const previousValue = !availabilityToggle.checked;
+      availabilityToggle.disabled = true;
+      availabilitySaveStatus.textContent = 'Saving availability...';
+
+      try {
+        const response = await fetch('/api/v1/donor/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_available: availabilityToggle.checked })
+        });
+        if (!response.ok) throw new Error('Availability could not be saved.');
+
+        const result = await response.json();
+        availabilityToggle.checked = result.is_available;
+        renderAvailabilityStatus(result);
+        availabilitySaveStatus.textContent = 'Availability saved.';
+      } catch (error) {
+        availabilityToggle.checked = previousValue;
+        availabilitySaveStatus.textContent = error.message;
+      } finally {
+        availabilityToggle.disabled = false;
+      }
+    });
+  }
+
+  if (availabilityPreferencesForm && availabilityToggle && availabilityState && availabilitySaveStatus) {
+    availabilityPreferencesForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const mode = unavailabilityMode.value;
+      const payload = {
+        is_available: availabilityToggle.checked,
+        unavailability_mode: mode,
+        temporary_unavailable_until: mode === 'temporary'
+          ? document.getElementById('temporary-unavailable-until').value || null
+          : null,
+        scheduled_unavailable_start: mode === 'scheduled'
+          ? document.getElementById('scheduled-unavailable-start').value || null
+          : null,
+        scheduled_unavailable_end: mode === 'scheduled'
+          ? document.getElementById('scheduled-unavailable-end').value || null
+          : null,
+        emergency_contact_preference: document.getElementById('emergency-contact-preference').value
+      };
+      const saveButton = availabilityPreferencesForm.querySelector('button[type="submit"]');
+      saveButton.disabled = true;
+      availabilitySaveStatus.textContent = 'Saving preferences...';
+
+      try {
+        const response = await fetch('/api/v1/donor/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Preferences could not be saved.');
+        renderAvailabilityStatus(result);
+        availabilitySaveStatus.textContent = 'Preferences saved.';
+      } catch (error) {
+        availabilitySaveStatus.textContent = error.message;
+      } finally {
+        saveButton.disabled = false;
+      }
+    });
   }
 
   function activateSection(targetId) {
