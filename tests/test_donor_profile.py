@@ -59,3 +59,26 @@ class DonorProfileTests(unittest.TestCase):
             cookies={"access_token": token},
         )
         self.assertEqual(response.status_code, 422)
+
+    def test_donor_matching_feed_returns_active_matches(self):
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get(
+            "/api/v1/donor/matches",
+            params={"urgency": "all", "district": "all"},
+            cookies={"access_token": token},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("requests", data)
+        self.assertTrue(data["requests"])
+        self.assertTrue(all(item["is_active"] for item in data["requests"]))
+        self.assertTrue(all("urgency" in item for item in data["requests"]))
+        self.assertTrue(any(item["blood_group"] == "A+" for item in data["requests"]))
+
+    def test_donor_dashboard_has_matching_request_filters(self):
+        response = self.client.get("/donor/dashboard?preview=1")
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn("Matched Blood Requests", html)
+        self.assertIn("matched-request-filters", html)
+        self.assertIn("matched-request-feed", html)
