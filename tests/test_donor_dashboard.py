@@ -35,6 +35,20 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn("Donor Reviews", html)
         self.assertIn("Settings & Preferences", html)
 
+    def test_donor_in_app_chat_rendered(self):
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get("/donor/dashboard", cookies={"access_token": token})
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+        self.assertIn('id="section-chat"', html)
+        self.assertIn('chat-module-shell', html)
+        self.assertIn('chat-threads-sidebar', html)
+        self.assertIn('Square Hospital - Blood Desk', html)
+        self.assertIn('Dhaka Medical Desk', html)
+        self.assertIn('chatMessages', html)
+        self.assertIn('chatInput', html)
+        self.assertIn('sendChatBtn', html)
+
     def test_donor_availability_api(self):
         response = self.client.post(
             "/api/v1/donor/availability",
