@@ -277,6 +277,30 @@ function initUrgentBoard() {
   const districtFilter =
     document.getElementById("urgent-district-filter");
 
+  const detailDialog =
+    document.getElementById("urgent-request-details");
+
+  const detailBloodGroup =
+    document.getElementById("urgent-detail-blood-group");
+
+  const detailHospital =
+    document.getElementById("urgent-detail-hospital");
+
+  const detailLocation =
+    document.getElementById("urgent-detail-location");
+
+  const detailDistance =
+    document.getElementById("urgent-detail-distance");
+
+  const detailExpiry =
+    document.getElementById("urgent-detail-expiry");
+
+  const detailDirections =
+    document.getElementById("urgent-detail-directions");
+
+  const detailConnect =
+    document.getElementById("urgent-detail-connect");
+
   if (
     !requestList ||
     !status ||
@@ -297,6 +321,56 @@ function initUrgentBoard() {
     element.textContent = text;
 
     return element;
+  }
+
+  function showRequestDetails(request) {
+    const locationParts = [
+      request.area,
+      request.district,
+    ].filter(Boolean);
+
+    detailBloodGroup.textContent = request.blood_group;
+    detailHospital.textContent = request.hospital_name;
+    detailLocation.textContent = locationParts.join(", ") || "Location unavailable";
+    detailDistance.textContent =
+      request.distance_km !== null &&
+      request.distance_km !== undefined &&
+      Number.isFinite(Number(request.distance_km))
+        ? `${Number(request.distance_km).toFixed(1)} km away`
+        : "Distance unavailable";
+
+    const expiryDate = new Date(request.expires_at);
+    detailExpiry.dateTime = request.expires_at;
+    detailExpiry.textContent = expiryDate.toLocaleString();
+
+    const destination = [
+      request.hospital_name,
+      ...locationParts,
+    ].join(", ");
+    const directionsUrl = new URL("https://www.google.com/maps/dir/");
+    directionsUrl.searchParams.set("api", "1");
+    directionsUrl.searchParams.set("destination", destination);
+    detailDirections.href = directionsUrl.toString();
+
+    const phone = String(request.contact_phone || "").replace(/[\s()-]/g, "");
+    if (/^\+?\d{6,15}$/.test(phone)) {
+      detailConnect.href = `tel:${phone}`;
+      detailConnect.hidden = false;
+    } else {
+      detailConnect.hidden = true;
+    }
+
+    detailDialog.showModal();
+  }
+
+  if (detailDialog) {
+    detailDialog
+      .querySelector("[data-dialog-close]")
+      .addEventListener("click", () => detailDialog.close());
+
+    detailDialog.addEventListener("click", (event) => {
+      if (event.target === detailDialog) detailDialog.close();
+    });
   }
 
   function countdownText(expiry) {
@@ -493,13 +567,34 @@ function initUrgentBoard() {
         );
       }
 
+      const detailsButton =
+        document.createElement("button");
+
+      detailsButton.className =
+        "urgent-details-button";
+
+      detailsButton.type = "button";
+      detailsButton.textContent = "View details";
+      detailsButton.addEventListener(
+        "click",
+        () => showRequestDetails(request)
+      );
+
+      const actions = textElement(
+        "div",
+        "urgent-request-actions",
+        ""
+      );
+
+      actions.append(detailsButton, connect);
+
       card.append(
         cardTop,
         facility,
         location,
         countdownLabel,
         countdown,
-        connect
+        actions
       );
 
       requestList.append(card);

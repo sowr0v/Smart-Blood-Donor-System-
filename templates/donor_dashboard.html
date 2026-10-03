@@ -328,7 +328,55 @@
       <section class="dashboard-content-section" id="section-request-flow"></section>
 
       <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
-      <section class="dashboard-content-section" id="section-request-details"></section>
+      <section class="dashboard-content-section" id="section-request-details" aria-labelledby="donor-request-details-title">
+        <header class="donor-request-details-header">
+          <span class="eyebrow">Active emergency requests</span>
+          <h1 id="donor-request-details-title">Blood Request Details &amp; Directions</h1>
+          <p>Review the hospital and request information, then open directions to the donation location.</p>
+        </header>
+
+        <p class="donor-request-details-status" id="donor-request-details-status" role="status" aria-live="polite">
+          Loading active emergency requests...
+        </p>
+
+        <div class="donor-request-details-controls">
+          <label for="donor-request-details-select">Select an active request</label>
+          <select id="donor-request-details-select" disabled>
+            <option value="">Loading requests...</option>
+          </select>
+        </div>
+
+        <div class="details-split-grid donor-request-details-grid" id="donor-request-details-content" hidden>
+          <section class="hospital-dossier-card" aria-labelledby="donor-request-hospital">
+            <div class="donor-request-detail-heading">
+              <span class="urgent-blood-pill" id="donor-request-blood-group"></span>
+              <span class="urgent-priority">Critical</span>
+            </div>
+            <h2 class="donor-request-hospital" id="donor-request-hospital"></h2>
+            <div class="dossier-row">
+              <span class="dossier-label">Location</span>
+              <span class="dossier-value" id="donor-request-location"></span>
+            </div>
+            <div class="dossier-row">
+              <span class="dossier-label">Distance</span>
+              <span class="dossier-value" id="donor-request-distance"></span>
+            </div>
+            <div class="dossier-row">
+              <span class="dossier-label">Request expires</span>
+              <time class="dossier-value" id="donor-request-expiry"></time>
+            </div>
+          </section>
+
+          <section class="route-simulation-card" aria-labelledby="donor-request-directions-title">
+            <h2 id="donor-request-directions-title">Hospital directions</h2>
+            <p>Open this request location in Google Maps to plan your route.</p>
+            <a class="donor-request-directions-link" id="donor-request-directions" href="#" target="_blank" rel="noopener noreferrer">
+              Get directions
+            </a>
+            <a class="donor-request-call-link" id="donor-request-call" href="#" hidden>Call hospital</a>
+          </section>
+        </div>
+      </section>
 
       <!-- ================= SECTION 7: IN-APP CHAT ================= -->
       <section class="dashboard-content-section" id="section-chat">
