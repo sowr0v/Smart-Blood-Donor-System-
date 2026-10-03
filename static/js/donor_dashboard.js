@@ -168,6 +168,31 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
+  const reviewList = document.getElementById('donor-review-list');
+  const reviewRatingFilter = document.getElementById('donor-review-rating-filter');
+  const reviewCount = document.getElementById('donor-review-count');
+  const reviewEmpty = document.getElementById('donor-review-empty');
+
+  if (reviewList && reviewRatingFilter && reviewCount && reviewEmpty) {
+    const reviewItems = [...reviewList.querySelectorAll('.donor-review-item')];
+
+    function filterReviews() {
+      const selectedRating = reviewRatingFilter.value;
+      let visibleCount = 0;
+
+      reviewItems.forEach(review => {
+        const isVisible = selectedRating === 'all' || review.dataset.rating === selectedRating;
+        review.hidden = !isVisible;
+        if (isVisible) visibleCount += 1;
+      });
+
+      reviewCount.textContent = `Showing ${visibleCount} sample ${visibleCount === 1 ? 'review' : 'reviews'}`;
+      reviewEmpty.hidden = visibleCount > 0;
+    }
+
+    reviewRatingFilter.addEventListener('change', filterReviews);
+  }
+
   // =========================================================
   // DONOR IN-APP CHAT MODULE (SBDS-89)
   // =========================================================
