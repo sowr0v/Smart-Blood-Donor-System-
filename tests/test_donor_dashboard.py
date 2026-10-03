@@ -1,7 +1,15 @@
 import unittest
+from contextlib import closing
+from datetime import timedelta
 from fastapi.testclient import TestClient
 
-from main import app, _generate_jwt
+from main import (
+    app,
+    _connection,
+    _current_donor_date,
+    _generate_jwt,
+    initialize_auth_database,
+)
 
 
 class DonorDashboardTests(unittest.TestCase):
@@ -26,6 +34,14 @@ class DonorDashboardTests(unittest.TestCase):
 
         # Verify all 9 required sidebar items
         self.assertIn("Donor Availability", html)
+        self.assertIn('id="section-availability"', html)
+        self.assertIn('id="donorAvailabilityToggle"', html)
+        self.assertIn('id="availabilityStatusText"', html)
+        self.assertIn('id="unavailabilityScheduleForm"', html)
+        self.assertIn('id="unavailabilityStartDate"', html)
+        self.assertIn('id="unavailabilityEndDate"', html)
+        self.assertNotIn("Whole-blood estimate", html)
+        self.assertNotIn('id="nextEligibleDate"', html)
         self.assertIn("Donor Profile & Medical Info", html)
         self.assertIn("Donation History", html)
         self.assertIn("Matched Blood Requests", html)
@@ -107,15 +123,129 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertEqual(read_data["unread_count"], 0)
 
     def test_donor_availability_api(self):
+        initialize_auth_database()
+        donor_token = _generate_jwt("+8801755555555", "donor")
+        cookies = {"access_token": donor_token}
+
+        initial = self.client.get("/api/v1/donor/availability", cookies=cookies)
+        self.assertEqual(initial.status_code, 200)
+        self.assertFalse(initial.json()["is_available"])
+
         response = self.client.post(
             "/api/v1/donor/availability",
             json={"is_available": True, "radius_km": 15, "preferred_zones": ["Dhanmondi"]},
+            cookies=cookies,
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertTrue(data["is_available"])
         self.assertEqual(data["radius_km"], 15)
+        self.assertEqual(data["preferred_zones"], ["Dhanmondi"])
+        self.assertTrue(self.client.get("/api/v1/donor/availability", cookies=cookies).json()["is_available"])
+
+        disabled = self.client.post(
+            "/api/v1/donor/availability",
+            json={"is_available": False},
+            cookies=cookies,
+        )
+        self.assertEqual(disabled.status_code, 200)
+        self.assertFalse(self.client.get("/api/v1/donor/availability", cookies=cookies).json()["is_available"])
+
+    def test_donor_availability_requires_donor_authentication(self):
+        initialize_auth_database()
+        endpoint = "/api/v1/donor/availability"
+        payload = {"is_available": True}
+        self.assertEqual(self.client.get(endpoint).status_code, 401)
+        self.assertEqual(self.client.post(endpoint, json=payload).status_code, 401)
+
+        seeker_cookies = {"access_token": _generate_jwt("+8801723456789", "seeker")}
+        self.assertEqual(self.client.get(endpoint, cookies=seeker_cookies).status_code, 403)
+        self.assertEqual(self.client.post(endpoint, json=payload, cookies=seeker_cookies).status_code, 403)
+
+    def test_donor_can_schedule_cancel_and_auto_expire_unavailability(self):
+        initialize_auth_database()
+        donor_phone = "+8801755555560"
+        cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        endpoint = "/api/v1/donor/availability/schedule"
+        today = _current_donor_date()
+        start_date = (today + timedelta(days=2)).isoformat()
+        end_date = (today + timedelta(days=7)).isoformat()
+
+        scheduled = self.client.post(
+            endpoint,
+            json={"start_date": start_date, "end_date": end_date},
+            cookies=cookies,
+        )
+        self.assertEqual(scheduled.status_code, 200)
+        self.assertTrue(scheduled.json()["is_available"])
+        self.assertEqual(scheduled.json()["unavailability_start_date"], start_date)
+        self.assertEqual(scheduled.json()["unavailability_end_date"], end_date)
+
+        cancelled = self.client.delete(endpoint, cookies=cookies)
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertTrue(cancelled.json()["is_available"])
+        self.assertIsNone(cancelled.json()["unavailability_start_date"])
+
+        active = self.client.post(
+            endpoint,
+            json={"start_date": today.isoformat(), "end_date": (today + timedelta(days=1)).isoformat()},
+            cookies=cookies,
+        )
+        self.assertEqual(active.status_code, 200)
+        self.assertFalse(active.json()["is_available"])
+        self.assertTrue(active.json()["unavailability_active"])
+        self.assertFalse(self.client.get("/api/v1/donor/availability", cookies=cookies).json()["is_available"])
+
+        expired_end = (today - timedelta(days=1)).isoformat()
+        with closing(_connection()) as connection:
+            with connection:
+                connection.execute(
+                    """UPDATE donor_availability
+                       SET unavailable_start_date = ?, unavailable_end_date = ?, is_available = 0
+                       WHERE donor_phone = ?""",
+                    (expired_end, expired_end, donor_phone),
+                )
+        reenabled = self.client.get("/api/v1/donor/availability", cookies=cookies)
+        self.assertEqual(reenabled.status_code, 200)
+        self.assertTrue(reenabled.json()["is_available"])
+        self.assertIsNone(reenabled.json()["unavailability_end_date"])
+
+    def test_donor_unavailability_schedule_rejects_invalid_or_unauthorized_ranges(self):
+        initialize_auth_database()
+        endpoint = "/api/v1/donor/availability/schedule"
+        today = _current_donor_date()
+        valid_range = {
+            "start_date": today.isoformat(),
+            "end_date": (today + timedelta(days=1)).isoformat(),
+        }
+        self.assertEqual(self.client.post(endpoint, json=valid_range).status_code, 401)
+        self.assertEqual(self.client.delete(endpoint).status_code, 401)
+
+        seeker_cookies = {"access_token": _generate_jwt("+8801723456789", "seeker")}
+        self.assertEqual(
+            self.client.post(endpoint, json=valid_range, cookies=seeker_cookies).status_code,
+            403,
+        )
+        self.assertEqual(self.client.delete(endpoint, cookies=seeker_cookies).status_code, 403)
+
+        donor_cookies = {"access_token": _generate_jwt("+8801755555561", "donor")}
+        invalid_order = {
+            "start_date": (today + timedelta(days=2)).isoformat(),
+            "end_date": (today + timedelta(days=1)).isoformat(),
+        }
+        self.assertEqual(
+            self.client.post(endpoint, json=invalid_order, cookies=donor_cookies).status_code,
+            422,
+        )
+        past_start = {
+            "start_date": (today - timedelta(days=1)).isoformat(),
+            "end_date": today.isoformat(),
+        }
+        self.assertEqual(
+            self.client.post(endpoint, json=past_start, cookies=donor_cookies).status_code,
+            422,
+        )
 
     def test_donor_respond_request_api(self):
         response = self.client.post(
@@ -146,4 +276,3 @@ class DonorDashboardTests(unittest.TestCase):
         data = response.json()
         self.assertTrue(data["is_authenticated"])
         self.assertEqual(data["role"], "donor")
-

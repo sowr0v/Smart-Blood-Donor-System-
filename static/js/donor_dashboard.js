@@ -18,6 +18,221 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3200);
   }
 
+  const availabilityToggle = document.getElementById('donorAvailabilityToggle');
+  const availabilityStatusCard = document.getElementById('availabilityStatusCard');
+  const availabilityStatusText = document.getElementById('availabilityStatusText');
+  const availabilityStatusDescription = document.getElementById('availabilityStatusDescription');
+  const availabilitySaveStatus = document.getElementById('availabilitySaveStatus');
+  const availabilityUpdated = document.getElementById('availabilityUpdated');
+  const unavailabilityScheduleForm = document.getElementById('unavailabilityScheduleForm');
+  const unavailabilityStartDate = document.getElementById('unavailabilityStartDate');
+  const unavailabilityEndDate = document.getElementById('unavailabilityEndDate');
+  const saveUnavailabilitySchedule = document.getElementById('saveUnavailabilitySchedule');
+  const unavailabilityScheduleStatus = document.getElementById('unavailabilityScheduleStatus');
+  const cancelUnavailabilitySchedule = document.getElementById('cancelUnavailabilitySchedule');
+
+  if (
+    availabilityToggle &&
+    availabilityStatusCard &&
+    availabilityStatusText &&
+    availabilityStatusDescription &&
+    availabilitySaveStatus &&
+    availabilityUpdated &&
+    unavailabilityScheduleForm &&
+    unavailabilityStartDate &&
+    unavailabilityEndDate &&
+    saveUnavailabilitySchedule &&
+    unavailabilityScheduleStatus &&
+    cancelUnavailabilitySchedule
+  ) {
+    const today = new Date();
+    const todayString = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0')
+    ].join('-');
+    unavailabilityStartDate.min = todayString;
+    unavailabilityEndDate.min = todayString;
+    let renderedScheduleKey;
+
+    function formatDate(dateValue) {
+      if (!dateValue) return '';
+      const [year, month, day] = dateValue.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+      });
+    }
+
+    function renderAvailability(data, updateScheduleFields = false) {
+      const isAvailable = data.is_available === true;
+      const hasSchedule = Boolean(data.unavailability_start_date && data.unavailability_end_date);
+      const scheduleActive = data.unavailability_active === true;
+      const scheduleKey = hasSchedule
+        ? `${data.unavailability_start_date}/${data.unavailability_end_date}`
+        : null;
+      availabilityToggle.checked = isAvailable;
+      availabilityToggle.disabled = scheduleActive;
+      availabilityStatusCard.dataset.availabilityStatus = isAvailable ? 'available' : 'unavailable';
+      availabilityStatusCard.classList.toggle('is-unavailable', !isAvailable);
+      availabilityStatusText.textContent = isAvailable ? 'Available' : 'Not available';
+      if (scheduleActive) {
+        availabilityStatusDescription.textContent =
+          `Temporary pause through ${formatDate(data.unavailability_end_date)}. Availability will resume the following day.`;
+      } else {
+        availabilityStatusDescription.textContent = isAvailable
+          ? 'You may be considered for matching blood requests.'
+          : 'You will not be included in donor matches until you enable availability.';
+      }
+      availabilityUpdated.textContent = data.updated_at
+        ? `Last updated ${new Date(data.updated_at).toLocaleString()}`
+        : 'You have not changed your availability yet.';
+      cancelUnavailabilitySchedule.hidden = !hasSchedule;
+      unavailabilityScheduleStatus.textContent = hasSchedule
+        ? scheduleActive
+          ? `Pause active: ${formatDate(data.unavailability_start_date)} – ${formatDate(data.unavailability_end_date)}.`
+          : `Pause scheduled: ${formatDate(data.unavailability_start_date)} – ${formatDate(data.unavailability_end_date)}.`
+        : 'No temporary pause scheduled.';
+      if (updateScheduleFields || scheduleKey !== renderedScheduleKey) {
+        unavailabilityStartDate.value = data.unavailability_start_date || '';
+        unavailabilityEndDate.value = data.unavailability_end_date || '';
+      }
+      unavailabilityEndDate.min = unavailabilityStartDate.value || todayString;
+      renderedScheduleKey = scheduleKey;
+    }
+
+    async function loadAvailability() {
+      const response = await fetch('/api/v1/donor/availability', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('Could not load your availability status.');
+      }
+      const data = await response.json();
+      if (typeof data.is_available !== 'boolean') {
+        throw new Error('The availability response was invalid.');
+      }
+      return data;
+    }
+
+    loadAvailability()
+      .then(data => {
+        renderAvailability(data, true);
+        unavailabilityStartDate.disabled = false;
+        unavailabilityEndDate.disabled = false;
+        saveUnavailabilitySchedule.disabled = false;
+      })
+      .catch(error => {
+        availabilityStatusCard.dataset.availabilityStatus = 'error';
+        availabilityStatusText.textContent = 'Status unavailable';
+        availabilityStatusDescription.textContent = error.message;
+        availabilitySaveStatus.textContent = 'Refresh the page to try again.';
+        availabilityToggle.disabled = true;
+        unavailabilityStartDate.disabled = true;
+        unavailabilityEndDate.disabled = true;
+        saveUnavailabilitySchedule.disabled = true;
+        cancelUnavailabilitySchedule.disabled = true;
+      });
+
+    availabilityToggle.addEventListener('change', async () => {
+      const previousValue = !availabilityToggle.checked;
+      const requestedValue = availabilityToggle.checked;
+      availabilityToggle.disabled = true;
+      availabilitySaveStatus.textContent = 'Saving availability...';
+
+      try {
+        const response = await fetch('/api/v1/donor/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_available: requestedValue })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not save your availability.');
+        }
+        renderAvailability(data, true);
+        availabilitySaveStatus.textContent = 'Availability saved.';
+      } catch (error) {
+        availabilityToggle.checked = previousValue;
+        availabilitySaveStatus.textContent = error.message || 'Could not save your availability.';
+        showToast(availabilitySaveStatus.textContent);
+      } finally {
+        availabilityToggle.disabled = false;
+      }
+    });
+
+    unavailabilityStartDate.addEventListener('change', () => {
+      unavailabilityEndDate.min = unavailabilityStartDate.value || todayString;
+      if (unavailabilityEndDate.value && unavailabilityEndDate.value < unavailabilityStartDate.value) {
+        unavailabilityEndDate.value = unavailabilityStartDate.value;
+      }
+    });
+
+    unavailabilityScheduleForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!unavailabilityScheduleForm.reportValidity()) return;
+      if (unavailabilityEndDate.value < unavailabilityStartDate.value) {
+        unavailabilityScheduleStatus.textContent = 'End date must be on or after the start date.';
+        return;
+      }
+
+      saveUnavailabilitySchedule.disabled = true;
+      cancelUnavailabilitySchedule.disabled = true;
+      unavailabilityScheduleStatus.textContent = 'Saving temporary pause...';
+      try {
+        const response = await fetch('/api/v1/donor/availability/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start_date: unavailabilityStartDate.value,
+            end_date: unavailabilityEndDate.value
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not schedule your pause.');
+        }
+        renderAvailability(data, true);
+        unavailabilityScheduleStatus.textContent = data.message;
+      } catch (error) {
+        unavailabilityScheduleStatus.textContent = error.message || 'Could not schedule your pause.';
+        showToast(unavailabilityScheduleStatus.textContent);
+      } finally {
+        saveUnavailabilitySchedule.disabled = false;
+        cancelUnavailabilitySchedule.disabled = false;
+      }
+    });
+
+    cancelUnavailabilitySchedule.addEventListener('click', async () => {
+      cancelUnavailabilitySchedule.disabled = true;
+      saveUnavailabilitySchedule.disabled = true;
+      unavailabilityScheduleStatus.textContent = 'Cancelling temporary pause...';
+      try {
+        const response = await fetch('/api/v1/donor/availability/schedule', { method: 'DELETE' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not cancel your pause.');
+        }
+        renderAvailability(data, true);
+        unavailabilityScheduleStatus.textContent = data.message;
+      } catch (error) {
+        unavailabilityScheduleStatus.textContent = error.message || 'Could not cancel your pause.';
+        showToast(unavailabilityScheduleStatus.textContent);
+      } finally {
+        cancelUnavailabilitySchedule.disabled = false;
+        saveUnavailabilitySchedule.disabled = false;
+      }
+    });
+
+    window.setInterval(() => {
+      loadAvailability()
+        .then(data => renderAvailability(data))
+        .catch(error => {
+          availabilitySaveStatus.textContent = error.message;
+        });
+    }, 60_000);
+  }
+
   function activateSection(targetId) {
     if (!targetId) return;
     const cleanId = targetId.replace('#', '');
@@ -796,4 +1011,3 @@ document.addEventListener('DOMContentLoaded', () => {
   window.activateSection = activateSection;
   window.showToast = showToast;
 });
-
