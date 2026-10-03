@@ -21,7 +21,31 @@
           <span class="brand-sub">Donor Network</span>
         </div>
       </a>
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
     </div>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+      </ul>
+
+      <div class="mobile-auth-actions">
+        <a href="/auth/register?role=donor" class="btn btn-primary btn-full">Register</a>
+      </div>
   </header>
 
   <main class="main-shell">
@@ -50,9 +74,15 @@
           </label>
 
           <label>
-            OTP Code (optional)
-            <input type="text" name="otp" placeholder="Enter OTP if using one-time code" />
+            SMS OTP Code (optional - enter any code e.g. 123456)
+            <input type="text" name="otp" placeholder="Enter 6-digit OTP code" />
           </label>
+          <div style="font-size: 0.8rem; margin-top: -6px; margin-bottom: 12px; display: flex; justify-content: space-between;">
+            <a href="/otp-verification" style="color: var(--primary-red); text-decoration: none; font-weight: 500;">
+              Or open SMS OTP Gateway screen →
+            </a>
+            <span style="color: var(--text-muted);">Demo: Any code accepted</span>
+          </div>
 
           <label class="checkbox-row">
             <input type="checkbox" name="admin_console" {% if admin_console %}checked{% endif %} />

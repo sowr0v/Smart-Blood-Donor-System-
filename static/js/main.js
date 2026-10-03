@@ -37,6 +37,38 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // =========================================================
+  // AUTH STATE SYNCHRONIZATION (Keep logged in across all pages)
+  // =========================================================
+  fetch("/api/v1/auth/status")
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data && data.is_authenticated) {
+        const dashUrl = data.dashboard_url || "/donor/dashboard";
+        const isCurrentDashboard = window.location.pathname.includes("/dashboard");
+        document.querySelectorAll(".nav-auth-actions").forEach((el) => {
+          const existingBtn = el.querySelector(".theme-toggle-btn");
+          const authLinks = isCurrentDashboard
+            ? `<a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>`
+            : `<a href="${dashUrl}" class="btn btn-outline">Dashboard</a>
+               <a href="/logout" class="btn btn-primary">Logout</a>`;
+          el.innerHTML = authLinks;
+          if (existingBtn) {
+            el.insertBefore(existingBtn, el.firstChild);
+          } else if (typeof window.setupThemeToggle === "function") {
+            window.setupThemeToggle();
+          }
+        });
+        document.querySelectorAll(".mobile-auth-actions").forEach((el) => {
+          el.innerHTML = isCurrentDashboard
+            ? `<a href="/logout" class="btn btn-outline btn-full">Logout</a>`
+            : `<a href="${dashUrl}" class="btn btn-outline btn-full">Dashboard</a>
+               <a href="/logout" class="btn btn-primary btn-full">Logout</a>`;
+        });
+      }
+    })
+    .catch(() => {});
+
+  // =========================================================
   // BLOOD REQUEST FEED
   // =========================================================
 
@@ -245,6 +277,30 @@ function initUrgentBoard() {
   const districtFilter =
     document.getElementById("urgent-district-filter");
 
+  const detailDialog =
+    document.getElementById("urgent-request-details");
+
+  const detailBloodGroup =
+    document.getElementById("urgent-detail-blood-group");
+
+  const detailHospital =
+    document.getElementById("urgent-detail-hospital");
+
+  const detailLocation =
+    document.getElementById("urgent-detail-location");
+
+  const detailDistance =
+    document.getElementById("urgent-detail-distance");
+
+  const detailExpiry =
+    document.getElementById("urgent-detail-expiry");
+
+  const detailDirections =
+    document.getElementById("urgent-detail-directions");
+
+  const detailConnect =
+    document.getElementById("urgent-detail-connect");
+
   if (
     !requestList ||
     !status ||
@@ -265,6 +321,56 @@ function initUrgentBoard() {
     element.textContent = text;
 
     return element;
+  }
+
+  function showRequestDetails(request) {
+    const locationParts = [
+      request.area,
+      request.district,
+    ].filter(Boolean);
+
+    detailBloodGroup.textContent = request.blood_group;
+    detailHospital.textContent = request.hospital_name;
+    detailLocation.textContent = locationParts.join(", ") || "Location unavailable";
+    detailDistance.textContent =
+      request.distance_km !== null &&
+      request.distance_km !== undefined &&
+      Number.isFinite(Number(request.distance_km))
+        ? `${Number(request.distance_km).toFixed(1)} km away`
+        : "Distance unavailable";
+
+    const expiryDate = new Date(request.expires_at);
+    detailExpiry.dateTime = request.expires_at;
+    detailExpiry.textContent = expiryDate.toLocaleString();
+
+    const destination = [
+      request.hospital_name,
+      ...locationParts,
+    ].join(", ");
+    const directionsUrl = new URL("https://www.google.com/maps/dir/");
+    directionsUrl.searchParams.set("api", "1");
+    directionsUrl.searchParams.set("destination", destination);
+    detailDirections.href = directionsUrl.toString();
+
+    const phone = String(request.contact_phone || "").replace(/[\s()-]/g, "");
+    if (/^\+?\d{6,15}$/.test(phone)) {
+      detailConnect.href = `tel:${phone}`;
+      detailConnect.hidden = false;
+    } else {
+      detailConnect.hidden = true;
+    }
+
+    detailDialog.showModal();
+  }
+
+  if (detailDialog) {
+    detailDialog
+      .querySelector("[data-dialog-close]")
+      .addEventListener("click", () => detailDialog.close());
+
+    detailDialog.addEventListener("click", (event) => {
+      if (event.target === detailDialog) detailDialog.close();
+    });
   }
 
   function countdownText(expiry) {
@@ -461,13 +567,34 @@ function initUrgentBoard() {
         );
       }
 
+      const detailsButton =
+        document.createElement("button");
+
+      detailsButton.className =
+        "urgent-details-button";
+
+      detailsButton.type = "button";
+      detailsButton.textContent = "View details";
+      detailsButton.addEventListener(
+        "click",
+        () => showRequestDetails(request)
+      );
+
+      const actions = textElement(
+        "div",
+        "urgent-request-actions",
+        ""
+      );
+
+      actions.append(detailsButton, connect);
+
       card.append(
         cardTop,
         facility,
         location,
         countdownLabel,
         countdown,
-        connect
+        actions
       );
 
       requestList.append(card);
@@ -1015,112 +1142,136 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-
-  // =======================================================
-  // REGISTRATION FORM
-  // =======================================================
-
-  const registrationForm =
-    document.getElementById(
-      "registration-form"
-    );
-
-  const roleSelect =
-    document.getElementById(
-      "register-role"
-    );
-
-  const personalFields =
-    document.getElementById(
-      "personal-fields"
-    );
-
-  const organizationFields =
-    document.getElementById(
-      "organization-fields"
-    );
-
-  const bloodGroup =
-    document.getElementById(
-      "blood-group"
-    );
-
-  if (
-    roleSelect &&
-    personalFields &&
-    organizationFields &&
-    bloodGroup
-  ) {
-
-    const updateRegistrationFields =
-      () => {
-
-        const isOrganization =
-          roleSelect.value ===
-            "blood_bank" ||
-          roleSelect.value ===
-            "hospital";
-
-        personalFields.hidden =
-          isOrganization;
-
-        organizationFields.hidden =
-          !isOrganization;
-
-        bloodGroup.required =
-          !isOrganization;
-
-        personalFields
-          .querySelectorAll(
-            "input, select"
-          )
-          .forEach((field) => {
-            field.disabled =
-              isOrganization;
-          });
-
-        organizationFields
-          .querySelectorAll(
-            "input, select"
-          )
-          .forEach((field) => {
-            field.disabled =
-              !isOrganization;
-          });
-      };
-
-    roleSelect.addEventListener(
-      "change",
-      updateRegistrationFields
-    );
-
-    updateRegistrationFields();
-  }
-
-
-  if (registrationForm) {
-    registrationForm.addEventListener(
-      "submit",
-      (event) => {
-        event.preventDefault();
-
-        const status =
-          document.getElementById(
-            "registration-status"
-          );
-
-        if (status) {
-          status.textContent =
-            "Account creation is not connected yet. Your information has not been submitted.";
-
-          status.hidden = false;
-        }
+  // ================= SBDS-10: Multi-Role User Registration =================
+  const roleSelect = document.getElementById("role-select");
+  const formIndividual = document.getElementById("form-individual");
+  const formOrganization = document.getElementById("form-organization");
+  
+  if (roleSelect && formIndividual && formOrganization) {
+    
+    const updateForms = () => {
+      const role = roleSelect.value;
+      const roleName = roleSelect.options[roleSelect.selectedIndex].text;
+      
+      // Update H1 title
+      const h1Title = document.querySelector(".form-panel h1");
+      if (h1Title) {
+        h1Title.textContent = "Register as a " + roleName;
       }
-    );
+      
+      if (role === "donor" || role === "seeker") {
+        formIndividual.style.display = "block";
+        formOrganization.style.display = "none";
+        document.getElementById("individual-role-input").value = role;
+        document.getElementById("btn-text-individual").textContent = roleName;
+      } else {
+        formIndividual.style.display = "none";
+        formOrganization.style.display = "block";
+        document.getElementById("organization-role-input").value = role;
+        document.getElementById("btn-text-organization").textContent = roleName;
+      }
+    };
+
+    roleSelect.addEventListener("change", updateForms);
+    updateForms();
+    
+    // Form submission logic
+    document.querySelectorAll(".multi-role-form").forEach(form => {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        // Require real-time location before successful registration
+        if (navigator.geolocation) {
+          const submitBtn = form.querySelector('button[type="submit"]');
+          const originalBtnText = submitBtn.innerHTML;
+          submitBtn.innerHTML = "Getting Location...";
+          submitBtn.disabled = true;
+
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              // Hide forms on success
+              formIndividual.style.display = "none";
+              formOrganization.style.display = "none";
+              document.querySelector(".role-switcher").style.display = "none";
+              
+              // Show success message
+              const successMsg = document.getElementById("registration-success-msg");
+              if (successMsg) {
+                successMsg.style.display = "block";
+              }
+            },
+            (error) => {
+              alert("Real-time location is required to register. Please allow location access in your browser.");
+              submitBtn.innerHTML = originalBtnText;
+              submitBtn.disabled = false;
+            }
+          );
+        } else {
+          alert("Geolocation is not supported by this browser.");
+        }
+      });
+    });
+  }
+});
+
+// ================= THEME TOGGLE (Dark/Light Mode) =================
+(function() {
+  const currentTheme = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', currentTheme);
+
+  function getSunIcon() {
+    return `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>`;
   }
 
+  function getMoonIcon() {
+    return `<svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7c.18 0 .35.02.51.05-.2.53-.31 1.1-.31 1.69 0 2.87 2.33 5.2 5.2 5.2.59 0 1.16-.11 1.69-.31.03.16.05.33.05.51 0 3.86-3.14 7-7 7z"/></svg>`;
+  }
 
-  // =======================================================
+  function setupThemeToggle() {
+    const activeTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'light';
+    let btn = document.querySelector('.theme-toggle-btn');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.className = 'theme-toggle-btn';
+      btn.setAttribute('aria-label', 'Toggle Dark Mode');
+    }
+
+    btn.innerHTML = (activeTheme === 'dark') ? getSunIcon() : getMoonIcon();
+
+    if (!btn._themeListenerAttached) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const newTheme = isDark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        btn.innerHTML = (newTheme === 'dark') ? getSunIcon() : getMoonIcon();
+      });
+      btn._themeListenerAttached = true;
+    }
+
+    // Attach to navbar if not already attached
+    const navActions = document.querySelector('.nav-auth-actions') || document.querySelector('.nav-container');
+    if (navActions && !navActions.contains(btn)) {
+      if (navActions.classList.contains('nav-auth-actions')) {
+        navActions.style.display = 'flex';
+        navActions.style.alignItems = 'center';
+        navActions.insertBefore(btn, navActions.firstChild);
+      } else {
+        navActions.appendChild(btn);
+      }
+    }
+  }
+
+  window.setupThemeToggle = setupThemeToggle;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupThemeToggle);
+  } else {
+    setupThemeToggle();
+  }
+})();
+  document.addEventListener('DOMContentLoaded', () => {
   // PLATFORM LIVE IMPACT STATISTICS
   // COUNTER ANIMATION
   // =======================================================

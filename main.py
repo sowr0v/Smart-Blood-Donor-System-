@@ -1,4 +1,5 @@
 import base64
+import asyncio
 import hashlib
 import hmac
 import json
@@ -12,7 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, closing
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -21,7 +22,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 AUTH_DATABASE_PATH = Path(
@@ -38,6 +39,7 @@ OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
+DONOR_TIMEZONE = timezone(timedelta(hours=6), name="Asia/Dhaka")
 
 
 def initialize_urgent_database():
@@ -91,7 +93,15 @@ def initialize_urgent_database():
 async def lifespan(_: FastAPI):
     initialize_auth_database()
     initialize_urgent_database()
-    yield
+    expiry_task = asyncio.create_task(_scheduled_unavailability_expiry_loop())
+    try:
+        yield
+    finally:
+        expiry_task.cancel()
+        try:
+            await expiry_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="Smart Blood Donor System", lifespan=lifespan)
@@ -120,13 +130,10 @@ REQUESTS = [
     {
         "id": "req-001",
         "blood_group": "A+",
-        "district": "Dhaka",
         "hospital": "Square Hospital",
         "area": "Farmgate",
         "units": 2,
         "status": "Critical",
-        "urgency": "Critical",
-        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(minutes=8)).isoformat(),
         "contact_name": "Blood Desk",
         "contact_phone": "+8801700000001",
@@ -134,13 +141,10 @@ REQUESTS = [
     {
         "id": "req-002",
         "blood_group": "O-",
-        "district": "Dhaka",
         "hospital": "Green Life Hospital",
         "area": "Panthapath",
         "units": 1,
         "status": "Urgent",
-        "urgency": "Urgent",
-        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(minutes=24)).isoformat(),
         "contact_name": "Emergency Desk",
         "contact_phone": "+8801700000002",
@@ -148,13 +152,10 @@ REQUESTS = [
     {
         "id": "req-003",
         "blood_group": "B+",
-        "district": "Dhaka",
         "hospital": "Ibn Sina Hospital",
         "area": "Dhanmondi",
         "units": 3,
         "status": "Open",
-        "urgency": "Standard",
-        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(hours=1, minutes=12)).isoformat(),
         "contact_name": "Transfusion Unit",
         "contact_phone": "+8801700000003",
@@ -162,13 +163,10 @@ REQUESTS = [
     {
         "id": "req-004",
         "blood_group": "A+",
-        "district": "Dhaka",
         "hospital": "Dhaka Medical College Hospital",
         "area": "Shahbagh",
         "units": 2,
         "status": "Urgent",
-        "urgency": "Urgent",
-        "is_active": True,
         "posted_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
         "contact_name": "Blood Bank",
         "contact_phone": "+8801700000004",
@@ -222,33 +220,33 @@ def _build_donor_match_requests(profile: dict) -> list[dict]:
     donor_group = (profile.get("blood_group") or "A+").upper()
     donor_district = (profile.get("district") or "Dhaka").strip().lower()
     donor_area = (profile.get("area") or "").strip().lower()
-    match_target_groups = DONOR_MATCH_COMPATIBILITY.get(donor_group, {donor_group})
+    compatible_groups = DONOR_MATCH_COMPATIBILITY.get(donor_group, {donor_group})
+    matches = []
 
-    matches: list[dict] = []
     for request in REQUESTS:
         if not _request_is_active(request):
             continue
-        request_group = (request.get("blood_group") or "").upper()
-        if request_group not in match_target_groups:
+        if (request.get("blood_group") or "").upper() not in compatible_groups:
             continue
 
         request_district = (request.get("district") or "Dhaka").strip().lower()
         request_area = (request.get("area") or "").strip().lower()
         if donor_district and donor_area and request_district != donor_district and request_area != donor_area:
-            # Keep the match relevant when the donor is in the same city but a nearby zone is requested.
             if request_district != donor_district and request_district != "dhaka":
                 continue
 
-        urgency = _normalized_request_urgency(request)
         request_data = dict(request)
         request_data["district"] = request.get("district") or "Dhaka"
-        request_data["urgency"] = urgency
+        request_data["urgency"] = _normalized_request_urgency(request)
         request_data["is_active"] = True
         request_data["location"] = f"{request.get('area') or 'Dhaka'}, {request.get('district') or 'Dhaka'}"
         matches.append(request_data)
 
     order = {"Critical": 3, "Urgent": 2, "Open": 1, "Standard": 1}
-    matches.sort(key=lambda item: (order.get(_normalized_request_urgency(item), 0), item.get("posted_at", "")), reverse=True)
+    matches.sort(
+        key=lambda item: (order.get(_normalized_request_urgency(item), 0), item.get("posted_at", "")),
+        reverse=True,
+    )
     return matches
 
 
@@ -374,6 +372,15 @@ def initialize_auth_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_reset_challenges_phone
                     ON password_reset_challenges(phone, created_at);
+                CREATE TABLE IF NOT EXISTS donor_availability (
+                    donor_phone TEXT PRIMARY KEY,
+                    is_available INTEGER NOT NULL DEFAULT 0,
+                    radius_km INTEGER NOT NULL DEFAULT 10,
+                    preferred_zones TEXT NOT NULL DEFAULT '[]',
+                    updated_at TEXT NOT NULL,
+                    unavailable_start_date TEXT,
+                    unavailable_end_date TEXT
+                );
                 CREATE TABLE IF NOT EXISTS donor_profiles (
                     phone TEXT NOT NULL UNIQUE,
                     name TEXT NOT NULL,
@@ -395,6 +402,18 @@ def initialize_auth_database():
                 );
                 """
             )
+            availability_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(donor_availability)")
+            }
+            if "unavailable_start_date" not in availability_columns:
+                connection.execute(
+                    "ALTER TABLE donor_availability ADD COLUMN unavailable_start_date TEXT"
+                )
+            if "unavailable_end_date" not in availability_columns:
+                connection.execute(
+                    "ALTER TABLE donor_availability ADD COLUMN unavailable_end_date TEXT"
+                )
 
 
 def _connection():
@@ -829,9 +848,8 @@ async def serve_registration(request: Request, role: str = "donor"):
 @app.get("/api/v1/requests/urgent")
 def get_urgent_requests(request: Request):
     now = datetime.now(timezone.utc)
-    user = _get_current_user(request)
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    donor_phone = token["sub"] if user and user.get("role") == "donor" and token else ""
+    donor_phone = token.get("sub", "") if token and token.get("role") == "donor" else ""
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
@@ -993,9 +1011,6 @@ async def otp_verification(request: Request, phone: str = ""):
     )
 
 
-VALID_BLOOD_GROUPS = {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}
-
-
 def _default_donor_profile(phone: str) -> dict:
     user = USERS.get(phone, {"name": "Ayesha Rahman", "role": "donor", "phone": phone})
     return {
@@ -1004,7 +1019,7 @@ def _default_donor_profile(phone: str) -> dict:
         "email": "ayesha.rahman@gmail.com",
         "date_of_birth": "1992-02-14",
         "gender": "Female",
-        "blood_group": "A+",
+        "blood_group": user.get("blood_group", "A+"),
         "district": "Dhaka",
         "area": "Dhanmondi",
         "address": "House 18, Road 7, Dhanmondi, Dhaka",
@@ -1020,49 +1035,28 @@ def _default_donor_profile(phone: str) -> dict:
 
 def _get_donor_profile(phone: str) -> dict:
     initialize_auth_database()
-    if not phone:
-        phone = "+8801712345678"
     with closing(_connection()) as connection:
         row = connection.execute(
-            """
-            SELECT phone, name, email, date_of_birth, gender, blood_group,
-                   district, area, address, last_donation, medical_conditions,
-                   medications, allergies, fitness_status, preferred_donation_types, updated_at
-            FROM donor_profiles WHERE phone = ?
-            """,
+            """SELECT phone, name, email, date_of_birth, gender, blood_group,
+                      district, area, address, last_donation, medical_conditions,
+                      medications, allergies, fitness_status, preferred_donation_types, updated_at
+               FROM donor_profiles WHERE phone = ?""",
             (phone,),
         ).fetchone()
-        if row is None:
-            profile = _default_donor_profile(phone)
+        if row is not None:
+            return {key: row[key] for key in row.keys()}
+
+        profile = _default_donor_profile(phone)
+        with connection:
             connection.execute(
-                """
-                INSERT INTO donor_profiles (
-                    phone, name, email, date_of_birth, gender, blood_group,
-                    district, area, address, last_donation, medical_conditions,
-                    medications, allergies, fitness_status, preferred_donation_types, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    profile["phone"],
-                    profile["name"],
-                    profile["email"],
-                    profile["date_of_birth"],
-                    profile["gender"],
-                    profile["blood_group"],
-                    profile["district"],
-                    profile["area"],
-                    profile["address"],
-                    profile["last_donation"],
-                    profile["medical_conditions"],
-                    profile["medications"],
-                    profile["allergies"],
-                    profile["fitness_status"],
-                    profile["preferred_donation_types"],
-                    profile["updated_at"],
-                ),
+                """INSERT INTO donor_profiles (
+                       phone, name, email, date_of_birth, gender, blood_group, district,
+                       area, address, last_donation, medical_conditions, medications,
+                       allergies, fitness_status, preferred_donation_types, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                tuple(profile.values()),
             )
-            return profile
-        return {key: row[key] for key in row.keys()}
+        return profile
 
 
 class DonorProfileUpdate(BaseModel):
@@ -1083,32 +1077,34 @@ class DonorProfileUpdate(BaseModel):
     preferred_donation_types: str = "Whole Blood"
 
 
+VALID_BLOOD_GROUPS = {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}
+
+
 @app.get("/api/v1/donor/profile")
 async def get_donor_profile(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = token.get("sub") if token else None
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
     if not phone and request.query_params.get("preview") == "1":
         phone = "+8801712345678"
     if not phone:
         raise HTTPException(status_code=401, detail="Sign in required to access donor profile.")
-    profile = _get_donor_profile(phone)
-    return {"status": "success", "profile": profile}
+    return {"status": "success", "profile": _get_donor_profile(phone)}
 
 
 @app.post("/api/v1/donor/profile")
 async def update_donor_profile(payload: DonorProfileUpdate, request: Request):
-    initialize_auth_database()
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = token.get("sub") if token else None
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
     if not phone:
-        if request.query_params.get("preview") == "1":
-            phone = "+8801712345678"
-        else:
-            raise HTTPException(status_code=401, detail="Sign in required to update donor profile.")
+        raise HTTPException(status_code=401, detail="Sign in required to update donor profile.")
 
     normalized_phone = normalize_phone(payload.phone)
+    if normalized_phone != phone:
+        raise HTTPException(status_code=422, detail="Phone number must match the authenticated donor.")
     if payload.blood_group not in VALID_BLOOD_GROUPS:
-        raise HTTPException(status_code=422, detail="Blood group must be one of A+, A-, B+, B-, AB+, AB-, O+, O-.")
+        raise HTTPException(status_code=422, detail="Blood group is invalid.")
     if not payload.name.strip() or not payload.district.strip() or not payload.area.strip() or not payload.address.strip():
         raise HTTPException(status_code=422, detail="Name, district, area, and address are required.")
     if payload.email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", payload.email.strip()):
@@ -1120,7 +1116,7 @@ async def update_donor_profile(payload: DonorProfileUpdate, request: Request):
             raise HTTPException(status_code=422, detail="Last donation date must use YYYY-MM-DD format.") from exc
 
     profile = {
-        "phone": normalized_phone,
+        "phone": phone,
         "name": payload.name.strip(),
         "email": payload.email.strip() if payload.email else "",
         "date_of_birth": payload.date_of_birth or "",
@@ -1137,77 +1133,67 @@ async def update_donor_profile(payload: DonorProfileUpdate, request: Request):
         "preferred_donation_types": payload.preferred_donation_types.strip() or "Whole Blood",
         "updated_at": int(time.time()),
     }
-
     with closing(_connection()) as connection:
-        connection.execute(
-            """
-            INSERT INTO donor_profiles (
-                phone, name, email, date_of_birth, gender, blood_group,
-                district, area, address, last_donation, medical_conditions,
-                medications, allergies, fitness_status, preferred_donation_types, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(phone)
-            DO UPDATE SET
-                name = excluded.name,
-                email = excluded.email,
-                date_of_birth = excluded.date_of_birth,
-                gender = excluded.gender,
-                blood_group = excluded.blood_group,
-                district = excluded.district,
-                area = excluded.area,
-                address = excluded.address,
-                last_donation = excluded.last_donation,
-                medical_conditions = excluded.medical_conditions,
-                medications = excluded.medications,
-                allergies = excluded.allergies,
-                fitness_status = excluded.fitness_status,
-                preferred_donation_types = excluded.preferred_donation_types,
-                updated_at = excluded.updated_at
-            """,
-            (
-                profile["phone"],
-                profile["name"],
-                profile["email"],
-                profile["date_of_birth"],
-                profile["gender"],
-                profile["blood_group"],
-                profile["district"],
-                profile["area"],
-                profile["address"],
-                profile["last_donation"],
-                profile["medical_conditions"],
-                profile["medications"],
-                profile["allergies"],
-                profile["fitness_status"],
-                profile["preferred_donation_types"],
-                profile["updated_at"],
-            ),
-        )
-
-    USERS[normalized_phone] = {
-        **USERS.get(normalized_phone, {"role": "donor"}),
-        "name": profile["name"],
-        "role": USERS.get(normalized_phone, {}).get("role", "donor"),
-        "phone": normalized_phone,
-        "blood_group": profile["blood_group"],
-    }
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_profiles (
+                   phone, name, email, date_of_birth, gender, blood_group, district,
+                   area, address, last_donation, medical_conditions, medications,
+                   allergies, fitness_status, preferred_donation_types, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(phone) DO UPDATE SET
+                   name = excluded.name, email = excluded.email, date_of_birth = excluded.date_of_birth,
+                   gender = excluded.gender, blood_group = excluded.blood_group, district = excluded.district,
+                   area = excluded.area, address = excluded.address, last_donation = excluded.last_donation,
+                   medical_conditions = excluded.medical_conditions, medications = excluded.medications,
+                   allergies = excluded.allergies, fitness_status = excluded.fitness_status,
+                   preferred_donation_types = excluded.preferred_donation_types, updated_at = excluded.updated_at""",
+                tuple(profile.values()),
+            )
+    USERS[phone] = {**USERS.get(phone, {"role": "donor"}), "name": profile["name"], "phone": phone, "blood_group": profile["blood_group"]}
     return {"status": "success", "message": "Donor profile updated successfully.", "profile": profile}
+
+
+@app.get("/api/v1/donor/matches")
+async def donor_matching_requests(
+    request: Request,
+    blood_group: str = Query(default="all"),
+    urgency: str = Query(default="all"),
+    district: str = Query(default="all"),
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        raise HTTPException(status_code=401, detail="Sign in required to access matched requests.")
+
+    profile = _get_donor_profile(phone)
+    matches = _build_donor_match_requests(profile)
+    if blood_group.lower() != "all":
+        matches = [item for item in matches if item.get("blood_group", "").upper() == blood_group.upper()]
+    if urgency.lower() != "all":
+        selected_urgency = _normalized_request_urgency({"urgency": urgency})
+        matches = [item for item in matches if _normalized_request_urgency(item) == selected_urgency]
+    if district.lower() != "all":
+        matches = [item for item in matches if item.get("district", "Dhaka").lower() == district.lower()]
+    return {"status": "success", "count": len(matches), "requests": matches, "profile": profile}
 
 
 @app.get("/donor/dashboard", response_class=HTMLResponse)
 async def donor_dashboard(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = token.get("sub") if token else None
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
     user = USERS.get(phone) if phone else None
 
-    if not user or user.get("role") != "donor":
+    if not user:
         if request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1":
-            user = USERS.get("+8801712345678", {"name": "Ayesha Rahman", "role": "donor", "phone": "+8801712345678"})
-            phone = user.get("phone")
+            phone = "+8801712345678"
+            user = USERS.get(phone, {"name": "Ayesha Rahman", "role": "donor", "phone": phone})
         else:
             return RedirectResponse(url="/login?next=/donor/dashboard", status_code=303)
 
-    profile = _get_donor_profile(phone or "+8801712345678")
+    profile = _get_donor_profile(phone)
     return templates.TemplateResponse(
         request=request,
         name="donor_dashboard.html",
@@ -1220,41 +1206,31 @@ async def donor_dashboard(request: Request):
     )
 
 
-@app.get("/api/v1/donor/matches")
-async def donor_matching_requests(
-    request: Request,
-    blood_group: str = Query(default="all"),
-    urgency: str = Query(default="all"),
-    district: str = Query(default="all"),
-):
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = token.get("sub") if token else None
-    if not phone and request.query_params.get("preview") == "1":
-        phone = "+8801712345678"
-    if not phone:
-        raise HTTPException(status_code=401, detail="Sign in required to access matched requests.")
+@app.get("/seeker/dashboard", response_class=HTMLResponse)
+async def seeker_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Seeker", "title": "Seeker Dashboard"},
+    )
 
-    profile = _get_donor_profile(phone)
-    matches = _build_donor_match_requests(profile)
 
-    blood_group_value = (blood_group or "all").strip()
-    urgency_value = (urgency or "all").strip()
-    district_value = (district or "all").strip()
+@app.get("/hospital/dashboard", response_class=HTMLResponse)
+async def hospital_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Hospital", "title": "Hospital Dashboard"},
+    )
 
-    if blood_group_value.lower() != "all":
-        matches = [item for item in matches if (item.get("blood_group") or "").upper() == blood_group_value.upper()]
-    if urgency_value.lower() != "all":
-        normalized = _normalized_request_urgency({"urgency": urgency_value})
-        matches = [item for item in matches if _normalized_request_urgency(item) == normalized]
-    if district_value.lower() != "all":
-        matches = [item for item in matches if (item.get("district") or "Dhaka").lower() == district_value.lower()]
 
-    return {
-        "status": "success",
-        "count": len(matches),
-        "requests": matches,
-        "profile": profile,
-    }
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={"request": request, "role": "Admin", "title": "Admin Console"},
+    )
 
 
 @app.get("/logout")
@@ -1267,17 +1243,207 @@ async def logout(request: Request):
 
 class DonorAvailabilityUpdate(BaseModel):
     is_available: bool
-    radius_km: int = 10
-    preferred_zones: list[str] = []
+    radius_km: int = Field(default=10, ge=1, le=500)
+    preferred_zones: list[str] = Field(default_factory=list)
+
+
+def _require_donor(request: Request) -> str:
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or not token.get("sub"):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Donor access required.")
+    phone = token["sub"]
+    if USERS.get(phone, {}).get("role", "donor") != "donor":
+        raise HTTPException(status_code=403, detail="Donor access required.")
+    return phone
+
+
+def _current_donor_date() -> date:
+    return datetime.now(DONOR_TIMEZONE).date()
+
+
+def _expire_scheduled_unavailability(current_date: date | None = None) -> None:
+    today = (current_date or _current_donor_date()).isoformat()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE donor_availability
+                   SET is_available = 0, updated_at = ?
+                   WHERE unavailable_start_date IS NOT NULL
+                     AND unavailable_end_date IS NOT NULL
+                     AND unavailable_start_date <= ?
+                     AND unavailable_end_date >= ?
+                     AND is_available != 0""",
+                (datetime.now(timezone.utc).isoformat(), today, today),
+            )
+            connection.execute(
+                """UPDATE donor_availability
+                   SET is_available = 1,
+                       unavailable_start_date = NULL,
+                       unavailable_end_date = NULL,
+                       updated_at = ?
+                   WHERE unavailable_end_date IS NOT NULL
+                     AND unavailable_end_date < ?""",
+                (datetime.now(timezone.utc).isoformat(), today),
+            )
+
+
+async def _scheduled_unavailability_expiry_loop() -> None:
+    while True:
+        await asyncio.to_thread(_expire_scheduled_unavailability)
+        await asyncio.sleep(60)
+
+
+class DonorUnavailabilitySchedule(BaseModel):
+    start_date: date
+    end_date: date
+
+
+def _read_donor_availability(phone: str) -> dict:
+    _expire_scheduled_unavailability()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT is_available, radius_km, preferred_zones, updated_at,
+                      unavailable_start_date, unavailable_end_date
+               FROM donor_availability WHERE donor_phone = ?""",
+            (phone,),
+        ).fetchone()
+
+    if row is None:
+        return {
+            "is_available": False,
+            "radius_km": 10,
+            "preferred_zones": [],
+            "updated_at": None,
+            "unavailability_start_date": None,
+            "unavailability_end_date": None,
+            "unavailability_active": False,
+        }
+    today = _current_donor_date().isoformat()
+    scheduled_pause_active = bool(
+        row["unavailable_start_date"]
+        and row["unavailable_end_date"]
+        and row["unavailable_start_date"] <= today <= row["unavailable_end_date"]
+    )
+    return {
+        "is_available": bool(row["is_available"]) and not scheduled_pause_active,
+        "radius_km": row["radius_km"],
+        "preferred_zones": json.loads(row["preferred_zones"]),
+        "updated_at": row["updated_at"],
+        "unavailability_start_date": row["unavailable_start_date"],
+        "unavailability_end_date": row["unavailable_end_date"],
+        "unavailability_active": scheduled_pause_active,
+    }
+
+
+@app.get("/api/v1/donor/availability")
+async def get_donor_availability(request: Request):
+    phone = _require_donor(request)
+    response = JSONResponse({"status": "success", **_read_donor_availability(phone)})
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.post("/api/v1/donor/availability")
 async def update_donor_availability(payload: DonorAvailabilityUpdate, request: Request):
+    phone = _require_donor(request)
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_availability
+                       (donor_phone, is_available, radius_km, preferred_zones, updated_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(donor_phone) DO UPDATE SET
+                       is_available = excluded.is_available,
+                       radius_km = excluded.radius_km,
+                       preferred_zones = excluded.preferred_zones,
+                       updated_at = excluded.updated_at,
+                       unavailable_start_date = NULL,
+                       unavailable_end_date = NULL""",
+                (
+                    phone,
+                    int(payload.is_available),
+                    payload.radius_km,
+                    json.dumps(payload.preferred_zones),
+                    updated_at,
+                ),
+            )
+
     return {
         "status": "success",
         "is_available": payload.is_available,
         "radius_km": payload.radius_km,
+        "preferred_zones": payload.preferred_zones,
+        "updated_at": updated_at,
         "message": "Availability updated successfully.",
+    }
+
+
+@app.post("/api/v1/donor/availability/schedule")
+async def schedule_donor_unavailability(
+    payload: DonorUnavailabilitySchedule,
+    request: Request,
+):
+    phone = _require_donor(request)
+    today = _current_donor_date()
+    if payload.start_date < today:
+        raise HTTPException(status_code=422, detail="Start date cannot be in the past.")
+    if payload.end_date < payload.start_date:
+        raise HTTPException(status_code=422, detail="End date must be on or after the start date.")
+
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_availability
+                       (donor_phone, is_available, radius_km, preferred_zones, updated_at,
+                        unavailable_start_date, unavailable_end_date)
+                   VALUES (?, 1, 10, '[]', ?, ?, ?)
+                   ON CONFLICT(donor_phone) DO UPDATE SET
+                       is_available = 1,
+                       updated_at = excluded.updated_at,
+                       unavailable_start_date = excluded.unavailable_start_date,
+                       unavailable_end_date = excluded.unavailable_end_date""",
+                (
+                    phone,
+                    updated_at,
+                    payload.start_date.isoformat(),
+                    payload.end_date.isoformat(),
+                ),
+            )
+
+    _expire_scheduled_unavailability()
+    availability = _read_donor_availability(phone)
+    return {
+        "status": "success",
+        **availability,
+        "message": "Temporary unavailability scheduled.",
+    }
+
+
+@app.delete("/api/v1/donor/availability/schedule")
+async def cancel_donor_unavailability_schedule(request: Request):
+    phone = _require_donor(request)
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE donor_availability
+                   SET is_available = 1,
+                       unavailable_start_date = NULL,
+                       unavailable_end_date = NULL,
+                       updated_at = ?
+                   WHERE donor_phone = ?""",
+                (updated_at, phone),
+            )
+
+    availability = _read_donor_availability(phone)
+    return {
+        "status": "success",
+        **availability,
+        "message": "Temporary unavailability cancelled.",
     }
 
 
@@ -1290,13 +1456,11 @@ class RespondBloodRequest(BaseModel):
 
 @app.post("/api/v1/donor/requests/{request_id}/respond")
 async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest, request: Request):
-    user = _get_current_user(request)
-    if not user:
-        raise HTTPException(status_code=401, detail="Sign in to respond to a blood request.")
-    if user.get("role") != "donor":
-        raise HTTPException(status_code=403, detail="Only donors can respond to blood requests.")
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    donor_phone = token["sub"]
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in to respond to a blood request.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can respond to blood requests.")
 
     action = payload.action.strip().lower()
     if action not in {"accept", "decline"}:
@@ -1337,7 +1501,7 @@ async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest
                        VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     (
                         database_request_id,
-                        donor_phone,
+                        token["sub"],
                         action,
                         payload.eta,
                         payload.reason,
@@ -1349,7 +1513,7 @@ async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest
                     """INSERT INTO seeker_notifications
                        (request_id, donor_phone, response, message, created_at)
                        VALUES (?, ?, ?, ?, ?)""",
-                    (database_request_id, donor_phone, action, notification_message, now.isoformat()),
+                    (database_request_id, token["sub"], action, notification_message, now.isoformat()),
                 )
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=409, detail="You have already responded to this request.") from None

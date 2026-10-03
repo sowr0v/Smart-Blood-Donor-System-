@@ -44,6 +44,13 @@ class DonorProfileTests(unittest.TestCase):
         self.assertEqual(data["profile"]["blood_group"], "A+")
         self.assertEqual(data["profile"]["area"], "Dhanmondi")
 
+        saved_profile = self.client.get(
+            "/api/v1/donor/profile",
+            cookies={"access_token": token},
+        )
+        self.assertEqual(saved_profile.status_code, 200)
+        self.assertEqual(saved_profile.json()["profile"]["area"], "Dhanmondi")
+
     def test_donor_profile_rejects_invalid_blood_group(self):
         token = _generate_jwt("+8801712345678", "donor")
         response = self.client.post(
