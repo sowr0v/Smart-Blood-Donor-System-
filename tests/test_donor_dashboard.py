@@ -44,6 +44,15 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertNotIn('id="nextEligibleDate"', html)
         self.assertIn("Donor Profile & Medical Info", html)
         self.assertIn("Donation History", html)
+        self.assertIn('id="section-history"', html)
+        self.assertIn('id="donationHistoryRows"', html)
+        self.assertIn('id="donationHistoryStatus"', html)
+        self.assertIn('id="donationHistoryTotal"', html)
+        self.assertIn('id="donationHistoryLives"', html)
+        self.assertIn('id="donationHistoryLastDate"', html)
+        self.assertIn('id="donationEligibilityBanner"', html)
+        self.assertIn("<th scope=\"col\">Status</th>", html)
+        self.assertIn("<th scope=\"col\">Certificate</th>", html)
         self.assertIn("Matched Blood Requests", html)
         self.assertIn("Accept & Decline Flow", html)
         self.assertIn("Request Details & Directions", html)
@@ -121,6 +130,93 @@ class DonorDashboardTests(unittest.TestCase):
         read_data = read_res.json()
         self.assertEqual(read_data["status"], "success")
         self.assertEqual(read_data["unread_count"], 0)
+
+    def test_donation_history_is_private_and_newest_first(self):
+        initialize_auth_database()
+        donor_phone = "+8801755555562"
+        other_donor_phone = "+8801755555563"
+
+        def remove_test_donations():
+            with closing(_connection()) as connection:
+                with connection:
+                    connection.execute(
+                        "DELETE FROM donor_donation_history WHERE donor_phone IN (?, ?)",
+                        (donor_phone, other_donor_phone),
+                    )
+
+        self.addCleanup(remove_test_donations)
+        with closing(_connection()) as connection:
+            with connection:
+                connection.executemany(
+                    """INSERT INTO donor_donation_history
+                           (donor_phone, donation_date, blood_group, hospital_name, area, request_id)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    [
+                        (donor_phone, "2025-01-12", "A+", "City Hospital", "Dhanmondi", "REQ-101"),
+                        (donor_phone, "2025-06-20", "A+", "Central Hospital", "Farmgate", "REQ-102"),
+                        (other_donor_phone, "2025-12-31", "O-", "Other Hospital", "Mirpur", "REQ-999"),
+                    ],
+                )
+
+        endpoint = "/api/v1/donor/donation-history"
+        self.assertEqual(self.client.get(endpoint).status_code, 401)
+        self.assertEqual(
+            self.client.get(
+                endpoint,
+                cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+            ).status_code,
+            403,
+        )
+
+        response = self.client.get(
+            endpoint,
+            cookies={"access_token": _generate_jwt(donor_phone, "donor")},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["summary"]["total_donations"], 2)
+        self.assertEqual(data["summary"]["estimated_lives_saved"], 6)
+        self.assertEqual(data["summary"]["last_donated"], "2025-06-20")
+        self.assertEqual(data["summary"]["eligibility_interval_days"], 56)
+        self.assertEqual(
+            [entry["donation_date"] for entry in data["donations"]],
+            ["2025-06-20", "2025-01-12"],
+        )
+        self.assertEqual(data["donations"][0]["hospital_name"], "Central Hospital")
+        self.assertEqual(data["donations"][0]["request_id"], "REQ-102")
+        self.assertNotIn("REQ-999", response.text)
+
+        donation_id = data["donations"][0]["id"]
+        certificate_path = f"{endpoint}/{donation_id}/certificate"
+        self.assertEqual(self.client.get(certificate_path).status_code, 401)
+        certificate = self.client.get(
+            certificate_path,
+            cookies={"access_token": _generate_jwt(donor_phone, "donor")},
+        )
+        self.assertEqual(certificate.status_code, 200)
+        self.assertEqual(certificate.headers["content-type"], "application/pdf")
+        self.assertTrue(certificate.content.startswith(b"%PDF-1.4"))
+        self.assertIn(b"Central Hospital", certificate.content)
+        self.assertIn(b"Status: Completed", certificate.content)
+        xref_offset = int(certificate.content.rsplit(b"startxref\n", 1)[1].splitlines()[0])
+        self.assertEqual(certificate.content[xref_offset:xref_offset + 4], b"xref")
+        self.assertEqual(
+            self.client.get(
+                certificate_path,
+                cookies={"access_token": _generate_jwt(other_donor_phone, "donor")},
+            ).status_code,
+            404,
+        )
+
+    def test_donation_history_returns_empty_list_for_new_donor(self):
+        initialize_auth_database()
+        response = self.client.get(
+            "/api/v1/donor/donation-history",
+            cookies={"access_token": _generate_jwt("+8801755555564", "donor")},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["donations"], [])
 
     def test_donor_availability_api(self):
         initialize_auth_database()

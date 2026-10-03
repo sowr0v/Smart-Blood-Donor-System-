@@ -286,6 +286,17 @@ def initialize_auth_database():
                     unavailable_start_date TEXT,
                     unavailable_end_date TEXT
                 );
+                CREATE TABLE IF NOT EXISTS donor_donation_history (
+                    id INTEGER PRIMARY KEY,
+                    donor_phone TEXT NOT NULL,
+                    donation_date TEXT NOT NULL,
+                    blood_group TEXT,
+                    hospital_name TEXT,
+                    area TEXT,
+                    request_id TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_donor_donation_history_donor_date
+                    ON donor_donation_history(donor_phone, donation_date DESC, id DESC);
                 """
             )
             availability_columns = {
@@ -949,6 +960,135 @@ class DonorAvailabilityUpdate(BaseModel):
     is_available: bool
     radius_km: int = Field(default=10, ge=1, le=500)
     preferred_zones: list[str] = Field(default_factory=list)
+
+
+@app.get("/api/v1/donor/donation-history")
+async def get_donor_donation_history(request: Request):
+    donor_phone = _require_donor(request)
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """SELECT id, donation_date, blood_group, hospital_name, area, request_id
+               FROM donor_donation_history
+               WHERE donor_phone = ?
+               ORDER BY donation_date DESC, id DESC""",
+            (donor_phone,),
+        ).fetchall()
+
+    donations = [dict(row) for row in rows]
+    last_donation_date = None
+    eligible_in_days = None
+    if donations:
+        try:
+            last_donation_date = date.fromisoformat(donations[0]["donation_date"])
+        except ValueError as error:
+            raise HTTPException(
+                status_code=500,
+                detail="A saved donation record has an invalid date.",
+            ) from error
+        eligible_in_days = (last_donation_date + timedelta(days=56) - _current_donor_date()).days
+
+    response = JSONResponse({
+        "status": "success",
+        "donations": donations,
+        "summary": {
+            "total_donations": len(donations),
+            "estimated_lives_saved": len(donations) * 3,
+            "last_donated": last_donation_date.isoformat() if last_donation_date else None,
+            "eligible_in_days": eligible_in_days,
+            "eligibility_interval_days": 56,
+        },
+    })
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _build_donation_certificate(donation: dict, donor_phone: str) -> bytes:
+    def escape_pdf_text(value: object) -> str:
+        text = str(value).encode("ascii", "replace").decode("ascii")
+        return text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+    donation_date = date.fromisoformat(donation["donation_date"])
+    lines = [
+        ("DONATION CERTIFICATE", 26),
+        ("This certificate confirms the following completed blood donation.", 12),
+        (f"Donor account: {donor_phone}", 12),
+        (f"Donation date: {donation_date.strftime('%B %d, %Y')}", 12),
+        (f"Blood group: {donation.get('blood_group') or 'Not recorded'}", 12),
+        (f"Hospital: {donation.get('hospital_name') or 'Not recorded'}", 12),
+        (f"Area: {donation.get('area') or 'Not recorded'}", 12),
+        (f"Related request: {donation.get('request_id') or 'Not recorded'}", 12),
+        ("Status: Completed", 12),
+        (f"Record number: {donation['id']}", 10),
+    ]
+
+    commands = ["BT"]
+    y_position = 700
+    for index, (text, font_size) in enumerate(lines):
+        if index:
+            y_position -= 42 if index == 1 else 30
+        commands.extend([
+            f"/F1 {font_size} Tf",
+            f"72 {y_position} Td" if index == 0 else f"0 -{42 if index == 1 else 30} Td",
+            f"({escape_pdf_text(text)}) Tj",
+        ])
+    commands.append("ET")
+    stream = "\n".join(commands).encode("ascii")
+
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+    ]
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for object_number, pdf_object in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{object_number} 0 obj\n".encode("ascii"))
+        pdf.extend(pdf_object)
+        pdf.extend(b"\nendobj\n")
+
+    xref_offset = len(pdf)
+    pdf.extend(f"xref\n0 {len(offsets)}\n".encode("ascii"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for offset in offsets[1:]:
+        pdf.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+    pdf.extend(
+        f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\n"
+        f"startxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+    )
+    return bytes(pdf)
+
+
+@app.get("/api/v1/donor/donation-history/{donation_id}/certificate")
+async def download_donation_certificate(donation_id: int, request: Request):
+    donor_phone = _require_donor(request)
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT id, donation_date, blood_group, hospital_name, area, request_id
+               FROM donor_donation_history
+               WHERE id = ? AND donor_phone = ?""",
+            (donation_id, donor_phone),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Donation record not found.")
+
+    try:
+        certificate = _build_donation_certificate(dict(row), donor_phone)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=500,
+            detail="The donation record has an invalid date.",
+        ) from error
+    return Response(
+        content=certificate,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="donation-certificate-{donation_id}.pdf"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 def _require_donor(request: Request) -> str:

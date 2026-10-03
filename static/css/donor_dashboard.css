@@ -658,6 +658,217 @@ input:checked + .switch-slider:before {
   font-size: 0.82rem;
 }
 
+.donation-history-header {
+  margin-bottom: 20px;
+}
+
+.donation-history-header h1 {
+  margin: 5px 0;
+  color: var(--heading-color);
+  font-size: 1.6rem;
+}
+
+.donation-history-header > p:last-child,
+.donation-history-status {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.donation-history-status {
+  min-height: 22px;
+  margin-bottom: 12px;
+}
+
+.donation-history-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.donation-history-stat-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.donation-history-stat-label {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.donation-history-stat-card strong {
+  color: var(--heading-color);
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.donation-history-stat-card small {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+.donation-history-stat-lives strong {
+  color: #059669;
+}
+
+.donation-eligibility-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 16px 20px;
+  border: 1px solid #A7F3D0;
+  border-radius: 14px;
+  background: linear-gradient(110deg, #ECFDF5, #F0FDFA);
+  color: #065F46;
+}
+
+.donation-eligibility-banner[data-eligibility="waiting"] {
+  border-color: #FDE68A;
+  background: linear-gradient(110deg, #FFFBEB, #FFF7ED);
+  color: #92400E;
+}
+
+.donation-eligibility-banner[data-eligibility="unknown"] {
+  border-color: var(--border-color);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.donation-eligibility-icon {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.14);
+  color: #059669;
+  font-size: 1.2rem;
+}
+
+.donation-eligibility-banner[data-eligibility="waiting"] .donation-eligibility-icon {
+  background: rgba(245, 158, 11, 0.16);
+  color: #D97706;
+}
+
+.donation-eligibility-banner strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.donation-eligibility-banner p {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.donation-history-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-card);
+}
+
+.donation-history-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.donation-history-table th,
+.donation-history-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.donation-history-table th {
+  background: var(--bg-soft-red);
+  font-weight: 700;
+}
+
+.donation-history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.donation-history-table tbody tr:hover {
+  background: var(--bg-page);
+}
+
+.donation-blood-group-badge,
+.donation-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.donation-blood-group-badge {
+  background: #FEE2E2;
+  color: #B91C1C;
+}
+
+.donation-status-badge {
+  background: #D1FAE5;
+  color: #047857;
+}
+
+.donation-certificate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  padding: 6px 11px;
+  border: 1px solid rgba(211, 47, 47, 0.24);
+  border-radius: 8px;
+  background: var(--bg-soft-red);
+  color: var(--primary-red);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+.donation-certificate-button:hover,
+.donation-certificate-button:focus-visible {
+  background: var(--primary-red);
+  color: #FFFFFF;
+}
+
+@media (max-width: 700px) {
+  .donation-history-stats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .donation-history-stat-card {
+    padding: 14px 16px;
+  }
+
+  .donation-eligibility-banner {
+    align-items: flex-start;
+    padding: 14px;
+  }
+}
+
 .status-indicator-badge {
   display: inline-flex;
   align-items: center;

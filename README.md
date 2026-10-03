@@ -68,6 +68,10 @@ The landing page's critical blood board reads from `/api/v1/requests/urgent` and
 
 Donors can view and change their availability from the donor dashboard. The authenticated `GET /api/v1/donor/availability` endpoint returns the donor's saved status, and `POST /api/v1/donor/availability` updates it along with the matching radius and preferred zones. Availability is stored by donor phone in `auth.db` (or the path configured by `SBDS_AUTH_DATABASE_PATH`); it defaults to unavailable. Both endpoints require a donor access token, and availability changes are persisted for use by donor matching. Donors may also schedule a temporary unavailable date range with `POST /api/v1/donor/availability/schedule`, or cancel it with `DELETE` on the same route. The date range is inclusive and the app automatically marks the donor available again on the day after its end, using a background expiry check and availability reads.
 
+## Donation History
+
+The donor dashboard's Donation History section reads completed records from `donor_donation_history` in `auth.db` (or the path configured by `SBDS_AUTH_DATABASE_PATH`). `GET /api/v1/donor/donation-history` requires a donor access token and only returns records belonging to that donor, newest first. Each record can include the donation date, blood group, hospital, area, and related request ID. The page summarizes the saved records, estimates lives saved at three per completed donation, and estimates whole-blood eligibility with a 56-day interval. Each row links to an authenticated PDF certificate download that only the record's donor can access.
+
 ---
 
 # 02 — Authentication

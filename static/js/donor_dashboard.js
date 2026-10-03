@@ -296,6 +296,135 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const donationHistoryStatus = document.getElementById('donationHistoryStatus');
+  const donationHistoryRows = document.getElementById('donationHistoryRows');
+  const donationHistoryTotal = document.getElementById('donationHistoryTotal');
+  const donationHistoryLives = document.getElementById('donationHistoryLives');
+  const donationHistoryLastDate = document.getElementById('donationHistoryLastDate');
+  const donationEligibilityBanner = document.getElementById('donationEligibilityBanner');
+  const donationEligibilityTitle = document.getElementById('donationEligibilityTitle');
+  const donationEligibilityDescription = document.getElementById('donationEligibilityDescription');
+
+  if (
+    donationHistoryStatus &&
+    donationHistoryRows &&
+    donationHistoryTotal &&
+    donationHistoryLives &&
+    donationHistoryLastDate &&
+    donationEligibilityBanner &&
+    donationEligibilityTitle &&
+    donationEligibilityDescription
+  ) {
+    function formatDonationDate(dateValue) {
+      const donationDate = new Date(`${dateValue}T00:00:00Z`);
+      return Number.isNaN(donationDate.getTime())
+        ? dateValue
+        : donationDate.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            timeZone: 'UTC'
+          });
+    }
+
+    function renderEligibility(eligibleInDays, totalDonations) {
+      if (totalDonations === 0 || !Number.isInteger(eligibleInDays)) {
+        donationEligibilityBanner.dataset.eligibility = 'unknown';
+        donationEligibilityTitle.textContent = 'Eligibility estimate unavailable';
+        donationEligibilityDescription.textContent = 'A completed donation date is needed to estimate your next eligibility.';
+        return;
+      }
+
+      if (eligibleInDays > 0) {
+        donationEligibilityBanner.dataset.eligibility = 'waiting';
+        donationEligibilityTitle.textContent = `Eligible to donate in ${eligibleInDays} ${eligibleInDays === 1 ? 'day' : 'days'}`;
+      } else {
+        donationEligibilityBanner.dataset.eligibility = 'ready';
+        donationEligibilityTitle.textContent = 'Eligible to donate today!';
+      }
+      donationEligibilityDescription.textContent =
+        'Estimate based on a 56-day whole-blood interval. Please confirm eligibility with a healthcare professional.';
+    }
+
+    fetch('/api/v1/donor/donation-history', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Could not load your donation history.');
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data.donations) || !data.summary) {
+          throw new Error('The donation history response was invalid.');
+        }
+        donationHistoryRows.replaceChildren();
+        const totalDonations = data.summary.total_donations;
+        donationHistoryTotal.textContent = `${totalDonations} ${totalDonations === 1 ? 'Time' : 'Times'}`;
+        donationHistoryLives.textContent = `${data.summary.estimated_lives_saved} ${data.summary.estimated_lives_saved === 1 ? 'Life' : 'Lives'}`;
+        donationHistoryLastDate.textContent = data.summary.last_donated
+          ? formatDonationDate(data.summary.last_donated)
+          : 'No donations yet';
+        renderEligibility(data.summary.eligible_in_days, totalDonations);
+
+        if (data.donations.length === 0) {
+          donationHistoryStatus.textContent = 'No completed donations have been recorded yet.';
+          return;
+        }
+
+        data.donations.forEach(donation => {
+          const row = document.createElement('tr');
+          const location = [donation.hospital_name, donation.area].filter(Boolean).join(', ');
+          const values = [
+            formatDonationDate(String(donation.donation_date || '')),
+            donation.blood_group || '—',
+            location || '—',
+            donation.request_id || '—'
+          ];
+
+          values.forEach(value => {
+            const cell = document.createElement('td');
+            if (value === donation.blood_group && donation.blood_group) {
+              const bloodGroupBadge = document.createElement('span');
+              bloodGroupBadge.className = 'donation-blood-group-badge';
+              bloodGroupBadge.textContent = value;
+              cell.appendChild(bloodGroupBadge);
+            } else {
+              cell.textContent = value;
+            }
+            row.appendChild(cell);
+          });
+
+          const statusCell = document.createElement('td');
+          const statusBadge = document.createElement('span');
+          statusBadge.className = 'donation-status-badge';
+          statusBadge.textContent = 'Completed';
+          statusCell.appendChild(statusBadge);
+          row.appendChild(statusCell);
+
+          const certificateCell = document.createElement('td');
+          const certificateLink = document.createElement('a');
+          certificateLink.className = 'donation-certificate-button';
+          certificateLink.href = `/api/v1/donor/donation-history/${encodeURIComponent(donation.id)}/certificate`;
+          certificateLink.textContent = 'PDF';
+          certificateLink.setAttribute('aria-label', `Download certificate for donation on ${values[0]}`);
+          certificateCell.appendChild(certificateLink);
+          row.appendChild(certificateCell);
+
+          donationHistoryRows.appendChild(row);
+        });
+
+        donationHistoryStatus.textContent = `${data.donations.length} completed ${data.donations.length === 1 ? 'donation' : 'donations'}`;
+      })
+      .catch(error => {
+        donationHistoryRows.replaceChildren();
+        donationHistoryTotal.textContent = '—';
+        donationHistoryLives.textContent = '—';
+        donationHistoryLastDate.textContent = '—';
+        donationEligibilityBanner.dataset.eligibility = 'unknown';
+        donationEligibilityTitle.textContent = 'Eligibility estimate unavailable';
+        donationEligibilityDescription.textContent = 'Could not load donation details.';
+        donationHistoryStatus.textContent = error.message || 'Could not load your donation history.';
+      });
+  }
+
   const requestDetailsStatus = document.getElementById('donor-request-details-status');
   const requestDetailsSelect = document.getElementById('donor-request-details-select');
   const requestDetailsContent = document.getElementById('donor-request-details-content');

@@ -370,7 +370,57 @@
       <section class="dashboard-content-section" id="section-profile"></section>
 
       <!-- ================= SECTION 3: DONATION HISTORY ================= -->
-      <section class="dashboard-content-section" id="section-history"></section>
+      <section class="dashboard-content-section" id="section-history" aria-labelledby="donation-history-title">
+        <header class="donation-history-header">
+          <p class="availability-eyebrow">Your donor records</p>
+          <h1 id="donation-history-title">Donation History</h1>
+          <p>Review your completed donations, dates, and related locations or requests.</p>
+        </header>
+
+        <div class="donation-history-stats" aria-label="Donation summary">
+          <article class="donation-history-stat-card">
+            <span class="donation-history-stat-label">Total Donations</span>
+            <strong id="donationHistoryTotal">—</strong>
+          </article>
+          <article class="donation-history-stat-card donation-history-stat-lives">
+            <span class="donation-history-stat-label">Lives Saved</span>
+            <strong id="donationHistoryLives">—</strong>
+            <small>Estimated at 3 per donation</small>
+          </article>
+          <article class="donation-history-stat-card">
+            <span class="donation-history-stat-label">Last Donated</span>
+            <strong id="donationHistoryLastDate">—</strong>
+          </article>
+        </div>
+
+        <aside class="donation-eligibility-banner" id="donationEligibilityBanner" data-eligibility="loading" aria-live="polite">
+          <span class="donation-eligibility-icon" aria-hidden="true">♥</span>
+          <div>
+            <strong id="donationEligibilityTitle">Checking eligibility estimate...</strong>
+            <p id="donationEligibilityDescription">Based on a 56-day whole-blood interval.</p>
+          </div>
+        </aside>
+
+        <p class="donation-history-status" id="donationHistoryStatus" role="status" aria-live="polite">
+          Loading your donation history...
+        </p>
+
+        <div class="donation-history-table-wrap">
+          <table class="donation-history-table">
+            <thead>
+              <tr>
+                <th scope="col">Donation date</th>
+                <th scope="col">Blood group</th>
+                <th scope="col">Location</th>
+                <th scope="col">Request</th>
+                <th scope="col">Status</th>
+                <th scope="col">Certificate</th>
+              </tr>
+            </thead>
+            <tbody id="donationHistoryRows"></tbody>
+          </table>
+        </div>
+      </section>
 
       <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
       <section class="dashboard-content-section" id="section-matched-requests"></section>
