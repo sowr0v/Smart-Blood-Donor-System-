@@ -81,6 +81,93 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const requestDetailsStatus = document.getElementById('donor-request-details-status');
+  const requestDetailsSelect = document.getElementById('donor-request-details-select');
+  const requestDetailsContent = document.getElementById('donor-request-details-content');
+
+  if (requestDetailsStatus && requestDetailsSelect && requestDetailsContent) {
+    const requestDetailFields = {
+      bloodGroup: document.getElementById('donor-request-blood-group'),
+      hospital: document.getElementById('donor-request-hospital'),
+      location: document.getElementById('donor-request-location'),
+      distance: document.getElementById('donor-request-distance'),
+      expiry: document.getElementById('donor-request-expiry'),
+      directions: document.getElementById('donor-request-directions'),
+      call: document.getElementById('donor-request-call'),
+    };
+    let activeRequests = [];
+
+    function renderRequestDetails() {
+      const request = activeRequests.find(
+        item => String(item.id) === requestDetailsSelect.value
+      );
+      if (!request) return;
+
+      const locationParts = [request.area, request.district].filter(Boolean);
+      requestDetailFields.bloodGroup.textContent = request.blood_group;
+      requestDetailFields.hospital.textContent = request.hospital_name;
+      requestDetailFields.location.textContent = locationParts.join(', ') || 'Location unavailable';
+      requestDetailFields.distance.textContent =
+        request.distance_km !== null && request.distance_km !== undefined && Number.isFinite(Number(request.distance_km))
+          ? `${Number(request.distance_km).toFixed(1)} km away`
+          : 'Distance unavailable';
+
+      const expiryDate = new Date(request.expires_at);
+      requestDetailFields.expiry.dateTime = request.expires_at;
+      requestDetailFields.expiry.textContent = expiryDate.toLocaleString();
+
+      const destination = [request.hospital_name, ...locationParts].join(', ');
+      const directionsUrl = new URL('https://www.google.com/maps/dir/');
+      directionsUrl.searchParams.set('api', '1');
+      directionsUrl.searchParams.set('destination', destination);
+      requestDetailFields.directions.href = directionsUrl.toString();
+
+      const phone = String(request.contact_phone || '').replace(/[\s()-]/g, '');
+      if (/^\+?\d{6,15}$/.test(phone)) {
+        requestDetailFields.call.href = `tel:${phone}`;
+        requestDetailFields.call.hidden = false;
+      } else {
+        requestDetailFields.call.hidden = true;
+      }
+
+      requestDetailsContent.hidden = false;
+      requestDetailsStatus.textContent = `${activeRequests.length} active emergency ${activeRequests.length === 1 ? 'request' : 'requests'}`;
+    }
+
+    requestDetailsSelect.addEventListener('change', renderRequestDetails);
+
+    fetch('/api/v1/requests/urgent', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Active requests are temporarily unavailable.');
+        return response.json();
+      })
+      .then(requests => {
+        if (!Array.isArray(requests)) throw new Error('Unexpected request list response.');
+        activeRequests = requests;
+        requestDetailsSelect.replaceChildren();
+
+        if (activeRequests.length === 0) {
+          requestDetailsSelect.add(new Option('No active requests', ''));
+          requestDetailsSelect.disabled = true;
+          requestDetailsStatus.textContent = 'There are no active emergency requests right now.';
+          return;
+        }
+
+        activeRequests.forEach(request => {
+          const location = [request.area, request.district].filter(Boolean).join(', ');
+          const label = [request.blood_group, request.hospital_name, location].filter(Boolean).join(' - ');
+          requestDetailsSelect.add(new Option(label, String(request.id)));
+        });
+        requestDetailsSelect.disabled = false;
+        renderRequestDetails();
+      })
+      .catch(error => {
+        requestDetailsSelect.replaceChildren(new Option('Requests unavailable', ''));
+        requestDetailsSelect.disabled = true;
+        requestDetailsStatus.textContent = error.message || 'Could not load active emergency requests.';
+      });
+  }
+
   // =========================================================
   // DONOR IN-APP CHAT MODULE (SBDS-89)
   // =========================================================

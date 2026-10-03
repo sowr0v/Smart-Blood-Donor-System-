@@ -17,6 +17,13 @@ class BloodRequestsTests(unittest.TestCase):
         self.assertIn('id="blood-group-filter"', response.text)
         self.assertIn("Farmgate", response.text)
 
+    def test_urgent_board_includes_request_details_dialog(self):
+        response = self.client.get("/find-blood")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('id="urgent-request-details"', response.text)
+        self.assertIn('id="urgent-detail-directions"', response.text)
+        self.assertIn('id="urgent-detail-hospital"', response.text)
+
     def test_feed_api_filters_by_blood_group(self):
         response = self.client.get("/api/blood-requests", params={"blood_group": "A+"})
         self.assertEqual(response.status_code, 200)
