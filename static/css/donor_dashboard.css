@@ -1129,6 +1129,200 @@ input:checked + .switch-slider:before {
   background: rgba(255, 255, 255, 0.1);
 }
 
+.donor-reviews-header {
+  margin-bottom: 18px;
+}
+
+.donor-reviews-header h1 {
+  margin-top: 5px;
+  color: var(--heading-color);
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+.donor-reviews-header p,
+.donor-review-toolbar p {
+  margin-top: 7px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.donor-reviews-sample-notice {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  color: #654b16;
+  background: #fff8e7;
+  border-left: 3px solid #c58b22;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.donor-review-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: 30px;
+}
+
+.review-overall-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+
+.review-overall-score strong {
+  color: var(--heading-color);
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.review-stars,
+.donor-review-item-rating {
+  color: #a66b00;
+  font-size: 1.1rem;
+  letter-spacing: 0;
+}
+
+.review-overall-caption {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.review-rating-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-rating-row {
+  display: grid;
+  grid-template-columns: 56px minmax(60px, 1fr) 24px;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.review-rating-track {
+  height: 7px;
+  overflow: hidden;
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.review-rating-track > span {
+  display: block;
+  height: 100%;
+  background: #c58b22;
+}
+
+.donor-review-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 26px 0 14px;
+}
+
+.donor-review-toolbar h2 {
+  color: var(--heading-color);
+  font-size: 1.15rem;
+}
+
+.donor-review-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.donor-review-toolbar select {
+  min-width: 130px;
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.donor-review-toolbar select:focus-visible {
+  outline: 3px solid rgba(211, 47, 47, 0.25);
+  outline-offset: 2px;
+}
+
+.donor-review-list {
+  display: grid;
+  gap: 12px;
+}
+
+.donor-review-item {
+  min-width: 0;
+  padding: 18px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.donor-review-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.donor-review-item-header h3 {
+  color: var(--heading-color);
+  font-size: 0.94rem;
+}
+
+.donor-review-item-header p,
+.donor-review-item-header time {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.donor-review-item-header time {
+  flex: 0 0 auto;
+  margin-top: 0;
+  text-align: right;
+}
+
+.donor-review-item-rating {
+  margin-top: 12px;
+}
+
+.donor-review-item blockquote {
+  margin: 8px 0 12px;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.donor-review-sample-tag {
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.donor-review-empty {
+  padding: 24px 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.donor-review-item[hidden] {
+  display: none;
+}
+
 @media (max-width: 600px) {
   .donor-request-details-controls {
     align-items: stretch;
@@ -1142,6 +1336,34 @@ input:checked + .switch-slider:before {
   .donor-request-details-grid .hospital-dossier-card,
   .donor-request-details-grid .route-simulation-card {
     padding: 16px;
+  }
+
+  .donor-review-summary {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .donor-review-toolbar,
+  .donor-review-toolbar label {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .donor-review-toolbar label select {
+    width: 100%;
+  }
+
+  .donor-review-item {
+    padding: 16px;
+  }
+
+  .donor-review-item-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .donor-review-item-header time {
+    text-align: left;
   }
 }
 
