@@ -113,6 +113,35 @@
         <div class="urgent-board-empty" id="urgent-board-empty" hidden>
           <p>No critical requests found matching your criteria right now.</p>
         </div>
+
+        <dialog class="urgent-detail-dialog" id="urgent-request-details" aria-labelledby="urgent-detail-title">
+          <div class="urgent-detail-content">
+            <div class="urgent-detail-header">
+              <div>
+                <span class="urgent-detail-kicker">Emergency request</span>
+                <h2 id="urgent-detail-title">Request details</h2>
+              </div>
+              <button class="urgent-detail-close" type="button" data-dialog-close aria-label="Close request details">&times;</button>
+            </div>
+
+            <div class="urgent-detail-blood-row">
+              <span class="urgent-blood-pill" id="urgent-detail-blood-group"></span>
+              <span class="urgent-priority">Critical</span>
+            </div>
+
+            <dl class="urgent-detail-list">
+              <div><dt>Hospital</dt><dd id="urgent-detail-hospital"></dd></div>
+              <div><dt>Location</dt><dd id="urgent-detail-location"></dd></div>
+              <div><dt>Distance</dt><dd id="urgent-detail-distance"></dd></div>
+              <div><dt>Request expires</dt><dd><time id="urgent-detail-expiry"></time></dd></div>
+            </dl>
+
+            <div class="urgent-detail-actions">
+              <a class="urgent-directions" id="urgent-detail-directions" href="#" target="_blank" rel="noopener noreferrer">Get directions</a>
+              <a class="urgent-connect" id="urgent-detail-connect" href="#">Call hospital</a>
+            </div>
+          </div>
+        </dialog>
       </section>
     </div>
   </main>
