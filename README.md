@@ -64,6 +64,10 @@ The About page describes the platform's purpose and limitations. The Contact pag
 
 The landing page's critical blood board reads from `/api/v1/requests/urgent` and displays only unexpired rows with `is_emergency = 1`. The app creates `urgent_requests.db` on startup by default; set `SBDS_DATABASE_PATH` to use another SQLite file. The board refreshes every 15 seconds and updates countdowns every second. Request records need a blood group, hospital name, district, area, expiry timestamp, and emergency flag; `distance_km` and `contact_phone` are optional.
 
+## Donor Availability
+
+Donors can view and change their availability from the donor dashboard. The authenticated `GET /api/v1/donor/availability` endpoint returns the donor's saved status, and `POST /api/v1/donor/availability` updates it along with the matching radius and preferred zones. Availability is stored by donor phone in `auth.db` (or the path configured by `SBDS_AUTH_DATABASE_PATH`); it defaults to unavailable. Both endpoints require a donor access token, and availability changes are persisted for use by donor matching. Donors may also schedule a temporary unavailable date range with `POST /api/v1/donor/availability/schedule`, or cancel it with `DELETE` on the same route. The date range is inclusive and the app automatically marks the donor available again on the day after its end, using a background expiry check and availability reads.
+
 ---
 
 # 02 — Authentication
