@@ -18,6 +18,221 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 3200);
   }
 
+  const availabilityToggle = document.getElementById('donorAvailabilityToggle');
+  const availabilityStatusCard = document.getElementById('availabilityStatusCard');
+  const availabilityStatusText = document.getElementById('availabilityStatusText');
+  const availabilityStatusDescription = document.getElementById('availabilityStatusDescription');
+  const availabilitySaveStatus = document.getElementById('availabilitySaveStatus');
+  const availabilityUpdated = document.getElementById('availabilityUpdated');
+  const unavailabilityScheduleForm = document.getElementById('unavailabilityScheduleForm');
+  const unavailabilityStartDate = document.getElementById('unavailabilityStartDate');
+  const unavailabilityEndDate = document.getElementById('unavailabilityEndDate');
+  const saveUnavailabilitySchedule = document.getElementById('saveUnavailabilitySchedule');
+  const unavailabilityScheduleStatus = document.getElementById('unavailabilityScheduleStatus');
+  const cancelUnavailabilitySchedule = document.getElementById('cancelUnavailabilitySchedule');
+
+  if (
+    availabilityToggle &&
+    availabilityStatusCard &&
+    availabilityStatusText &&
+    availabilityStatusDescription &&
+    availabilitySaveStatus &&
+    availabilityUpdated &&
+    unavailabilityScheduleForm &&
+    unavailabilityStartDate &&
+    unavailabilityEndDate &&
+    saveUnavailabilitySchedule &&
+    unavailabilityScheduleStatus &&
+    cancelUnavailabilitySchedule
+  ) {
+    const today = new Date();
+    const todayString = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, '0'),
+      String(today.getDate()).padStart(2, '0')
+    ].join('-');
+    unavailabilityStartDate.min = todayString;
+    unavailabilityEndDate.min = todayString;
+    let renderedScheduleKey;
+
+    function formatDate(dateValue) {
+      if (!dateValue) return '';
+      const [year, month, day] = dateValue.split('-').map(Number);
+      return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+      });
+    }
+
+    function renderAvailability(data, updateScheduleFields = false) {
+      const isAvailable = data.is_available === true;
+      const hasSchedule = Boolean(data.unavailability_start_date && data.unavailability_end_date);
+      const scheduleActive = data.unavailability_active === true;
+      const scheduleKey = hasSchedule
+        ? `${data.unavailability_start_date}/${data.unavailability_end_date}`
+        : null;
+      availabilityToggle.checked = isAvailable;
+      availabilityToggle.disabled = scheduleActive;
+      availabilityStatusCard.dataset.availabilityStatus = isAvailable ? 'available' : 'unavailable';
+      availabilityStatusCard.classList.toggle('is-unavailable', !isAvailable);
+      availabilityStatusText.textContent = isAvailable ? 'Available' : 'Not available';
+      if (scheduleActive) {
+        availabilityStatusDescription.textContent =
+          `Temporary pause through ${formatDate(data.unavailability_end_date)}. Availability will resume the following day.`;
+      } else {
+        availabilityStatusDescription.textContent = isAvailable
+          ? 'You may be considered for matching blood requests.'
+          : 'You will not be included in donor matches until you enable availability.';
+      }
+      availabilityUpdated.textContent = data.updated_at
+        ? `Last updated ${new Date(data.updated_at).toLocaleString()}`
+        : 'You have not changed your availability yet.';
+      cancelUnavailabilitySchedule.hidden = !hasSchedule;
+      unavailabilityScheduleStatus.textContent = hasSchedule
+        ? scheduleActive
+          ? `Pause active: ${formatDate(data.unavailability_start_date)} – ${formatDate(data.unavailability_end_date)}.`
+          : `Pause scheduled: ${formatDate(data.unavailability_start_date)} – ${formatDate(data.unavailability_end_date)}.`
+        : 'No temporary pause scheduled.';
+      if (updateScheduleFields || scheduleKey !== renderedScheduleKey) {
+        unavailabilityStartDate.value = data.unavailability_start_date || '';
+        unavailabilityEndDate.value = data.unavailability_end_date || '';
+      }
+      unavailabilityEndDate.min = unavailabilityStartDate.value || todayString;
+      renderedScheduleKey = scheduleKey;
+    }
+
+    async function loadAvailability() {
+      const response = await fetch('/api/v1/donor/availability', { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error('Could not load your availability status.');
+      }
+      const data = await response.json();
+      if (typeof data.is_available !== 'boolean') {
+        throw new Error('The availability response was invalid.');
+      }
+      return data;
+    }
+
+    loadAvailability()
+      .then(data => {
+        renderAvailability(data, true);
+        unavailabilityStartDate.disabled = false;
+        unavailabilityEndDate.disabled = false;
+        saveUnavailabilitySchedule.disabled = false;
+      })
+      .catch(error => {
+        availabilityStatusCard.dataset.availabilityStatus = 'error';
+        availabilityStatusText.textContent = 'Status unavailable';
+        availabilityStatusDescription.textContent = error.message;
+        availabilitySaveStatus.textContent = 'Refresh the page to try again.';
+        availabilityToggle.disabled = true;
+        unavailabilityStartDate.disabled = true;
+        unavailabilityEndDate.disabled = true;
+        saveUnavailabilitySchedule.disabled = true;
+        cancelUnavailabilitySchedule.disabled = true;
+      });
+
+    availabilityToggle.addEventListener('change', async () => {
+      const previousValue = !availabilityToggle.checked;
+      const requestedValue = availabilityToggle.checked;
+      availabilityToggle.disabled = true;
+      availabilitySaveStatus.textContent = 'Saving availability...';
+
+      try {
+        const response = await fetch('/api/v1/donor/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_available: requestedValue })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not save your availability.');
+        }
+        renderAvailability(data, true);
+        availabilitySaveStatus.textContent = 'Availability saved.';
+      } catch (error) {
+        availabilityToggle.checked = previousValue;
+        availabilitySaveStatus.textContent = error.message || 'Could not save your availability.';
+        showToast(availabilitySaveStatus.textContent);
+      } finally {
+        availabilityToggle.disabled = false;
+      }
+    });
+
+    unavailabilityStartDate.addEventListener('change', () => {
+      unavailabilityEndDate.min = unavailabilityStartDate.value || todayString;
+      if (unavailabilityEndDate.value && unavailabilityEndDate.value < unavailabilityStartDate.value) {
+        unavailabilityEndDate.value = unavailabilityStartDate.value;
+      }
+    });
+
+    unavailabilityScheduleForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!unavailabilityScheduleForm.reportValidity()) return;
+      if (unavailabilityEndDate.value < unavailabilityStartDate.value) {
+        unavailabilityScheduleStatus.textContent = 'End date must be on or after the start date.';
+        return;
+      }
+
+      saveUnavailabilitySchedule.disabled = true;
+      cancelUnavailabilitySchedule.disabled = true;
+      unavailabilityScheduleStatus.textContent = 'Saving temporary pause...';
+      try {
+        const response = await fetch('/api/v1/donor/availability/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            start_date: unavailabilityStartDate.value,
+            end_date: unavailabilityEndDate.value
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not schedule your pause.');
+        }
+        renderAvailability(data, true);
+        unavailabilityScheduleStatus.textContent = data.message;
+      } catch (error) {
+        unavailabilityScheduleStatus.textContent = error.message || 'Could not schedule your pause.';
+        showToast(unavailabilityScheduleStatus.textContent);
+      } finally {
+        saveUnavailabilitySchedule.disabled = false;
+        cancelUnavailabilitySchedule.disabled = false;
+      }
+    });
+
+    cancelUnavailabilitySchedule.addEventListener('click', async () => {
+      cancelUnavailabilitySchedule.disabled = true;
+      saveUnavailabilitySchedule.disabled = true;
+      unavailabilityScheduleStatus.textContent = 'Cancelling temporary pause...';
+      try {
+        const response = await fetch('/api/v1/donor/availability/schedule', { method: 'DELETE' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not cancel your pause.');
+        }
+        renderAvailability(data, true);
+        unavailabilityScheduleStatus.textContent = data.message;
+      } catch (error) {
+        unavailabilityScheduleStatus.textContent = error.message || 'Could not cancel your pause.';
+        showToast(unavailabilityScheduleStatus.textContent);
+      } finally {
+        cancelUnavailabilitySchedule.disabled = false;
+        saveUnavailabilitySchedule.disabled = false;
+      }
+    });
+
+    window.setInterval(() => {
+      loadAvailability()
+        .then(data => renderAvailability(data))
+        .catch(error => {
+          availabilitySaveStatus.textContent = error.message;
+        });
+    }, 60_000);
+  }
+
   function activateSection(targetId) {
     if (!targetId) return;
     const cleanId = targetId.replace('#', '');
@@ -65,61 +280,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activateSection('section-personal-dashboard');
   }
 
-  const donorProfileForm = document.getElementById('donorProfileForm');
-  const profileFormMessage = document.getElementById('profileFormMessage');
-
-  if (donorProfileForm) {
-    donorProfileForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const formData = new FormData(donorProfileForm);
-      const payload = Object.fromEntries(formData.entries());
-
-      const requiredFields = ['name', 'phone', 'blood_group', 'district', 'area', 'address'];
-      const missing = requiredFields.filter(field => !String(payload[field] || '').trim());
-      if (missing.length) {
-        if (profileFormMessage) {
-          profileFormMessage.textContent = 'Please complete the required profile fields before saving.';
-          profileFormMessage.style.color = '#b91c1c';
-        }
-        return;
-      }
-
-      const validBloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-      if (!validBloodGroups.includes(payload.blood_group)) {
-        if (profileFormMessage) {
-          profileFormMessage.textContent = 'Blood group is invalid.';
-          profileFormMessage.style.color = '#b91c1c';
-        }
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/v1/donor/profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.detail || 'Unable to save donor profile.');
-        }
-
-        if (profileFormMessage) {
-          profileFormMessage.textContent = data?.message || 'Profile saved successfully.';
-          profileFormMessage.style.color = '#166534';
-        }
-        showToast(data?.message || 'Profile updated successfully.', 'success');
-      } catch (error) {
-        if (profileFormMessage) {
-          profileFormMessage.textContent = error.message;
-          profileFormMessage.style.color = '#b91c1c';
-        }
-        showToast(error.message || 'Could not save profile.', 'error');
-      }
-    });
-  }
-
   // Mobile sidebar drawer toggle
   if (mobileToggleBtn && mobileSidebar) {
     mobileToggleBtn.addEventListener('click', () => {
@@ -136,14 +296,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Matched blood requests feed and filters
+  const donorProfileForm = document.getElementById('donorProfileForm');
+  const profileFormMessage = document.getElementById('profileFormMessage');
+
+  if (donorProfileForm) {
+    donorProfileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(donorProfileForm).entries());
+      const requiredFields = ['name', 'phone', 'blood_group', 'district', 'area', 'address'];
+      const missing = requiredFields.filter(field => !String(payload[field] || '').trim());
+      if (missing.length) {
+        profileFormMessage.textContent = 'Please complete the required profile fields before saving.';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/v1/donor/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Unable to save donor profile.');
+        profileFormMessage.textContent = result.message || 'Profile saved successfully.';
+        showToast(profileFormMessage.textContent, 'success');
+      } catch (error) {
+        profileFormMessage.textContent = error.message || 'Could not save profile.';
+        showToast(profileFormMessage.textContent, 'error');
+      }
+    });
+  }
+
   const matchedFeed = document.getElementById('matched-request-feed');
   const matchedEmptyState = document.getElementById('matched-request-empty');
   const bloodGroupFilter = document.getElementById('matched-blood-group-filter');
   const urgencyFilter = document.getElementById('matched-urgency-filter');
   const locationFilter = document.getElementById('matched-location-filter');
 
-  if (matchedFeed && bloodGroupFilter && urgencyFilter && locationFilter) {
+  if (matchedFeed && matchedEmptyState && bloodGroupFilter && urgencyFilter && locationFilter) {
     function normalizeUrgency(urgency) {
       const value = String(urgency || 'Standard').toLowerCase();
       if (value.includes('critical') || value.includes('emergency')) return 'Critical';
@@ -151,110 +341,58 @@ document.addEventListener('DOMContentLoaded', () => {
       return 'Standard';
     }
 
-    function badgeClassForUrgency(urgency) {
-      switch (normalizeUrgency(urgency)) {
-        case 'Critical': return 'urgency-critical';
-        case 'Urgent': return 'urgency-urgent';
-        default: return 'urgency-standard';
-      }
-    }
-
-    function renderMatchedRequestCard(request) {
+    function renderMatchedRequestCard(bloodRequest) {
       const card = document.createElement('article');
-      const urgency = normalizeUrgency(request.urgency || request.status);
+      const urgency = normalizeUrgency(bloodRequest.urgency || bloodRequest.status);
       card.className = `match-request-card ${urgency === 'Critical' || urgency === 'Urgent' ? 'urgent-border' : ''}`;
 
-      const topMeta = document.createElement('div');
-      topMeta.className = 'card-top-meta';
-
+      const meta = document.createElement('div');
+      meta.className = 'card-top-meta';
       const bloodGroup = document.createElement('span');
       bloodGroup.className = 'nav-pill-badge pill-red';
-      bloodGroup.textContent = request.blood_group || 'A+';
+      bloodGroup.textContent = bloodRequest.blood_group || 'A+';
+      const urgencyBadge = document.createElement('span');
+      urgencyBadge.className = `urgency-flag urgency-${urgency.toLowerCase()}`;
+      urgencyBadge.textContent = urgency;
+      meta.append(bloodGroup, urgencyBadge);
 
-      const urgencyFlag = document.createElement('span');
-      urgencyFlag.className = `urgency-flag ${badgeClassForUrgency(urgency)}`;
-      urgencyFlag.textContent = urgency;
-
-      topMeta.appendChild(bloodGroup);
-      topMeta.appendChild(urgencyFlag);
-
-      const hospital = document.createElement('div');
+      const hospital = document.createElement('h3');
       hospital.className = 'hospital-headline';
-      hospital.textContent = request.hospital || 'Hospital request';
-
-      const locationRow = document.createElement('div');
-      locationRow.className = 'location-distance-row';
-      const locationText = document.createElement('span');
-      const area = request.area || 'Dhaka';
-      const district = request.district || 'Dhaka';
-      locationText.textContent = `${area}, ${district}`;
-
-      const distance = document.createElement('span');
-      distance.textContent = `${request.distance_km || '5'} km away`;
-
-      locationRow.appendChild(locationText);
-      locationRow.appendChild(distance);
-
-      const details = document.createElement('div');
+      hospital.textContent = bloodRequest.hospital || 'Hospital request';
+      const location = document.createElement('p');
+      location.className = 'location-distance-row';
+      location.textContent = `${bloodRequest.area || 'Dhaka'}, ${bloodRequest.district || 'Dhaka'} · ${bloodRequest.distance_km ?? 'Distance unavailable'}${bloodRequest.distance_km !== undefined ? ' km away' : ''}`;
+      const details = document.createElement('p');
       details.className = 'patient-note-box';
-      details.textContent = `${request.units || 1} unit${(request.units || 1) === 1 ? '' : 's'} needed • ${request.status || 'Open'} request`;
+      details.textContent = `${bloodRequest.units || 1} unit${(bloodRequest.units || 1) === 1 ? '' : 's'} needed · ${bloodRequest.status || 'Open'} request`;
 
-      const actionRow = document.createElement('div');
-      actionRow.className = 'action-buttons-flex';
-
-      const acceptBtn = document.createElement('button');
-      acceptBtn.type = 'button';
-      acceptBtn.className = 'primary-button';
-      acceptBtn.textContent = 'Accept';
-
-      const viewBtn = document.createElement('button');
-      viewBtn.type = 'button';
-      viewBtn.className = 'secondary-button';
-      viewBtn.textContent = 'Details';
-
-      actionRow.appendChild(acceptBtn);
-      actionRow.appendChild(viewBtn);
-
-      card.appendChild(topMeta);
-      card.appendChild(hospital);
-      card.appendChild(locationRow);
-      card.appendChild(details);
-      card.appendChild(actionRow);
-
+      card.append(meta, hospital, location, details);
       return card;
     }
 
     async function refreshMatchedRequests() {
-      const params = new URLSearchParams();
-      params.set('blood_group', bloodGroupFilter.value || 'all');
-      params.set('urgency', urgencyFilter.value || 'all');
-      params.set('district', locationFilter.value || 'all');
-
-      const response = await fetch(`/api/v1/donor/matches?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Unable to load matched requests');
-      }
-
-      const payload = await response.json();
-      const requests = Array.isArray(payload.requests) ? payload.requests : [];
-
-      matchedFeed.replaceChildren();
-      if (!requests.length) {
-        matchedEmptyState.style.display = 'block';
-        matchedEmptyState.textContent = 'No active requests match your filters at the moment.';
-        return;
-      }
-
-      matchedEmptyState.style.display = 'none';
-      requests.forEach((request) => {
-        matchedFeed.appendChild(renderMatchedRequestCard(request));
+      const params = new URLSearchParams({
+        blood_group: bloodGroupFilter.value || 'all',
+        urgency: urgencyFilter.value || 'all',
+        district: locationFilter.value || 'all',
       });
+      const response = await fetch(`/api/v1/donor/matches?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load matched requests.');
+      const result = await response.json();
+      const requests = Array.isArray(result.requests) ? result.requests : [];
+      matchedFeed.replaceChildren(...requests.map(renderMatchedRequestCard));
+      matchedEmptyState.style.display = requests.length ? 'none' : 'block';
     }
 
-    [bloodGroupFilter, urgencyFilter, locationFilter].forEach((filterInput) => {
-      filterInput.addEventListener('change', refreshMatchedRequests);
+    [bloodGroupFilter, urgencyFilter, locationFilter].forEach(filter => {
+      filter.addEventListener('change', () => {
+        refreshMatchedRequests().catch(() => {
+          matchedFeed.replaceChildren();
+          matchedEmptyState.style.display = 'block';
+          matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
+        });
+      });
     });
-
     refreshMatchedRequests().catch(() => {
       matchedEmptyState.style.display = 'block';
       matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
@@ -278,7 +416,6 @@ document.addEventListener('DOMContentLoaded', () => {
       donorRequests.forEach(bloodRequest => {
         const card = document.createElement('article');
         card.className = 'donor-response-card';
-
         const details = document.createElement('div');
         details.className = 'donor-response-details';
         const heading = document.createElement('h2');
@@ -305,27 +442,24 @@ document.addEventListener('DOMContentLoaded', () => {
           acceptButton.type = 'button';
           acceptButton.className = 'donor-response-button is-accept';
           acceptButton.textContent = 'Accept request';
-          acceptButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'accept', acceptButton, declineButton));
-
           const declineButton = document.createElement('button');
           declineButton.type = 'button';
           declineButton.className = 'donor-response-button is-decline';
           declineButton.textContent = 'Decline';
+          acceptButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'accept', acceptButton, declineButton));
           declineButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'decline', acceptButton, declineButton));
           actions.append(acceptButton, declineButton);
         }
-
         card.append(details, actions);
         requestFlowList.append(card);
       });
     }
 
     async function submitDonorResponse(bloodRequest, action, acceptButton, declineButton) {
-      const confirmation = action === 'accept'
+      const message = action === 'accept'
         ? `Accept the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`
         : `Decline the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`;
-      if (!window.confirm(confirmation)) return;
-
+      if (!window.confirm(message)) return;
       acceptButton.disabled = true;
       declineButton.disabled = true;
       try {
@@ -336,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.detail || 'Your response could not be saved.');
-
         bloodRequest.response_status = result.request_status;
         renderDonorRequests();
         showToast(`${result.message} The seeker has been notified.`, 'success');
@@ -360,6 +493,118 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(error => {
         requestFlowStatus.textContent = error.message || 'Could not load active requests.';
       });
+  }
+
+  const requestDetailsStatus = document.getElementById('donor-request-details-status');
+  const requestDetailsSelect = document.getElementById('donor-request-details-select');
+  const requestDetailsContent = document.getElementById('donor-request-details-content');
+
+  if (requestDetailsStatus && requestDetailsSelect && requestDetailsContent) {
+    const requestDetailFields = {
+      bloodGroup: document.getElementById('donor-request-blood-group'),
+      hospital: document.getElementById('donor-request-hospital'),
+      location: document.getElementById('donor-request-location'),
+      distance: document.getElementById('donor-request-distance'),
+      expiry: document.getElementById('donor-request-expiry'),
+      directions: document.getElementById('donor-request-directions'),
+      call: document.getElementById('donor-request-call'),
+    };
+    let activeRequests = [];
+
+    function renderRequestDetails() {
+      const request = activeRequests.find(
+        item => String(item.id) === requestDetailsSelect.value
+      );
+      if (!request) return;
+
+      const locationParts = [request.area, request.district].filter(Boolean);
+      requestDetailFields.bloodGroup.textContent = request.blood_group;
+      requestDetailFields.hospital.textContent = request.hospital_name;
+      requestDetailFields.location.textContent = locationParts.join(', ') || 'Location unavailable';
+      requestDetailFields.distance.textContent =
+        request.distance_km !== null && request.distance_km !== undefined && Number.isFinite(Number(request.distance_km))
+          ? `${Number(request.distance_km).toFixed(1)} km away`
+          : 'Distance unavailable';
+
+      const expiryDate = new Date(request.expires_at);
+      requestDetailFields.expiry.dateTime = request.expires_at;
+      requestDetailFields.expiry.textContent = expiryDate.toLocaleString();
+
+      const destination = [request.hospital_name, ...locationParts].join(', ');
+      const directionsUrl = new URL('https://www.google.com/maps/dir/');
+      directionsUrl.searchParams.set('api', '1');
+      directionsUrl.searchParams.set('destination', destination);
+      requestDetailFields.directions.href = directionsUrl.toString();
+
+      const phone = String(request.contact_phone || '').replace(/[\s()-]/g, '');
+      if (/^\+?\d{6,15}$/.test(phone)) {
+        requestDetailFields.call.href = `tel:${phone}`;
+        requestDetailFields.call.hidden = false;
+      } else {
+        requestDetailFields.call.hidden = true;
+      }
+
+      requestDetailsContent.hidden = false;
+      requestDetailsStatus.textContent = `${activeRequests.length} active emergency ${activeRequests.length === 1 ? 'request' : 'requests'}`;
+    }
+
+    requestDetailsSelect.addEventListener('change', renderRequestDetails);
+
+    fetch('/api/v1/requests/urgent', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Active requests are temporarily unavailable.');
+        return response.json();
+      })
+      .then(requests => {
+        if (!Array.isArray(requests)) throw new Error('Unexpected request list response.');
+        activeRequests = requests;
+        requestDetailsSelect.replaceChildren();
+
+        if (activeRequests.length === 0) {
+          requestDetailsSelect.add(new Option('No active requests', ''));
+          requestDetailsSelect.disabled = true;
+          requestDetailsStatus.textContent = 'There are no active emergency requests right now.';
+          return;
+        }
+
+        activeRequests.forEach(request => {
+          const location = [request.area, request.district].filter(Boolean).join(', ');
+          const label = [request.blood_group, request.hospital_name, location].filter(Boolean).join(' - ');
+          requestDetailsSelect.add(new Option(label, String(request.id)));
+        });
+        requestDetailsSelect.disabled = false;
+        renderRequestDetails();
+      })
+      .catch(error => {
+        requestDetailsSelect.replaceChildren(new Option('Requests unavailable', ''));
+        requestDetailsSelect.disabled = true;
+        requestDetailsStatus.textContent = error.message || 'Could not load active emergency requests.';
+      });
+  }
+
+  const reviewList = document.getElementById('donor-review-list');
+  const reviewRatingFilter = document.getElementById('donor-review-rating-filter');
+  const reviewCount = document.getElementById('donor-review-count');
+  const reviewEmpty = document.getElementById('donor-review-empty');
+
+  if (reviewList && reviewRatingFilter && reviewCount && reviewEmpty) {
+    const reviewItems = [...reviewList.querySelectorAll('.donor-review-item')];
+
+    function filterReviews() {
+      const selectedRating = reviewRatingFilter.value;
+      let visibleCount = 0;
+
+      reviewItems.forEach(review => {
+        const isVisible = selectedRating === 'all' || review.dataset.rating === selectedRating;
+        review.hidden = !isVisible;
+        if (isVisible) visibleCount += 1;
+      });
+
+      reviewCount.textContent = `Showing ${visibleCount} sample ${visibleCount === 1 ? 'review' : 'reviews'}`;
+      reviewEmpty.hidden = visibleCount > 0;
+    }
+
+    reviewRatingFilter.addEventListener('change', filterReviews);
   }
 
   // =========================================================
@@ -965,4 +1210,3 @@ document.addEventListener('DOMContentLoaded', () => {
   window.activateSection = activateSection;
   window.showToast = showToast;
 });
-

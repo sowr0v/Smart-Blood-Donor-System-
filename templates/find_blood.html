@@ -21,40 +21,131 @@
           <span class="brand-sub">Donor Network</span>
         </div>
       </a>
-      <div class="nav-auth-actions">
-        <a href="/auth/login" class="btn btn-outline">Login</a>
-        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link active">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+            <div class="nav-auth-actions">
+        {% if user or logged_in_user %}
+          <a href="/donor/dashboard" class="btn btn-outline">Dashboard</a>
+          <a href="/logout" class="btn btn-primary">Logout</a>
+        {% else %}
+          <a href="/login" class="btn btn-outline">Login</a>
+          <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+        {% endif %}
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link active">Urgent Requests</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+
+            <div class="mobile-auth-actions">
+        {% if user or logged_in_user %}
+          <a href="/donor/dashboard" class="btn btn-outline btn-full">Dashboard</a>
+          <a href="/logout" class="btn btn-primary btn-full">Logout</a>
+        {% else %}
+          <a href="/login" class="btn btn-outline btn-full">Login</a>
+          <a href="/auth/register?role=donor" class="btn btn-primary btn-full">Register</a>
+        {% endif %}
       </div>
     </div>
   </header>
 
   <main class="main-shell">
     <div class="container">
-      <section class="page-panel">
-        <span class="eyebrow">Find Blood</span>
-        <h1>Locate nearby donors fast</h1>
-        <p class="hero-subtext">Search by blood type, area, and urgency to find verified matches in minutes.</p>
-
-        <form class="search-panel">
-          <div class="field-row">
-            <label>
-              Blood group
-              <select>
-                <option>O+</option>
-                <option>A+</option>
-                <option>B+</option>
-                <option>AB+</option>
+      <section class="urgent-board-section" aria-labelledby="urgent-board-heading">
+        <div class="urgent-board-header">
+          <div>
+            <span class="eyebrow">Critical Needs</span>
+            <h1 id="urgent-board-heading">Urgent Blood Board</h1>
+            <p class="hero-subtext">Real-time emergency requests requiring immediate donor response.</p>
+          </div>
+          
+          <div class="urgent-board-filters">
+            <label class="filter-label">
+              <span>Blood Group</span>
+              <select id="urgent-blood-filter">
+                <option value="">All Groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
               </select>
             </label>
-            <label>
-              Location
-              <input type="text" value="Dhaka" />
+            <label class="filter-label">
+              <span>District</span>
+              <select id="urgent-district-filter">
+                <option value="">All Districts</option>
+              </select>
             </label>
           </div>
-          <button type="button" class="btn btn-primary btn-cta">Search donors</button>
-        </form>
+        </div>
+
+        <div class="urgent-board-status-bar">
+          <span id="urgent-board-status" role="status" aria-live="polite">Loading active emergency requests...</span>
+        </div>
+
+        <div class="urgent-request-list" id="urgent-request-list" aria-live="polite">
+          <!-- Populated by main.js -->
+        </div>
+
+        <div class="urgent-board-empty" id="urgent-board-empty" hidden>
+          <p>No critical requests found matching your criteria right now.</p>
+        </div>
+
+        <dialog class="urgent-detail-dialog" id="urgent-request-details" aria-labelledby="urgent-detail-title">
+          <div class="urgent-detail-content">
+            <div class="urgent-detail-header">
+              <div>
+                <span class="urgent-detail-kicker">Emergency request</span>
+                <h2 id="urgent-detail-title">Request details</h2>
+              </div>
+              <button class="urgent-detail-close" type="button" data-dialog-close aria-label="Close request details">&times;</button>
+            </div>
+
+            <div class="urgent-detail-blood-row">
+              <span class="urgent-blood-pill" id="urgent-detail-blood-group"></span>
+              <span class="urgent-priority">Critical</span>
+            </div>
+
+            <dl class="urgent-detail-list">
+              <div><dt>Hospital</dt><dd id="urgent-detail-hospital"></dd></div>
+              <div><dt>Location</dt><dd id="urgent-detail-location"></dd></div>
+              <div><dt>Distance</dt><dd id="urgent-detail-distance"></dd></div>
+              <div><dt>Request expires</dt><dd><time id="urgent-detail-expiry"></time></dd></div>
+            </dl>
+
+            <div class="urgent-detail-actions">
+              <a class="urgent-directions" id="urgent-detail-directions" href="#" target="_blank" rel="noopener noreferrer">Get directions</a>
+              <a class="urgent-connect" id="urgent-detail-connect" href="#">Call hospital</a>
+            </div>
+          </div>
+        </dialog>
       </section>
     </div>
   </main>
+  {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
 </body>
 </html>

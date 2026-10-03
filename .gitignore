@@ -1,7 +1,28 @@
-auth.db
-auth.db-shm
-auth.db-wal
+# Python virtual environments
 .venv/
+venv/
+ENV/
+env/
 
+# SQLite databases & runtime storage
+*.db
+*.db-shm
+*.db-wal
+*.sqlite3
+
+# Python bytecode & cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE & editor configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.local
+

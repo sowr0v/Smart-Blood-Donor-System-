@@ -3,23 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Terms of Use | Smart Blood Donor System</title>
+  <title>Terms of Service</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="public-info-page">
-  {% include "partials/public_info_header.html" %}
-  <main class="public-info-main legal-main">
-    <p class="public-info-eyebrow">Legal</p>
-    <h1>Terms of Use</h1>
-    <p class="public-info-lede">Use this platform responsibly and verify information before acting on it.</p>
-    <section class="public-info-section"><h2>Informational service</h2><p>The platform helps people discover and communicate about blood donation. It does not provide medical care, guarantee donor availability, or replace advice from qualified healthcare professionals.</p></section>
-    <section class="public-info-section"><h2>Responsible use</h2><p>Provide accurate information, respect other users, and do not misuse contact details or publish information without permission. Verify requests and arrangements directly with the patient or medical facility.</p></section>
-    <section class="public-info-section"><h2>Availability and affiliation</h2><p>Information may be incomplete or unavailable. Smart Blood Donor System is an independent platform and does not claim affiliation with hospitals, government agencies, or emergency services.</p></section>
-    <p class="legal-updated">Last updated: September 2026</p>
+<body>
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+            <div class="nav-auth-actions">
+        {% if user or logged_in_user %}
+          <a href="/donor/dashboard" class="btn btn-outline">Dashboard</a>
+          <a href="/logout" class="btn btn-primary">Logout</a>
+        {% else %}
+          <a href="/login" class="btn btn-outline">Login</a>
+          <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <div class="container">
+      <section class="page-panel">
+        <span class="eyebrow">Legal</span>
+        <h1>Terms of Service</h1>
+        <p class="hero-subtext">Last updated: {{ current_year | default(2026) }}</p>
+        
+        <div class="info-content-prose">
+          <h2>1. Acceptance of Terms</h2>
+          <p>By accessing and using the Smart Blood Donor System (SBDS), you accept and agree to be bound by the terms and provisions of this agreement. Furthermore, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.</p>
+          
+          <h2>2. Description of Service</h2>
+          <p>SBDS provides a platform for connecting blood donors with patients/hospitals in need. We do not provide medical services, and we are not a blood bank. We solely act as an intermediary communication platform.</p>
+
+          <h2>3. User Conduct</h2>
+          <p>Users must not use the platform to: (a) harass or threaten others; (b) provide false information regarding blood requirements or donation capabilities; (c) demand financial compensation for blood donation.</p>
+
+          <h2>4. Disclaimer of Warranties</h2>
+          <p>SBDS is provided "as is" and without warranties of any kind. We do not guarantee that donors will be found in time or that the blood provided is safe. Hospitals are entirely responsible for screening and testing all donated blood.</p>
+        </div>
+      </section>
+    </div>
   </main>
+
   {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
 </body>
 </html>

@@ -313,7 +313,58 @@
       </section>
 
       <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
-      <section class="dashboard-content-section" id="section-availability"></section>
+      <section class="dashboard-content-section" id="section-availability">
+        <div class="availability-section-heading">
+          <p class="availability-eyebrow">Donor Operations</p>
+          <h1>Donor Availability</h1>
+          <p>Choose whether blood seekers may find you as a potential match.</p>
+        </div>
+
+        <div class="availability-dashboard-grid">
+          <article class="status-callout-card" id="availabilityStatusCard" data-availability-status="loading">
+            <h2>Current availability</h2>
+            <span class="status-indicator-badge" id="availabilityStatusBadge">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              <span id="availabilityStatusText" aria-live="polite">Loading status...</span>
+            </span>
+            <p id="availabilityStatusDescription">Checking your saved availability.</p>
+            <p class="availability-updated" id="availabilityUpdated"></p>
+          </article>
+
+          <article class="availability-control-card">
+            <h2>Availability setting</h2>
+            <p>When enabled, you may be considered for blood requests that match your donor profile.</p>
+            <div class="availability-control-row">
+              <span class="availability-control-label" id="availabilityToggleLabel">Available for requests</span>
+              <label class="switch-toggle-btn" aria-label="Toggle donor availability">
+                <input type="checkbox" id="donorAvailabilityToggle" aria-labelledby="availabilityToggleLabel" disabled>
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </div>
+            <p class="availability-save-status" id="availabilitySaveStatus" role="status" aria-live="polite"></p>
+            <div class="availability-schedule">
+              <h3>Temporary unavailability</h3>
+              <p>Set the first and last dates you cannot donate. Your availability will automatically turn back on the day after the end date.</p>
+              <form id="unavailabilityScheduleForm">
+                <div class="unavailability-date-fields">
+                  <label for="unavailabilityStartDate">
+                    Start date
+                    <input type="date" id="unavailabilityStartDate" name="start_date" required disabled>
+                  </label>
+                  <label for="unavailabilityEndDate">
+                    End date
+                    <input type="date" id="unavailabilityEndDate" name="end_date" required disabled>
+                  </label>
+                </div>
+                <button type="submit" class="availability-schedule-button" id="saveUnavailabilitySchedule" disabled>Schedule pause</button>
+              </form>
+              <p id="unavailabilityScheduleStatus" class="availability-schedule-status" role="status" aria-live="polite"></p>
+              <button type="button" class="availability-cancel-schedule" id="cancelUnavailabilitySchedule" hidden>Cancel scheduled pause</button>
+            </div>
+          </article>
+
+        </div>
+      </section>
 
       <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
       <section class="dashboard-content-section" id="section-profile">
@@ -322,125 +373,39 @@
             <div class="card-title-combo">
               <span style="font-size: 1.5rem;">🩺</span>
               <div>
-                <h2>Donor Profile & Medical Information</h2>
+                <h2>Donor Profile &amp; Medical Information</h2>
                 <div class="card-subtitle">Review and update your personal, location, and medical details used for safe donor matching.</div>
               </div>
             </div>
             <span class="nav-pill-badge pill-red">Blood Group: {{ profile.blood_group if profile and profile.blood_group else 'A+' }}</span>
           </div>
 
-          <div class="profile-overview-panel" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-            <div class="detail-pill">
-              <span class="detail-label">Current status</span>
-              <strong>{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong>
-            </div>
-            <div class="detail-pill">
-              <span class="detail-label">Last donation</span>
-              <strong>{{ profile.last_donation if profile and profile.last_donation else '2026-01-14' }}</strong>
-            </div>
-            <div class="detail-pill">
-              <span class="detail-label">Location</span>
-              <strong>{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong>
-            </div>
+          <div class="profile-overview-panel" style="margin-bottom: 24px;">
+            <div class="detail-pill"><span class="detail-label">Current status</span><strong>{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Last donation</span><strong>{{ profile.last_donation if profile and profile.last_donation else 'Not recorded' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Location</span><strong>{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong></div>
           </div>
 
           <form id="donorProfileForm" class="donor-profile-form">
-            <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
-              <label class="field-block">
-                <span>Full name</span>
-                <input type="text" name="name" value="{{ profile.name if profile and profile.name else 'Ayesha Rahman' }}" required>
-              </label>
-
-              <label class="field-block">
-                <span>Phone number</span>
-                <input type="tel" name="phone" value="{{ profile.phone if profile and profile.phone else user.phone if user and user.phone else '+8801712345678' }}" required>
-              </label>
-
-              <label class="field-block">
-                <span>Email address</span>
-                <input type="email" name="email" value="{{ profile.email if profile and profile.email else 'ayesha.rahman@gmail.com' }}">
-              </label>
-
-              <label class="field-block">
-                <span>Gender</span>
-                <select name="gender">
-                  <option value="Female" {% if profile and profile.gender == 'Female' %}selected{% endif %}>Female</option>
-                  <option value="Male" {% if profile and profile.gender == 'Male' %}selected{% endif %}>Male</option>
-                  <option value="Other" {% if profile and profile.gender == 'Other' %}selected{% endif %}>Other</option>
-                </select>
-              </label>
-
-              <label class="field-block">
-                <span>Blood group</span>
-                <select name="blood_group" required>
-                  {% set groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
-                  {% for group in groups %}
-                    <option value="{{ group }}" {% if profile and profile.blood_group == group %}selected{% endif %}>{{ group }}</option>
-                  {% endfor %}
-                </select>
-              </label>
-
-              <label class="field-block">
-                <span>Date of birth</span>
-                <input type="date" name="date_of_birth" value="{{ profile.date_of_birth if profile and profile.date_of_birth else '1992-02-14' }}">
-              </label>
-
-              <label class="field-block">
-                <span>District</span>
-                <input type="text" name="district" value="{{ profile.district if profile and profile.district else 'Dhaka' }}" required>
-              </label>
-
-              <label class="field-block">
-                <span>Area</span>
-                <input type="text" name="area" value="{{ profile.area if profile and profile.area else 'Dhanmondi' }}" required>
-              </label>
-
-              <label class="field-block" style="grid-column: 1 / -1;">
-                <span>Address</span>
-                <input type="text" name="address" value="{{ profile.address if profile and profile.address else 'House 18, Road 7, Dhanmondi, Dhaka' }}" required>
-              </label>
-
-              <label class="field-block">
-                <span>Last donation date</span>
-                <input type="date" name="last_donation" value="{{ profile.last_donation if profile and profile.last_donation else '2026-01-14' }}">
-              </label>
-
-              <label class="field-block">
-                <span>Fitness status</span>
-                <select name="fitness_status">
-                  <option value="Eligible" {% if profile and profile.fitness_status == 'Eligible' %}selected{% endif %}>Eligible</option>
-                  <option value="Temporary Hold" {% if profile and profile.fitness_status == 'Temporary Hold' %}selected{% endif %}>Temporary Hold</option>
-                  <option value="Deferred" {% if profile and profile.fitness_status == 'Deferred' %}selected{% endif %}>Deferred</option>
-                </select>
-              </label>
-
-              <label class="field-block">
-                <span>Preferred donation type</span>
-                <select name="preferred_donation_types">
-                  <option value="Whole Blood" {% if profile and profile.preferred_donation_types == 'Whole Blood' %}selected{% endif %}>Whole Blood</option>
-                  <option value="Platelets" {% if profile and profile.preferred_donation_types == 'Platelets' %}selected{% endif %}>Platelets</option>
-                  <option value="Plasma" {% if profile and profile.preferred_donation_types == 'Plasma' %}selected{% endif %}>Plasma</option>
-                </select>
-              </label>
-
-              <label class="field-block" style="grid-column: 1 / -1;">
-                <span>Medical conditions</span>
-                <textarea name="medical_conditions" rows="3" placeholder="Note any relevant medical conditions">{{ profile.medical_conditions if profile and profile.medical_conditions else 'No major medical issues' }}</textarea>
-              </label>
-
-              <label class="field-block" style="grid-column: 1 / -1;">
-                <span>Medications</span>
-                <textarea name="medications" rows="2" placeholder="List current medications or none">{{ profile.medications if profile and profile.medications else 'None' }}</textarea>
-              </label>
-
-              <label class="field-block" style="grid-column: 1 / -1;">
-                <span>Allergies</span>
-                <textarea name="allergies" rows="2" placeholder="Document allergies if any">{{ profile.allergies if profile and profile.allergies else 'Penicillin' }}</textarea>
-              </label>
+            <div class="profile-overview-panel">
+              <label class="field-block"><span>Full name</span><input type="text" name="name" value="{{ profile.name if profile else user.name }}" required></label>
+              <label class="field-block"><span>Phone number</span><input type="tel" name="phone" value="{{ profile.phone if profile else user.phone }}" required></label>
+              <label class="field-block"><span>Email address</span><input type="email" name="email" value="{{ profile.email if profile else '' }}"></label>
+              <label class="field-block"><span>Gender</span><select name="gender"><option value="Female" {% if profile.gender == 'Female' %}selected{% endif %}>Female</option><option value="Male" {% if profile.gender == 'Male' %}selected{% endif %}>Male</option><option value="Other" {% if profile.gender == 'Other' %}selected{% endif %}>Other</option></select></label>
+              <label class="field-block"><span>Blood group</span><select name="blood_group" required>{% for group in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}<option value="{{ group }}" {% if profile.blood_group == group %}selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
+              <label class="field-block"><span>Date of birth</span><input type="date" name="date_of_birth" value="{{ profile.date_of_birth if profile else '' }}"></label>
+              <label class="field-block"><span>District</span><input type="text" name="district" value="{{ profile.district if profile else 'Dhaka' }}" required></label>
+              <label class="field-block"><span>Area</span><input type="text" name="area" value="{{ profile.area if profile else 'Dhanmondi' }}" required></label>
+              <label class="field-block"><span>Address</span><input type="text" name="address" value="{{ profile.address if profile else '' }}" required></label>
+              <label class="field-block"><span>Last donation date</span><input type="date" name="last_donation" value="{{ profile.last_donation if profile else '' }}"></label>
+              <label class="field-block"><span>Fitness status</span><select name="fitness_status"><option value="Eligible" {% if profile.fitness_status == 'Eligible' %}selected{% endif %}>Eligible</option><option value="Temporary Hold" {% if profile.fitness_status == 'Temporary Hold' %}selected{% endif %}>Temporary Hold</option><option value="Deferred" {% if profile.fitness_status == 'Deferred' %}selected{% endif %}>Deferred</option></select></label>
+              <label class="field-block"><span>Preferred donation type</span><select name="preferred_donation_types"><option value="Whole Blood" {% if profile.preferred_donation_types == 'Whole Blood' %}selected{% endif %}>Whole Blood</option><option value="Platelets" {% if profile.preferred_donation_types == 'Platelets' %}selected{% endif %}>Platelets</option><option value="Plasma" {% if profile.preferred_donation_types == 'Plasma' %}selected{% endif %}>Plasma</option></select></label>
+              <label class="field-block"><span>Medical conditions</span><textarea name="medical_conditions" rows="3">{{ profile.medical_conditions if profile else '' }}</textarea></label>
+              <label class="field-block"><span>Medications</span><textarea name="medications" rows="2">{{ profile.medications if profile else '' }}</textarea></label>
+              <label class="field-block"><span>Allergies</span><textarea name="allergies" rows="2">{{ profile.allergies if profile else '' }}</textarea></label>
             </div>
-
-            <div class="profile-form-actions" style="display:flex; justify-content:flex-end; gap:12px; margin-top: 20px; flex-wrap: wrap;">
-              <div id="profileFormMessage" class="status-message" aria-live="polite" style="margin-right:auto; min-height:24px;"></div>
+            <div class="profile-form-actions">
+              <p id="profileFormMessage" class="status-message" role="status" aria-live="polite"></p>
               <button type="reset" class="secondary-button">Reset</button>
               <button type="submit" id="profileSaveBtn" class="primary-button">Save profile</button>
             </div>
@@ -457,55 +422,17 @@
           <div class="card-header-flex" style="margin-bottom: 18px;">
             <div class="card-title-combo">
               <span style="font-size: 1.6rem;">🎯</span>
-              <div>
-                <h2>Matched Blood Requests</h2>
-                <div class="card-subtitle">Relevant opportunities based on your blood group, district, and availability.</div>
-              </div>
+              <div><h2>Matched Blood Requests</h2><div class="card-subtitle">Relevant opportunities based on your blood group, district, and availability.</div></div>
             </div>
-            <span class="nav-pill-badge pill-green">
-                <span class="pulse-dot"></span> Live matching feed
-            </span>
+            <span class="nav-pill-badge pill-green"><span class="pulse-dot"></span> Live matching feed</span>
           </div>
-
           <div class="filters-bar-flex matched-request-filters" id="matched-request-filters">
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
-              Blood group
-              <select id="matched-blood-group-filter" class="form-control-custom" style="min-width: 130px;">
-                <option value="all">All</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-              </select>
-            </label>
-
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
-              Urgency
-              <select id="matched-urgency-filter" class="form-control-custom" style="min-width: 130px;">
-                <option value="all">All</option>
-                <option value="Critical">Critical</option>
-                <option value="Urgent">Urgent</option>
-                <option value="Standard">Standard</option>
-              </select>
-            </label>
-
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color: var(--text-secondary);">
-              Location
-              <select id="matched-location-filter" class="form-control-custom" style="min-width: 160px;">
-                <option value="all">All locations</option>
-                <option value="Dhaka">Dhaka</option>
-                <option value="Chattogram">Chattogram</option>
-                <option value="Sylhet">Sylhet</option>
-              </select>
-            </label>
+            <label>Blood group<select id="matched-blood-group-filter" class="form-control-custom"><option value="all">All</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></label>
+            <label>Urgency<select id="matched-urgency-filter" class="form-control-custom"><option value="all">All</option><option value="Critical">Critical</option><option value="Urgent">Urgent</option><option value="Standard">Standard</option></select></label>
+            <label>Location<select id="matched-location-filter" class="form-control-custom"><option value="all">All locations</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Sylhet">Sylhet</option></select></label>
           </div>
-
           <div id="matched-request-feed" class="requests-cards-stack" aria-live="polite"></div>
-          <div id="matched-request-empty" class="status-message" style="display:none; margin-top:16px; color: var(--text-secondary);">No active requests match your filters at the moment.</div>
+          <div id="matched-request-empty" class="status-message" style="display:none; margin-top:16px;">No active requests match your filters at the moment.</div>
         </div>
       </section>
 
@@ -516,14 +443,60 @@
           <h1 id="donor-request-flow-title">Accept or decline a blood request</h1>
           <p>Choose how you can help. The seeker will be notified of your response.</p>
         </header>
-        <p class="donor-request-flow-status" id="donor-request-flow-status" role="status" aria-live="polite">
-          Loading active requests...
-        </p>
+        <p class="donor-request-flow-status" id="donor-request-flow-status" role="status" aria-live="polite">Loading active requests...</p>
         <div class="donor-request-flow-list" id="donor-request-flow-list" aria-live="polite"></div>
       </section>
 
       <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
-      <section class="dashboard-content-section" id="section-request-details"></section>
+      <section class="dashboard-content-section" id="section-request-details" aria-labelledby="donor-request-details-title">
+        <header class="donor-request-details-header">
+          <span class="eyebrow">Active emergency requests</span>
+          <h1 id="donor-request-details-title">Blood Request Details &amp; Directions</h1>
+          <p>Review the hospital and request information, then open directions to the donation location.</p>
+        </header>
+
+        <p class="donor-request-details-status" id="donor-request-details-status" role="status" aria-live="polite">
+          Loading active emergency requests...
+        </p>
+
+        <div class="donor-request-details-controls">
+          <label for="donor-request-details-select">Select an active request</label>
+          <select id="donor-request-details-select" disabled>
+            <option value="">Loading requests...</option>
+          </select>
+        </div>
+
+        <div class="details-split-grid donor-request-details-grid" id="donor-request-details-content" hidden>
+          <section class="hospital-dossier-card" aria-labelledby="donor-request-hospital">
+            <div class="donor-request-detail-heading">
+              <span class="urgent-blood-pill" id="donor-request-blood-group"></span>
+              <span class="urgent-priority">Critical</span>
+            </div>
+            <h2 class="donor-request-hospital" id="donor-request-hospital"></h2>
+            <div class="dossier-row">
+              <span class="dossier-label">Location</span>
+              <span class="dossier-value" id="donor-request-location"></span>
+            </div>
+            <div class="dossier-row">
+              <span class="dossier-label">Distance</span>
+              <span class="dossier-value" id="donor-request-distance"></span>
+            </div>
+            <div class="dossier-row">
+              <span class="dossier-label">Request expires</span>
+              <time class="dossier-value" id="donor-request-expiry"></time>
+            </div>
+          </section>
+
+          <section class="route-simulation-card" aria-labelledby="donor-request-directions-title">
+            <h2 id="donor-request-directions-title">Hospital directions</h2>
+            <p>Open this request location in Google Maps to plan your route.</p>
+            <a class="donor-request-directions-link" id="donor-request-directions" href="#" target="_blank" rel="noopener noreferrer">
+              Get directions
+            </a>
+            <a class="donor-request-call-link" id="donor-request-call" href="#" hidden>Call hospital</a>
+          </section>
+        </div>
+      </section>
 
       <!-- ================= SECTION 7: IN-APP CHAT ================= -->
       <section class="dashboard-content-section" id="section-chat">
@@ -760,7 +733,112 @@
       </section>
 
       <!-- ================= SECTION 8: REVIEWS ================= -->
-      <section class="dashboard-content-section" id="section-reviews"></section>
+      <section class="dashboard-content-section" id="section-reviews" aria-labelledby="donor-reviews-title">
+        <header class="donor-reviews-header">
+          <span class="eyebrow">Recipient feedback</span>
+          <h1 id="donor-reviews-title">Donor Reviews</h1>
+          <p>See how recipients and hospital teams describe their donation experience with you.</p>
+        </header>
+
+        <p class="donor-reviews-sample-notice">Preview content: these sample reviews are shown until recipient review records are connected.</p>
+
+        <section class="donor-card donor-review-summary" aria-label="Donor rating summary">
+          <div class="review-overall-score">
+            <strong>4.9</strong>
+            <span class="review-stars" aria-label="4.9 out of 5 stars">★★★★★</span>
+            <span class="review-overall-caption">Based on 18 recipient reviews</span>
+          </div>
+
+          <div class="review-rating-breakdown" aria-label="Rating breakdown">
+            <div class="review-rating-row">
+              <span>5 stars</span>
+              <span class="review-rating-track"><span style="width: 94%"></span></span>
+              <span>17</span>
+            </div>
+            <div class="review-rating-row">
+              <span>4 stars</span>
+              <span class="review-rating-track"><span style="width: 6%"></span></span>
+              <span>1</span>
+            </div>
+            <div class="review-rating-row">
+              <span>3 stars</span>
+              <span class="review-rating-track"><span style="width: 0%"></span></span>
+              <span>0</span>
+            </div>
+            <div class="review-rating-row">
+              <span>2 stars</span>
+              <span class="review-rating-track"><span style="width: 0%"></span></span>
+              <span>0</span>
+            </div>
+            <div class="review-rating-row">
+              <span>1 star</span>
+              <span class="review-rating-track"><span style="width: 0%"></span></span>
+              <span>0</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="donor-review-toolbar">
+          <div>
+            <h2>Recent recipient feedback</h2>
+            <p id="donor-review-count" role="status" aria-live="polite">Showing 3 sample reviews</p>
+          </div>
+          <label for="donor-review-rating-filter">
+            Filter by rating
+            <select id="donor-review-rating-filter">
+              <option value="all">All ratings</option>
+              <option value="5">5 stars</option>
+              <option value="4">4 stars</option>
+              <option value="3">3 stars</option>
+              <option value="2">2 stars</option>
+              <option value="1">1 star</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="donor-review-list" id="donor-review-list" aria-live="polite">
+          <article class="donor-review-item" data-rating="5">
+            <div class="donor-review-item-header">
+              <div>
+                <h3>Recipient's family</h3>
+                <p>Square Hospital · Panthapath</p>
+              </div>
+              <time datetime="2026-09-28">Sep 28, 2026</time>
+            </div>
+            <div class="donor-review-item-rating" aria-label="5 out of 5 stars">★★★★★</div>
+            <blockquote>“You stayed calm and kind through a stressful day. Our family is deeply grateful for your help.”</blockquote>
+            <span class="donor-review-sample-tag">Sample review</span>
+          </article>
+
+          <article class="donor-review-item" data-rating="5">
+            <div class="donor-review-item-header">
+              <div>
+                <h3>Recipient</h3>
+                <p>Dhaka Medical College Hospital · Shahbagh</p>
+              </div>
+              <time datetime="2026-09-21">Sep 21, 2026</time>
+            </div>
+            <div class="donor-review-item-rating" aria-label="5 out of 5 stars">★★★★★</div>
+            <blockquote>“Thank you for responding quickly and keeping us updated. Your donation made a real difference to us.”</blockquote>
+            <span class="donor-review-sample-tag">Sample review</span>
+          </article>
+
+          <article class="donor-review-item" data-rating="4">
+            <div class="donor-review-item-header">
+              <div>
+                <h3>Patient's relative</h3>
+                <p>Green Life Hospital · Dhanmondi</p>
+              </div>
+              <time datetime="2026-09-12">Sep 12, 2026</time>
+            </div>
+            <div class="donor-review-item-rating" aria-label="4 out of 5 stars">★★★★☆</div>
+            <blockquote>“You were thoughtful and helpful throughout the process. We appreciate you being there when we needed support.”</blockquote>
+            <span class="donor-review-sample-tag">Sample review</span>
+          </article>
+        </div>
+
+        <p class="donor-review-empty" id="donor-review-empty" hidden>No sample reviews match this rating.</p>
+      </section>
 
       <!-- ================= SECTION 9: SETTINGS ================= -->
       <section class="dashboard-content-section" id="section-settings">
