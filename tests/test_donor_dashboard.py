@@ -1,4 +1,5 @@
 import unittest
+import uuid
 from contextlib import closing
 from datetime import timedelta
 from fastapi.testclient import TestClient
@@ -248,14 +249,23 @@ class DonorDashboardTests(unittest.TestCase):
         )
 
     def test_donor_respond_request_api(self):
-        response = self.client.post(
-            "/api/v1/donor/requests/req-001/respond",
-            json={"action": "accept", "eta": "30 mins", "note": "On the way"},
-        )
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertEqual(data["status"], "success")
-        self.assertEqual(data["action"], "accept")
+        donor_phone = f"+88017{uuid.uuid4().int % 10**9:09d}"
+        cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        with TestClient(app) as client:
+            active_requests = client.get("/api/v1/requests/urgent").json()
+            self.assertTrue(active_requests)
+            request_id = active_requests[0]["id"]
+            response = client.post(
+                f"/api/v1/donor/requests/{request_id}/respond",
+                json={"action": "accept", "eta": "30 mins", "note": "On the way"},
+                cookies=cookies,
+            )
+            self.assertEqual(response.status_code, 200)
+            data = response.json()
+            self.assertEqual(data["status"], "success")
+            self.assertEqual(data["action"], "accept")
+            self.assertEqual(data["request_status"], "accepted")
+            self.assertEqual(data["notification"]["recipient"], "seeker")
 
     def test_logout_redirects_to_login(self):
         response = self.client.get("/logout", follow_redirects=False)

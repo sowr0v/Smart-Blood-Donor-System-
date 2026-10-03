@@ -1178,6 +1178,207 @@ input:checked + .switch-slider:before {
   gap: 8px;
 }
 
+.profile-overview-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.donor-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.field-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-block span {
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.field-block input,
+.field-block select,
+.field-block textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.field-block input:focus-visible,
+.field-block select:focus-visible,
+.field-block textarea:focus-visible {
+  outline: 3px solid rgba(211, 47, 47, 0.2);
+  outline-offset: 1px;
+}
+
+.profile-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.profile-form-actions p {
+  flex: 1 1 220px;
+  min-height: 22px;
+  margin: 0;
+}
+
+.profile-form-actions button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.profile-form-actions button[type="submit"] {
+  color: #fff;
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+}
+
+.donor-request-flow-header {
+  margin-bottom: 20px;
+}
+
+.donor-request-flow-header h1 {
+  margin-top: 5px;
+  color: var(--heading-color);
+  font-size: 1.6rem;
+  line-height: 1.25;
+}
+
+.donor-request-flow-header p,
+.donor-request-flow-status {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.donor-request-flow-status {
+  min-height: 22px;
+  margin-bottom: 12px;
+}
+
+.donor-request-flow-list {
+  display: grid;
+  gap: 12px;
+}
+
+.donor-response-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-width: 0;
+  padding: 18px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.donor-response-details {
+  min-width: 0;
+}
+
+.donor-response-details h2 {
+  color: var(--heading-color);
+  font-size: 1.05rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.donor-response-details p {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.donor-response-details .donor-response-hospital {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.donor-response-details .donor-response-expiry {
+  font-size: 0.78rem;
+}
+
+.donor-response-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.donor-response-button {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.donor-response-button.is-accept {
+  color: #fff;
+  background: var(--primary-red);
+  border-color: var(--primary-red);
+}
+
+.donor-response-button.is-decline {
+  color: var(--text-primary);
+  background: transparent;
+  border-color: var(--border-color);
+}
+
+.donor-response-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.donor-response-button:focus-visible {
+  outline: 3px solid rgba(211, 47, 47, 0.25);
+  outline-offset: 2px;
+}
+
+.donor-response-result {
+  color: var(--text-primary);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.donor-response-result.is-accepted {
+  color: #15803D;
+}
+
+.donor-response-result.is-declined {
+  color: var(--text-secondary);
+}
+
 .donor-request-details-header {
   margin-bottom: 20px;
 }

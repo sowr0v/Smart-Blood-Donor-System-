@@ -296,6 +296,205 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const donorProfileForm = document.getElementById('donorProfileForm');
+  const profileFormMessage = document.getElementById('profileFormMessage');
+
+  if (donorProfileForm) {
+    donorProfileForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(donorProfileForm).entries());
+      const requiredFields = ['name', 'phone', 'blood_group', 'district', 'area', 'address'];
+      const missing = requiredFields.filter(field => !String(payload[field] || '').trim());
+      if (missing.length) {
+        profileFormMessage.textContent = 'Please complete the required profile fields before saving.';
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/v1/donor/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Unable to save donor profile.');
+        profileFormMessage.textContent = result.message || 'Profile saved successfully.';
+        showToast(profileFormMessage.textContent, 'success');
+      } catch (error) {
+        profileFormMessage.textContent = error.message || 'Could not save profile.';
+        showToast(profileFormMessage.textContent, 'error');
+      }
+    });
+  }
+
+  const matchedFeed = document.getElementById('matched-request-feed');
+  const matchedEmptyState = document.getElementById('matched-request-empty');
+  const bloodGroupFilter = document.getElementById('matched-blood-group-filter');
+  const urgencyFilter = document.getElementById('matched-urgency-filter');
+  const locationFilter = document.getElementById('matched-location-filter');
+
+  if (matchedFeed && matchedEmptyState && bloodGroupFilter && urgencyFilter && locationFilter) {
+    function normalizeUrgency(urgency) {
+      const value = String(urgency || 'Standard').toLowerCase();
+      if (value.includes('critical') || value.includes('emergency')) return 'Critical';
+      if (value.includes('urgent')) return 'Urgent';
+      return 'Standard';
+    }
+
+    function renderMatchedRequestCard(bloodRequest) {
+      const card = document.createElement('article');
+      const urgency = normalizeUrgency(bloodRequest.urgency || bloodRequest.status);
+      card.className = `match-request-card ${urgency === 'Critical' || urgency === 'Urgent' ? 'urgent-border' : ''}`;
+
+      const meta = document.createElement('div');
+      meta.className = 'card-top-meta';
+      const bloodGroup = document.createElement('span');
+      bloodGroup.className = 'nav-pill-badge pill-red';
+      bloodGroup.textContent = bloodRequest.blood_group || 'A+';
+      const urgencyBadge = document.createElement('span');
+      urgencyBadge.className = `urgency-flag urgency-${urgency.toLowerCase()}`;
+      urgencyBadge.textContent = urgency;
+      meta.append(bloodGroup, urgencyBadge);
+
+      const hospital = document.createElement('h3');
+      hospital.className = 'hospital-headline';
+      hospital.textContent = bloodRequest.hospital || 'Hospital request';
+      const location = document.createElement('p');
+      location.className = 'location-distance-row';
+      location.textContent = `${bloodRequest.area || 'Dhaka'}, ${bloodRequest.district || 'Dhaka'} · ${bloodRequest.distance_km ?? 'Distance unavailable'}${bloodRequest.distance_km !== undefined ? ' km away' : ''}`;
+      const details = document.createElement('p');
+      details.className = 'patient-note-box';
+      details.textContent = `${bloodRequest.units || 1} unit${(bloodRequest.units || 1) === 1 ? '' : 's'} needed · ${bloodRequest.status || 'Open'} request`;
+
+      card.append(meta, hospital, location, details);
+      return card;
+    }
+
+    async function refreshMatchedRequests() {
+      const params = new URLSearchParams({
+        blood_group: bloodGroupFilter.value || 'all',
+        urgency: urgencyFilter.value || 'all',
+        district: locationFilter.value || 'all',
+      });
+      const response = await fetch(`/api/v1/donor/matches?${params.toString()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Unable to load matched requests.');
+      const result = await response.json();
+      const requests = Array.isArray(result.requests) ? result.requests : [];
+      matchedFeed.replaceChildren(...requests.map(renderMatchedRequestCard));
+      matchedEmptyState.style.display = requests.length ? 'none' : 'block';
+    }
+
+    [bloodGroupFilter, urgencyFilter, locationFilter].forEach(filter => {
+      filter.addEventListener('change', () => {
+        refreshMatchedRequests().catch(() => {
+          matchedFeed.replaceChildren();
+          matchedEmptyState.style.display = 'block';
+          matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
+        });
+      });
+    });
+    refreshMatchedRequests().catch(() => {
+      matchedEmptyState.style.display = 'block';
+      matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
+    });
+  }
+
+  const requestFlowStatus = document.getElementById('donor-request-flow-status');
+  const requestFlowList = document.getElementById('donor-request-flow-list');
+
+  if (requestFlowStatus && requestFlowList) {
+    let donorRequests = [];
+
+    function renderDonorRequests() {
+      requestFlowList.replaceChildren();
+      if (donorRequests.length === 0) {
+        requestFlowStatus.textContent = 'There are no active requests right now.';
+        return;
+      }
+
+      requestFlowStatus.textContent = `${donorRequests.length} active ${donorRequests.length === 1 ? 'request' : 'requests'}`;
+      donorRequests.forEach(bloodRequest => {
+        const card = document.createElement('article');
+        card.className = 'donor-response-card';
+        const details = document.createElement('div');
+        details.className = 'donor-response-details';
+        const heading = document.createElement('h2');
+        heading.textContent = `${bloodRequest.blood_group} blood needed`;
+        const hospital = document.createElement('p');
+        hospital.className = 'donor-response-hospital';
+        hospital.textContent = bloodRequest.hospital_name;
+        const location = document.createElement('p');
+        location.textContent = [bloodRequest.area, bloodRequest.district].filter(Boolean).join(', ') || 'Location unavailable';
+        const expiry = document.createElement('p');
+        expiry.className = 'donor-response-expiry';
+        expiry.textContent = `Active until ${new Date(bloodRequest.expires_at).toLocaleString()}`;
+        details.append(heading, hospital, location, expiry);
+
+        const actions = document.createElement('div');
+        actions.className = 'donor-response-actions';
+        if (bloodRequest.response_status) {
+          const responseStatus = document.createElement('span');
+          responseStatus.className = `donor-response-result is-${bloodRequest.response_status}`;
+          responseStatus.textContent = `You ${bloodRequest.response_status} this request`;
+          actions.append(responseStatus);
+        } else {
+          const acceptButton = document.createElement('button');
+          acceptButton.type = 'button';
+          acceptButton.className = 'donor-response-button is-accept';
+          acceptButton.textContent = 'Accept request';
+          const declineButton = document.createElement('button');
+          declineButton.type = 'button';
+          declineButton.className = 'donor-response-button is-decline';
+          declineButton.textContent = 'Decline';
+          acceptButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'accept', acceptButton, declineButton));
+          declineButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'decline', acceptButton, declineButton));
+          actions.append(acceptButton, declineButton);
+        }
+        card.append(details, actions);
+        requestFlowList.append(card);
+      });
+    }
+
+    async function submitDonorResponse(bloodRequest, action, acceptButton, declineButton) {
+      const message = action === 'accept'
+        ? `Accept the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`
+        : `Decline the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`;
+      if (!window.confirm(message)) return;
+      acceptButton.disabled = true;
+      declineButton.disabled = true;
+      try {
+        const response = await fetch(`/api/v1/donor/requests/${encodeURIComponent(bloodRequest.id)}/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Your response could not be saved.');
+        bloodRequest.response_status = result.request_status;
+        renderDonorRequests();
+        showToast(`${result.message} The seeker has been notified.`, 'success');
+      } catch (error) {
+        acceptButton.disabled = false;
+        declineButton.disabled = false;
+        showToast(error.message || 'Your response could not be saved.', 'error');
+      }
+    }
+
+    fetch('/api/v1/requests/urgent', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Active requests are temporarily unavailable.');
+        return response.json();
+      })
+      .then(requests => {
+        if (!Array.isArray(requests)) throw new Error('Unexpected request list response.');
+        donorRequests = requests;
+        renderDonorRequests();
+      })
+      .catch(error => {
+        requestFlowStatus.textContent = error.message || 'Could not load active requests.';
+      });
+  }
+
   const requestDetailsStatus = document.getElementById('donor-request-details-status');
   const requestDetailsSelect = document.getElementById('donor-request-details-select');
   const requestDetailsContent = document.getElementById('donor-request-details-content');

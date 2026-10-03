@@ -367,16 +367,85 @@
       </section>
 
       <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
-      <section class="dashboard-content-section" id="section-profile"></section>
+      <section class="dashboard-content-section" id="section-profile">
+        <div class="donor-card" style="padding: 20px 24px; margin-bottom: 24px;">
+          <div class="card-header-flex" style="margin-bottom: 18px;">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🩺</span>
+              <div>
+                <h2>Donor Profile &amp; Medical Information</h2>
+                <div class="card-subtitle">Review and update your personal, location, and medical details used for safe donor matching.</div>
+              </div>
+            </div>
+            <span class="nav-pill-badge pill-red">Blood Group: {{ profile.blood_group if profile and profile.blood_group else 'A+' }}</span>
+          </div>
+
+          <div class="profile-overview-panel" style="margin-bottom: 24px;">
+            <div class="detail-pill"><span class="detail-label">Current status</span><strong>{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Last donation</span><strong>{{ profile.last_donation if profile and profile.last_donation else 'Not recorded' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Location</span><strong>{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong></div>
+          </div>
+
+          <form id="donorProfileForm" class="donor-profile-form">
+            <div class="profile-overview-panel">
+              <label class="field-block"><span>Full name</span><input type="text" name="name" value="{{ profile.name if profile else user.name }}" required></label>
+              <label class="field-block"><span>Phone number</span><input type="tel" name="phone" value="{{ profile.phone if profile else user.phone }}" required></label>
+              <label class="field-block"><span>Email address</span><input type="email" name="email" value="{{ profile.email if profile else '' }}"></label>
+              <label class="field-block"><span>Gender</span><select name="gender"><option value="Female" {% if profile.gender == 'Female' %}selected{% endif %}>Female</option><option value="Male" {% if profile.gender == 'Male' %}selected{% endif %}>Male</option><option value="Other" {% if profile.gender == 'Other' %}selected{% endif %}>Other</option></select></label>
+              <label class="field-block"><span>Blood group</span><select name="blood_group" required>{% for group in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}<option value="{{ group }}" {% if profile.blood_group == group %}selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
+              <label class="field-block"><span>Date of birth</span><input type="date" name="date_of_birth" value="{{ profile.date_of_birth if profile else '' }}"></label>
+              <label class="field-block"><span>District</span><input type="text" name="district" value="{{ profile.district if profile else 'Dhaka' }}" required></label>
+              <label class="field-block"><span>Area</span><input type="text" name="area" value="{{ profile.area if profile else 'Dhanmondi' }}" required></label>
+              <label class="field-block"><span>Address</span><input type="text" name="address" value="{{ profile.address if profile else '' }}" required></label>
+              <label class="field-block"><span>Last donation date</span><input type="date" name="last_donation" value="{{ profile.last_donation if profile else '' }}"></label>
+              <label class="field-block"><span>Fitness status</span><select name="fitness_status"><option value="Eligible" {% if profile.fitness_status == 'Eligible' %}selected{% endif %}>Eligible</option><option value="Temporary Hold" {% if profile.fitness_status == 'Temporary Hold' %}selected{% endif %}>Temporary Hold</option><option value="Deferred" {% if profile.fitness_status == 'Deferred' %}selected{% endif %}>Deferred</option></select></label>
+              <label class="field-block"><span>Preferred donation type</span><select name="preferred_donation_types"><option value="Whole Blood" {% if profile.preferred_donation_types == 'Whole Blood' %}selected{% endif %}>Whole Blood</option><option value="Platelets" {% if profile.preferred_donation_types == 'Platelets' %}selected{% endif %}>Platelets</option><option value="Plasma" {% if profile.preferred_donation_types == 'Plasma' %}selected{% endif %}>Plasma</option></select></label>
+              <label class="field-block"><span>Medical conditions</span><textarea name="medical_conditions" rows="3">{{ profile.medical_conditions if profile else '' }}</textarea></label>
+              <label class="field-block"><span>Medications</span><textarea name="medications" rows="2">{{ profile.medications if profile else '' }}</textarea></label>
+              <label class="field-block"><span>Allergies</span><textarea name="allergies" rows="2">{{ profile.allergies if profile else '' }}</textarea></label>
+            </div>
+            <div class="profile-form-actions">
+              <p id="profileFormMessage" class="status-message" role="status" aria-live="polite"></p>
+              <button type="reset" class="secondary-button">Reset</button>
+              <button type="submit" id="profileSaveBtn" class="primary-button">Save profile</button>
+            </div>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= SECTION 3: DONATION HISTORY ================= -->
       <section class="dashboard-content-section" id="section-history"></section>
 
       <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
-      <section class="dashboard-content-section" id="section-matched-requests"></section>
+      <section class="dashboard-content-section" id="section-matched-requests">
+        <div class="donor-card" style="padding: 24px;">
+          <div class="card-header-flex" style="margin-bottom: 18px;">
+            <div class="card-title-combo">
+              <span style="font-size: 1.6rem;">🎯</span>
+              <div><h2>Matched Blood Requests</h2><div class="card-subtitle">Relevant opportunities based on your blood group, district, and availability.</div></div>
+            </div>
+            <span class="nav-pill-badge pill-green"><span class="pulse-dot"></span> Live matching feed</span>
+          </div>
+          <div class="filters-bar-flex matched-request-filters" id="matched-request-filters">
+            <label>Blood group<select id="matched-blood-group-filter" class="form-control-custom"><option value="all">All</option><option value="A+">A+</option><option value="A-">A-</option><option value="B+">B+</option><option value="B-">B-</option><option value="AB+">AB+</option><option value="AB-">AB-</option><option value="O+">O+</option><option value="O-">O-</option></select></label>
+            <label>Urgency<select id="matched-urgency-filter" class="form-control-custom"><option value="all">All</option><option value="Critical">Critical</option><option value="Urgent">Urgent</option><option value="Standard">Standard</option></select></label>
+            <label>Location<select id="matched-location-filter" class="form-control-custom"><option value="all">All locations</option><option value="Dhaka">Dhaka</option><option value="Chattogram">Chattogram</option><option value="Sylhet">Sylhet</option></select></label>
+          </div>
+          <div id="matched-request-feed" class="requests-cards-stack" aria-live="polite"></div>
+          <div id="matched-request-empty" class="status-message" style="display:none; margin-top:16px;">No active requests match your filters at the moment.</div>
+        </div>
+      </section>
 
       <!-- ================= SECTION 5: ACCEPT & DECLINE FLOW ================= -->
-      <section class="dashboard-content-section" id="section-request-flow"></section>
+      <section class="dashboard-content-section" id="section-request-flow" aria-labelledby="donor-request-flow-title">
+        <header class="donor-request-flow-header">
+          <span class="eyebrow">Your response matters</span>
+          <h1 id="donor-request-flow-title">Accept or decline a blood request</h1>
+          <p>Choose how you can help. The seeker will be notified of your response.</p>
+        </header>
+        <p class="donor-request-flow-status" id="donor-request-flow-status" role="status" aria-live="polite">Loading active requests...</p>
+        <div class="donor-request-flow-list" id="donor-request-flow-list" aria-live="polite"></div>
+      </section>
 
       <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
       <section class="dashboard-content-section" id="section-request-details" aria-labelledby="donor-request-details-title">
