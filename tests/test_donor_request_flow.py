@@ -15,11 +15,48 @@ class DonorRequestFlowTests(unittest.TestCase):
         self.addCleanup(self.client.__exit__, None, None, None)
         self.donor_phone = f"+88017{uuid.uuid4().int % 10**9:09d}"
         self.client.cookies.set("access_token", _generate_jwt(self.donor_phone, "donor"))
+        self.request_ids = []
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            for index in range(2):
+                cursor = connection.execute(
+                    """INSERT INTO blood_requests (
+                           blood_group, hospital_name, district, area, distance_km,
+                           expires_at, contact_phone, is_emergency
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)""",
+                    (
+                        "A+",
+                        f"Request Flow Test Hospital {index}",
+                        "Dhaka",
+                        "Dhanmondi",
+                        1.0,
+                        (datetime.now(timezone.utc) + timedelta(hours=1 + index)).isoformat(),
+                        "+8801700000099",
+                    ),
+                )
+                self.request_ids.append(cursor.lastrowid)
+        self.addCleanup(self._remove_test_requests)
+
+    def _remove_test_requests(self):
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            placeholders = ",".join("?" for _ in self.request_ids)
+            connection.execute(
+                f"DELETE FROM seeker_notifications WHERE request_id IN ({placeholders})",
+                self.request_ids,
+            )
+            connection.execute(
+                f"DELETE FROM donor_request_responses WHERE request_id IN ({placeholders})",
+                self.request_ids,
+            )
+            connection.execute(
+                f"DELETE FROM blood_requests WHERE id IN ({placeholders})",
+                self.request_ids,
+            )
 
     def test_accept_updates_status_and_queues_seeker_notification(self):
         active_requests = self.client.get("/api/v1/requests/urgent").json()
-        self.assertTrue(active_requests)
-        request_id = active_requests[0]["id"]
+        active_request_ids = {item["id"] for item in active_requests}
+        request_id = self.request_ids[0]
+        self.assertIn(request_id, active_request_ids)
 
         response = self.client.post(
             f"/api/v1/donor/requests/{request_id}/respond",
@@ -50,8 +87,9 @@ class DonorRequestFlowTests(unittest.TestCase):
 
     def test_decline_updates_status(self):
         active_requests = self.client.get("/api/v1/requests/urgent").json()
-        self.assertGreaterEqual(len(active_requests), 2)
-        request_id = active_requests[1]["id"]
+        active_request_ids = {item["id"] for item in active_requests}
+        request_id = self.request_ids[1]
+        self.assertIn(request_id, active_request_ids)
 
         response = self.client.post(
             f"/api/v1/donor/requests/{request_id}/respond",
@@ -63,9 +101,12 @@ class DonorRequestFlowTests(unittest.TestCase):
 
     def test_expired_request_cannot_be_answered(self):
         active_requests = self.client.get("/api/v1/requests/urgent").json()
-        self.assertTrue(active_requests)
-        request_id = active_requests[0]["id"]
-        original_expiry = active_requests[0]["expires_at"]
+        active_request_ids = {item["id"] for item in active_requests}
+        request_id = self.request_ids[0]
+        self.assertIn(request_id, active_request_ids)
+        original_expiry = next(
+            item["expires_at"] for item in active_requests if item["id"] == request_id
+        )
 
         try:
             expired_at = (datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat()
