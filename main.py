@@ -57,6 +57,25 @@ def initialize_urgent_database():
                     contact_phone TEXT,
                     is_emergency INTEGER DEFAULT 0
                 );
+                CREATE TABLE IF NOT EXISTS donor_request_responses (
+                    id INTEGER PRIMARY KEY,
+                    request_id INTEGER NOT NULL REFERENCES blood_requests(id),
+                    donor_phone TEXT NOT NULL,
+                    action TEXT NOT NULL CHECK (action IN ('accept', 'decline')),
+                    eta TEXT NOT NULL DEFAULT '',
+                    reason TEXT NOT NULL DEFAULT '',
+                    note TEXT NOT NULL DEFAULT '',
+                    responded_at TEXT NOT NULL,
+                    UNIQUE (request_id, donor_phone)
+                );
+                CREATE TABLE IF NOT EXISTS seeker_notifications (
+                    id INTEGER PRIMARY KEY,
+                    request_id INTEGER NOT NULL REFERENCES blood_requests(id),
+                    donor_phone TEXT NOT NULL,
+                    response TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
             count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
@@ -808,16 +827,27 @@ async def serve_registration(request: Request, role: str = "donor"):
     )
 
 @app.get("/api/v1/requests/urgent")
-def get_urgent_requests():
+def get_urgent_requests(request: Request):
     now = datetime.now(timezone.utc)
+    user = _get_current_user(request)
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    donor_phone = token["sub"] if user and user.get("role") == "donor" and token else ""
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
-            """SELECT id, blood_group, hospital_name, district, area,
-                      distance_km, expires_at, contact_phone
+            """SELECT blood_requests.id, blood_group, hospital_name, district, area,
+                      distance_km, expires_at, contact_phone,
+                      CASE donor_request_responses.action
+                          WHEN 'accept' THEN 'accepted'
+                          WHEN 'decline' THEN 'declined'
+                      END AS response_status
                FROM blood_requests
+               LEFT JOIN donor_request_responses
+                 ON donor_request_responses.request_id = blood_requests.id
+                AND donor_request_responses.donor_phone = ?
                WHERE is_emergency = 1
-               ORDER BY expires_at ASC"""
+               ORDER BY expires_at ASC""",
+            (donor_phone,),
         ).fetchall()
 
     active_requests = []
@@ -1260,12 +1290,78 @@ class RespondBloodRequest(BaseModel):
 
 @app.post("/api/v1/donor/requests/{request_id}/respond")
 async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest, request: Request):
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to respond to a blood request.")
+    if user.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can respond to blood requests.")
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    donor_phone = token["sub"]
+
+    action = payload.action.strip().lower()
+    if action not in {"accept", "decline"}:
+        raise HTTPException(status_code=422, detail="Action must be accept or decline.")
+    try:
+        database_request_id = int(request_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Active blood request not found.") from None
+
+    now = datetime.now(timezone.utc)
+    notification_message = (
+        f"A donor accepted blood request {request_id}."
+        if action == "accept"
+        else f"A donor declined blood request {request_id}."
+    )
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        blood_request = connection.execute(
+            "SELECT expires_at FROM blood_requests WHERE id = ? AND is_emergency = 1",
+            (database_request_id,),
+        ).fetchone()
+        if blood_request is None:
+            raise HTTPException(status_code=404, detail="Active blood request not found.")
+        try:
+            expires_at = datetime.fromisoformat(blood_request["expires_at"].replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(status_code=409, detail="This request is no longer active.") from None
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= now:
+            raise HTTPException(status_code=409, detail="This request is no longer active.")
+
+        try:
+            with connection:
+                connection.execute(
+                    """INSERT INTO donor_request_responses
+                       (request_id, donor_phone, action, eta, reason, note, responded_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        database_request_id,
+                        donor_phone,
+                        action,
+                        payload.eta,
+                        payload.reason,
+                        payload.note,
+                        now.isoformat(),
+                    ),
+                )
+                connection.execute(
+                    """INSERT INTO seeker_notifications
+                       (request_id, donor_phone, response, message, created_at)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (database_request_id, donor_phone, action, notification_message, now.isoformat()),
+                )
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="You have already responded to this request.") from None
+
     return {
         "status": "success",
         "request_id": request_id,
-        "action": payload.action,
+        "action": action,
+        "request_status": "accepted" if action == "accept" else "declined",
         "eta": payload.eta,
-        "message": f"Blood request {request_id} {payload.action}ed successfully.",
+        "message": f"Blood request {request_id} {action}ed successfully.",
+        "notification": {"recipient": "seeker", "status": "queued", "message": notification_message},
     }
 
 

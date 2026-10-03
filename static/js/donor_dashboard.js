@@ -261,6 +261,107 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const requestFlowStatus = document.getElementById('donor-request-flow-status');
+  const requestFlowList = document.getElementById('donor-request-flow-list');
+
+  if (requestFlowStatus && requestFlowList) {
+    let donorRequests = [];
+
+    function renderDonorRequests() {
+      requestFlowList.replaceChildren();
+      if (donorRequests.length === 0) {
+        requestFlowStatus.textContent = 'There are no active requests right now.';
+        return;
+      }
+
+      requestFlowStatus.textContent = `${donorRequests.length} active ${donorRequests.length === 1 ? 'request' : 'requests'}`;
+      donorRequests.forEach(bloodRequest => {
+        const card = document.createElement('article');
+        card.className = 'donor-response-card';
+
+        const details = document.createElement('div');
+        details.className = 'donor-response-details';
+        const heading = document.createElement('h2');
+        heading.textContent = `${bloodRequest.blood_group} blood needed`;
+        const hospital = document.createElement('p');
+        hospital.className = 'donor-response-hospital';
+        hospital.textContent = bloodRequest.hospital_name;
+        const location = document.createElement('p');
+        location.textContent = [bloodRequest.area, bloodRequest.district].filter(Boolean).join(', ') || 'Location unavailable';
+        const expiry = document.createElement('p');
+        expiry.className = 'donor-response-expiry';
+        expiry.textContent = `Active until ${new Date(bloodRequest.expires_at).toLocaleString()}`;
+        details.append(heading, hospital, location, expiry);
+
+        const actions = document.createElement('div');
+        actions.className = 'donor-response-actions';
+        if (bloodRequest.response_status) {
+          const responseStatus = document.createElement('span');
+          responseStatus.className = `donor-response-result is-${bloodRequest.response_status}`;
+          responseStatus.textContent = `You ${bloodRequest.response_status} this request`;
+          actions.append(responseStatus);
+        } else {
+          const acceptButton = document.createElement('button');
+          acceptButton.type = 'button';
+          acceptButton.className = 'donor-response-button is-accept';
+          acceptButton.textContent = 'Accept request';
+          acceptButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'accept', acceptButton, declineButton));
+
+          const declineButton = document.createElement('button');
+          declineButton.type = 'button';
+          declineButton.className = 'donor-response-button is-decline';
+          declineButton.textContent = 'Decline';
+          declineButton.addEventListener('click', () => submitDonorResponse(bloodRequest, 'decline', acceptButton, declineButton));
+          actions.append(acceptButton, declineButton);
+        }
+
+        card.append(details, actions);
+        requestFlowList.append(card);
+      });
+    }
+
+    async function submitDonorResponse(bloodRequest, action, acceptButton, declineButton) {
+      const confirmation = action === 'accept'
+        ? `Accept the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`
+        : `Decline the ${bloodRequest.blood_group} request at ${bloodRequest.hospital_name}? The seeker will be notified.`;
+      if (!window.confirm(confirmation)) return;
+
+      acceptButton.disabled = true;
+      declineButton.disabled = true;
+      try {
+        const response = await fetch(`/api/v1/donor/requests/${encodeURIComponent(bloodRequest.id)}/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Your response could not be saved.');
+
+        bloodRequest.response_status = result.request_status;
+        renderDonorRequests();
+        showToast(`${result.message} The seeker has been notified.`, 'success');
+      } catch (error) {
+        acceptButton.disabled = false;
+        declineButton.disabled = false;
+        showToast(error.message || 'Your response could not be saved.', 'error');
+      }
+    }
+
+    fetch('/api/v1/requests/urgent', { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error('Active requests are temporarily unavailable.');
+        return response.json();
+      })
+      .then(requests => {
+        if (!Array.isArray(requests)) throw new Error('Unexpected request list response.');
+        donorRequests = requests;
+        renderDonorRequests();
+      })
+      .catch(error => {
+        requestFlowStatus.textContent = error.message || 'Could not load active requests.';
+      });
+  }
+
   // =========================================================
   // DONOR IN-APP CHAT MODULE (SBDS-89)
   // =========================================================
