@@ -299,6 +299,125 @@ document.addEventListener('DOMContentLoaded', () => {
   const donorProfileForm = document.getElementById('donorProfileForm');
   const profileFormMessage = document.getElementById('profileFormMessage');
 
+  const donationHistoryStatus = document.getElementById('donation-history-status');
+  const donationHistoryList = document.getElementById('donation-history-list');
+  const donationTotalCount = document.getElementById('donation-total-count');
+  const donationLivesSaved = document.getElementById('donation-lives-saved');
+  const donationLastDate = document.getElementById('donation-last-date');
+  const donationEligibility = document.getElementById('donation-eligibility');
+  const donationEligibilityTitle = document.getElementById('donation-eligibility-title');
+  const donationEligibilityDetail = document.getElementById('donation-eligibility-detail');
+
+  if (donationHistoryStatus && donationHistoryList) {
+    function formatDonationDate(dateValue) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateValue || '');
+      if (!match) return dateValue || 'Date not recorded';
+      const donationDate = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+      return donationDate.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'UTC'
+      });
+    }
+
+    function appendHistoryDetail(parent, className, text) {
+      const detail = document.createElement('div');
+      detail.className = className;
+      detail.textContent = text;
+      parent.appendChild(detail);
+    }
+
+    function updateDonationSummary(data) {
+      const donationCount = data.donations.length;
+      donationTotalCount.textContent = `${donationCount} ${donationCount === 1 ? 'Time' : 'Times'}`;
+      donationLivesSaved.textContent = `${donationCount * 3} ${donationCount * 3 === 1 ? 'Life' : 'Lives'}`;
+      donationLastDate.textContent = data.last_donated
+        ? formatDonationDate(data.last_donated)
+        : 'No donation yet';
+
+      donationEligibility.classList.remove('is-eligible', 'is-unknown');
+      if (data.days_until_eligible === null || data.days_until_eligible === undefined) {
+        donationEligibility.classList.add('is-unknown');
+        donationEligibilityTitle.textContent = 'No completed donation recorded yet.';
+        donationEligibilityDetail.textContent = 'Your last donation date and eligibility will appear after a completed donation is recorded.';
+      } else if (data.days_until_eligible === 0) {
+        donationEligibility.classList.add('is-eligible');
+        donationEligibilityTitle.textContent = 'Eligible to donate today!';
+        donationEligibilityDetail.textContent = 'The standard 56-day interval has passed. Final eligibility is confirmed by the collection center.';
+      } else {
+        donationEligibilityTitle.textContent = `Eligible to donate in ${data.days_until_eligible} day${data.days_until_eligible === 1 ? '' : 's'}.`;
+        donationEligibilityDetail.textContent = data.next_eligible_date
+          ? `Estimated date: ${formatDonationDate(data.next_eligible_date)}. Final eligibility is confirmed by the collection center.`
+          : 'Based on the standard 56-day interval after your last donation.';
+      }
+    }
+
+    async function loadDonationHistory() {
+      try {
+        const response = await fetch('/api/v1/donor/donation-history', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || 'Could not load your donation history.');
+        }
+        if (data.status !== 'success' || !Array.isArray(data.donations)) {
+          throw new Error('The donation history response was invalid.');
+        }
+
+        updateDonationSummary(data);
+        donationHistoryList.replaceChildren();
+        if (data.donations.length === 0) {
+          donationHistoryStatus.textContent = 'You have no completed donations recorded yet.';
+          return;
+        }
+
+        data.donations.forEach(donation => {
+          const card = document.createElement('article');
+          card.className = 'history-card-item';
+
+          const left = document.createElement('div');
+          left.className = 'history-item-left';
+
+          const dateBadge = document.createElement('div');
+          dateBadge.className = 'history-date-badge';
+          dateBadge.textContent = formatDonationDate(donation.donation_date);
+          left.appendChild(dateBadge);
+
+          const details = document.createElement('div');
+          appendHistoryDetail(
+            details,
+            'history-hospital-title',
+            donation.hospital_name || 'Donation location not recorded'
+          );
+          const location = [donation.area, donation.district].filter(Boolean).join(', ');
+          const detailParts = [donation.donation_type || 'Whole Blood'];
+          if (location) detailParts.push(location);
+          if (donation.request_id !== null && donation.request_id !== undefined) {
+            detailParts.push(`Request #${donation.request_id}`);
+          }
+          appendHistoryDetail(details, 'history-details-sub', detailParts.join(' · '));
+          left.appendChild(details);
+          card.appendChild(left);
+          appendHistoryDetail(card, 'nav-pill-badge pill-green', 'Completed');
+          donationHistoryList.appendChild(card);
+        });
+
+        donationHistoryStatus.textContent = `${data.donations.length} completed donation${data.donations.length === 1 ? '' : 's'} recorded.`;
+      } catch (error) {
+        donationHistoryList.replaceChildren();
+        donationHistoryStatus.textContent = error.message || 'Could not load your donation history.';
+        donationTotalCount.textContent = '--';
+        donationLivesSaved.textContent = '--';
+        donationLastDate.textContent = '--';
+        donationEligibility.classList.add('is-unknown');
+        donationEligibilityTitle.textContent = 'Eligibility could not be checked.';
+        donationEligibilityDetail.textContent = 'Refresh the page to try again.';
+      }
+    }
+
+    loadDonationHistory();
+  }
+
   if (donorProfileForm) {
     donorProfileForm.addEventListener('submit', async (event) => {
       event.preventDefault();
