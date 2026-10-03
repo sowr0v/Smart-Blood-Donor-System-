@@ -468,10 +468,41 @@ input:checked + .switch-slider:before {
 }
 
 /* SECTION 1: AVAILABILITY STYLES */
+.availability-section-heading {
+  margin-bottom: 22px;
+}
+
+.availability-section-heading h1 {
+  margin: 4px 0 6px;
+  color: var(--heading-color);
+  font-size: 1.55rem;
+  font-weight: 800;
+}
+
+.availability-section-heading > p:last-child,
+.availability-control-card > p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.availability-eyebrow {
+  color: var(--primary-red);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .availability-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
   gap: 20px;
+}
+
+.availability-dashboard-grid h2 {
+  color: var(--heading-color);
+  font-size: 1.05rem;
 }
 
 .status-callout-card {
@@ -482,6 +513,149 @@ input:checked + .switch-slider:before {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.status-callout-card > p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.status-callout-card.is-unavailable {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.status-callout-card.is-unavailable .status-indicator-badge {
+  color: #475569;
+  background: #E2E8F0;
+}
+
+.status-callout-card.is-unavailable .pulse-dot {
+  background-color: #64748B;
+  animation: none;
+  box-shadow: none;
+}
+
+.status-callout-card[data-availability-status="loading"] .pulse-dot {
+  background-color: #94A3B8;
+  animation: none;
+  box-shadow: none;
+}
+
+.availability-updated {
+  font-size: 0.8rem !important;
+}
+
+.availability-control-card {
+  padding: 22px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.availability-control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.availability-control-label {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.availability-control-row .switch-toggle-btn input:focus-visible + .switch-slider {
+  outline: 3px solid rgba(211, 47, 47, 0.35);
+  outline-offset: 3px;
+}
+
+.availability-schedule {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.availability-schedule h3 {
+  color: var(--heading-color);
+  font-size: 0.95rem;
+}
+
+.availability-schedule > p,
+.availability-schedule label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.unavailability-date-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.unavailability-date-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.unavailability-date-fields input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.availability-schedule-button,
+.availability-cancel-schedule {
+  padding: 9px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--primary-red);
+  color: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.availability-schedule-button:disabled,
+.availability-cancel-schedule:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.availability-schedule-status {
+  font-size: 0.85rem;
+}
+
+.availability-cancel-schedule {
+  align-self: flex-start;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.availability-save-status {
+  min-height: 1.2em;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
 }
 
 .status-indicator-badge {

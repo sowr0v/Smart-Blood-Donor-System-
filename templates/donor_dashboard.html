@@ -313,7 +313,58 @@
       </section>
 
       <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
-      <section class="dashboard-content-section" id="section-availability"></section>
+      <section class="dashboard-content-section" id="section-availability">
+        <div class="availability-section-heading">
+          <p class="availability-eyebrow">Donor Operations</p>
+          <h1>Donor Availability</h1>
+          <p>Choose whether blood seekers may find you as a potential match.</p>
+        </div>
+
+        <div class="availability-dashboard-grid">
+          <article class="status-callout-card" id="availabilityStatusCard" data-availability-status="loading">
+            <h2>Current availability</h2>
+            <span class="status-indicator-badge" id="availabilityStatusBadge">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              <span id="availabilityStatusText" aria-live="polite">Loading status...</span>
+            </span>
+            <p id="availabilityStatusDescription">Checking your saved availability.</p>
+            <p class="availability-updated" id="availabilityUpdated"></p>
+          </article>
+
+          <article class="availability-control-card">
+            <h2>Availability setting</h2>
+            <p>When enabled, you may be considered for blood requests that match your donor profile.</p>
+            <div class="availability-control-row">
+              <span class="availability-control-label" id="availabilityToggleLabel">Available for requests</span>
+              <label class="switch-toggle-btn" aria-label="Toggle donor availability">
+                <input type="checkbox" id="donorAvailabilityToggle" aria-labelledby="availabilityToggleLabel" disabled>
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </div>
+            <p class="availability-save-status" id="availabilitySaveStatus" role="status" aria-live="polite"></p>
+            <div class="availability-schedule">
+              <h3>Temporary unavailability</h3>
+              <p>Set the first and last dates you cannot donate. Your availability will automatically turn back on the day after the end date.</p>
+              <form id="unavailabilityScheduleForm">
+                <div class="unavailability-date-fields">
+                  <label for="unavailabilityStartDate">
+                    Start date
+                    <input type="date" id="unavailabilityStartDate" name="start_date" required disabled>
+                  </label>
+                  <label for="unavailabilityEndDate">
+                    End date
+                    <input type="date" id="unavailabilityEndDate" name="end_date" required disabled>
+                  </label>
+                </div>
+                <button type="submit" class="availability-schedule-button" id="saveUnavailabilitySchedule" disabled>Schedule pause</button>
+              </form>
+              <p id="unavailabilityScheduleStatus" class="availability-schedule-status" role="status" aria-live="polite"></p>
+              <button type="button" class="availability-cancel-schedule" id="cancelUnavailabilitySchedule" hidden>Cancel scheduled pause</button>
+            </div>
+          </article>
+
+        </div>
+      </section>
 
       <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
       <section class="dashboard-content-section" id="section-profile"></section>
