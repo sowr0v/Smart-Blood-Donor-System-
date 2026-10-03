@@ -510,7 +510,17 @@
       </section>
 
       <!-- ================= SECTION 5: ACCEPT & DECLINE FLOW ================= -->
-      <section class="dashboard-content-section" id="section-request-flow"></section>
+      <section class="dashboard-content-section" id="section-request-flow" aria-labelledby="donor-request-flow-title">
+        <header class="donor-request-flow-header">
+          <span class="eyebrow">Your response matters</span>
+          <h1 id="donor-request-flow-title">Accept or decline a blood request</h1>
+          <p>Choose how you can help. The seeker will be notified of your response.</p>
+        </header>
+        <p class="donor-request-flow-status" id="donor-request-flow-status" role="status" aria-live="polite">
+          Loading active requests...
+        </p>
+        <div class="donor-request-flow-list" id="donor-request-flow-list" aria-live="polite"></div>
+      </section>
 
       <!-- ================= SECTION 6: REQUEST DETAILS & DIRECTIONS ================= -->
       <section class="dashboard-content-section" id="section-request-details"></section>
