@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Git commit-msg hook to prevent commit messages containing 'copilot'
+
+COMMIT_MSG_FILE="$1"
+
+if [ -z "$COMMIT_MSG_FILE" ] || [ ! -f "$COMMIT_MSG_FILE" ]; then
+    exit 0
+fi
+
+# Search for case-insensitive 'copilot' in commit message
+if grep -iq "copilot" "$COMMIT_MSG_FILE"; then
+    echo "================================================================="
+    echo "❌ COMMIT BLOCKED: Your commit message contains 'copilot'!"
+    echo "-----------------------------------------------------------------"
+    echo "Found matching line(s):"
+    grep -i "copilot" "$COMMIT_MSG_FILE"
+    echo "-----------------------------------------------------------------"
+    echo "Policy: No Copilot commits, references, or co-author tags allowed."
+    echo "Please edit your commit message and try again."
+    echo "================================================================="
+    exit 1
+fi
+
+exit 0

@@ -661,6 +661,18 @@ The system aims to simplify donor discovery, improve communication, organize blo
 
 ---
 
+## 🛡️ Git Workflow & Strict No-Copilot Policy
+
+For academic evaluation integrity and lab requirements:
+* **No GitHub Copilot Attributions**: Commits authored, co-authored, or messaged with Copilot references (`copilot`, `Co-authored-by: Copilot`, etc.) are strictly prohibited and blocked by both automated CI checks and local git hooks.
+* **Direct pushes to `main` are restricted**: All changes must go through pull requests with automated verification.
+* **Local Git Hooks Setup**: Every contributor should activate local hooks by running:
+  ```bash
+  python setup_git_hooks.py
+  ```
+
+---
+
 ## 📜 License
 
 This project is developed for **academic and educational purposes**.

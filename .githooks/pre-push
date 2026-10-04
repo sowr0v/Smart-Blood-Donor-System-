@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Git pre-push hook to prevent pushing any Copilot references
+
+remote="$1"
+url="$2"
+
+z40="0000000000000000000000000000000000000000"
+
+while read local_ref local_sha remote_ref remote_sha
+do
+    if [ "$local_sha" = "$z40" ]; then
+        # Branch deletion, allow
+        continue
+    fi
+
+    if [ "$remote_sha" = "$z40" ]; then
+        # New branch being pushed
+        range="$local_sha"
+    else
+        range="$remote_sha..$local_sha"
+    fi
+
+    # Check commit logs in this push range
+    copilot_commits=$(git log "$range" --grep="[Cc]opilot" --oneline 2>/dev/null)
+    copilot_authors=$(git log "$range" --author="[Cc]opilot" --oneline 2>/dev/null)
+    copilot_committers=$(git log "$range" --committer="[Cc]opilot" --oneline 2>/dev/null)
+
+    if [ -n "$copilot_commits" ] || [ -n "$copilot_authors" ] || [ -n "$copilot_committers" ]; then
+        echo "================================================================="
+        echo "❌ PUSH BLOCKED: Commits contain 'copilot' references!"
+        echo "-----------------------------------------------------------------"
+        echo "Push destination: $remote_ref ($remote)"
+        if [ -n "$copilot_commits" ]; then
+            echo "Commits with 'copilot' in message:"
+            echo "$copilot_commits"
+        fi
+        if [ -n "$copilot_authors" ]; then
+            echo "Commits with 'copilot' in author:"
+            echo "$copilot_authors"
+        fi
+        if [ -n "$copilot_committers" ]; then
+            echo "Commits with 'copilot' in committer:"
+            echo "$copilot_committers"
+        fi
+        echo "-----------------------------------------------------------------"
+        echo "Policy: Absolutely NO Copilot references allowed on $remote_ref!"
+        echo "================================================================="
+        exit 1
+    fi
+done
+
+exit 0

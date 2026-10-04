@@ -1,0 +1,35 @@
+name: "Enforce No Copilot Policy"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  block-copilot:
+    name: "Verify No Copilot References"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run Copilot Blocker Script
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          python .github/scripts/check_no_copilot.py
