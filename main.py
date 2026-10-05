@@ -40,7 +40,6 @@ OTP_MAX_ATTEMPTS = 5
 PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
 DONOR_TIMEZONE = timezone(timedelta(hours=6), name="Asia/Dhaka")
-DONATION_ELIGIBILITY_DAYS = 56
 
 
 def initialize_urgent_database():
@@ -71,18 +70,6 @@ def initialize_urgent_database():
                     responded_at TEXT NOT NULL,
                     UNIQUE (request_id, donor_phone)
                 );
-                CREATE TABLE IF NOT EXISTS donation_history (
-                    id INTEGER PRIMARY KEY,
-                    donor_phone TEXT NOT NULL,
-                    donation_date TEXT NOT NULL,
-                    request_id INTEGER REFERENCES blood_requests(id),
-                    donation_type TEXT NOT NULL DEFAULT 'Whole Blood',
-                    hospital_name TEXT NOT NULL DEFAULT '',
-                    district TEXT NOT NULL DEFAULT '',
-                    area TEXT NOT NULL DEFAULT ''
-                );
-                CREATE INDEX IF NOT EXISTS idx_donation_history_donor_date
-                    ON donation_history(donor_phone, donation_date DESC, id DESC);
                 CREATE TABLE IF NOT EXISTS seeker_notifications (
                     id INTEGER PRIMARY KEY,
                     request_id INTEGER NOT NULL REFERENCES blood_requests(id),
@@ -1193,43 +1180,6 @@ async def donor_matching_requests(
     return {"status": "success", "count": len(matches), "requests": matches, "profile": profile}
 
 
-@app.get("/api/v1/donor/donation-history")
-async def get_donor_donation_history(request: Request):
-    phone = _require_donor(request)
-    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-        connection.row_factory = sqlite3.Row
-        rows = connection.execute(
-            """SELECT id, donation_date, request_id, donation_type,
-                      hospital_name, district, area
-               FROM donation_history
-               WHERE donor_phone = ?
-               ORDER BY donation_date DESC, id DESC""",
-            (phone,),
-        ).fetchall()
-    donations = [dict(row) for row in rows]
-    last_donated = donations[0]["donation_date"] if donations else None
-    try:
-        last_donation_date = date.fromisoformat(str(last_donated)[:10]) if last_donated else None
-    except ValueError:
-        last_donation_date = None
-    next_eligible_date = (
-        last_donation_date + timedelta(days=DONATION_ELIGIBILITY_DAYS)
-        if last_donation_date
-        else None
-    )
-    return {
-        "status": "success",
-        "donations": donations,
-        "last_donated": last_donation_date.isoformat() if last_donation_date else None,
-        "next_eligible_date": next_eligible_date.isoformat() if next_eligible_date else None,
-        "days_until_eligible": (
-            max(0, (next_eligible_date - _current_donor_date()).days)
-            if next_eligible_date
-            else None
-        ),
-    }
-
-
 @app.get("/donor/dashboard", response_class=HTMLResponse)
 async def donor_dashboard(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
@@ -1808,3 +1758,5 @@ async def mark_donor_chat_read(thread_id: str):
         "unread_count": 0,
         "total_unread": total_unread,
     }
+
+
