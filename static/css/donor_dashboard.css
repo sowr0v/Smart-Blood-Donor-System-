@@ -344,6 +344,48 @@ input:checked + .switch-slider:before {
   transform: translateX(20px);
 }
 
+.availability-card {
+  padding: 24px;
+}
+
+.availability-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.availability-setting h3 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.availability-setting p,
+.availability-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.availability-setting .switch-toggle-btn input:focus-visible + .switch-slider {
+  outline: 3px solid rgba(211, 47, 47, 0.3);
+  outline-offset: 3px;
+}
+
+.availability-setting .switch-toggle-btn input:disabled + .switch-slider {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.availability-message {
+  min-height: 20px;
+  padding-top: 12px;
+}
+
 /* Quick Metrics Row */
 .metrics-grid-4 {
   display: grid;

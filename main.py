@@ -379,11 +379,20 @@ def initialize_auth_database():
                     allergies TEXT,
                     fitness_status TEXT NOT NULL DEFAULT 'Eligible',
                     preferred_donation_types TEXT NOT NULL DEFAULT 'Whole Blood',
+                    is_available INTEGER NOT NULL DEFAULT 1,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
                 );
                 """
             )
+            donor_profile_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(donor_profiles)").fetchall()
+            }
+            if "is_available" not in donor_profile_columns:
+                connection.execute(
+                    "ALTER TABLE donor_profiles ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1"
+                )
 
 
 def _connection():
@@ -999,6 +1008,7 @@ def _default_donor_profile(phone: str) -> dict:
         "allergies": "Penicillin",
         "fitness_status": "Eligible",
         "preferred_donation_types": "Whole Blood",
+        "is_available": True,
         "updated_at": int(time.time()),
     }
 
@@ -1009,7 +1019,8 @@ def _get_donor_profile(phone: str) -> dict:
         row = connection.execute(
             """SELECT phone, name, email, date_of_birth, gender, blood_group,
                       district, area, address, last_donation, medical_conditions,
-                      medications, allergies, fitness_status, preferred_donation_types, updated_at
+                      medications, allergies, fitness_status, preferred_donation_types,
+                      is_available, updated_at
                FROM donor_profiles WHERE phone = ?""",
             (phone,),
         ).fetchone()
@@ -1022,8 +1033,8 @@ def _get_donor_profile(phone: str) -> dict:
                 """INSERT INTO donor_profiles (
                        phone, name, email, date_of_birth, gender, blood_group, district,
                        area, address, last_donation, medical_conditions, medications,
-                       allergies, fitness_status, preferred_donation_types, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       allergies, fitness_status, preferred_donation_types, is_available, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 tuple(profile.values()),
             )
         return profile
@@ -1139,7 +1150,7 @@ async def donor_matching_requests(
         raise HTTPException(status_code=401, detail="Sign in required to access matched requests.")
 
     profile = _get_donor_profile(phone)
-    matches = _build_donor_match_requests(profile)
+    matches = _build_donor_match_requests(profile) if profile["is_available"] else []
     if blood_group.lower() != "all":
         matches = [item for item in matches if item.get("blood_group", "").upper() == blood_group.upper()]
     if urgency.lower() != "all":
@@ -1214,11 +1225,37 @@ async def logout(request: Request):
 class DonorAvailabilityUpdate(BaseModel):
     is_available: bool
     radius_km: int = 10
-    preferred_zones: list[str] = []
+    preferred_zones: list[str] = Field(default_factory=list)
+
+
+@app.get("/api/v1/donor/availability")
+async def get_donor_availability(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in required to access donor availability.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can access donor availability.")
+
+    profile = _get_donor_profile(token["sub"])
+    return {"status": "success", "is_available": bool(profile["is_available"])}
 
 
 @app.post("/api/v1/donor/availability")
 async def update_donor_availability(payload: DonorAvailabilityUpdate, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in required to update donor availability.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can update donor availability.")
+
+    phone = token["sub"]
+    _get_donor_profile(phone)
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                "UPDATE donor_profiles SET is_available = ?, updated_at = ? WHERE phone = ?",
+                (int(payload.is_available), int(time.time()), phone),
+            )
     return {
         "status": "success",
         "is_available": payload.is_available,
@@ -1538,5 +1575,3 @@ async def mark_donor_chat_read(thread_id: str):
         "unread_count": 0,
         "total_unread": total_unread,
     }
-
-

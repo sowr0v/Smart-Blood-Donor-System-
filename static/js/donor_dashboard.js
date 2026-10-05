@@ -112,6 +112,43 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const availabilityToggle = document.getElementById('donorAvailabilityToggle');
+  const availabilityStatusBadge = document.getElementById('availabilityStatusBadge');
+  const availabilityStatusText = document.getElementById('availabilityStatusText');
+  const availabilityFormMessage = document.getElementById('availabilityFormMessage');
+
+  if (availabilityToggle && availabilityStatusBadge && availabilityStatusText && availabilityFormMessage) {
+    availabilityToggle.addEventListener('change', async () => {
+      const requestedAvailability = availabilityToggle.checked;
+      availabilityToggle.disabled = true;
+      availabilityFormMessage.textContent = 'Saving availability…';
+
+      try {
+        const response = await fetch('/api/v1/donor/availability', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_available: requestedAvailability }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Unable to update availability.');
+
+        availabilityStatusBadge.textContent = result.is_available ? 'Available' : 'Unavailable';
+        availabilityStatusBadge.className = `nav-pill-badge ${result.is_available ? 'pill-green' : 'pill-amber'}`;
+        availabilityStatusText.textContent = result.is_available
+          ? 'You may appear in matching results for blood requests.'
+          : 'You will not appear in matching results while unavailable.';
+        availabilityFormMessage.textContent = result.message;
+        window.dispatchEvent(new Event('donor-availability-updated'));
+      } catch (error) {
+        availabilityToggle.checked = !requestedAvailability;
+        availabilityFormMessage.textContent = error.message || 'Could not update availability.';
+        showToast(availabilityFormMessage.textContent, 'error');
+      } finally {
+        availabilityToggle.disabled = false;
+      }
+    });
+  }
+
   const matchedFeed = document.getElementById('matched-request-feed');
   const matchedEmptyState = document.getElementById('matched-request-empty');
   const bloodGroupFilter = document.getElementById('matched-blood-group-filter');
@@ -176,6 +213,13 @@ document.addEventListener('DOMContentLoaded', () => {
           matchedEmptyState.style.display = 'block';
           matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
         });
+      });
+    });
+    window.addEventListener('donor-availability-updated', () => {
+      refreshMatchedRequests().catch(() => {
+        matchedFeed.replaceChildren();
+        matchedEmptyState.style.display = 'block';
+        matchedEmptyState.textContent = 'Matched requests could not be loaded right now.';
       });
     });
     refreshMatchedRequests().catch(() => {
@@ -995,4 +1039,3 @@ document.addEventListener('DOMContentLoaded', () => {
   window.activateSection = activateSection;
   window.showToast = showToast;
 });
-
