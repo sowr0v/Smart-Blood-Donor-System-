@@ -77,6 +77,16 @@ def initialize_urgent_database():
                     message TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS donor_donation_history (
+                    id INTEGER PRIMARY KEY,
+                    donor_phone TEXT NOT NULL,
+                    request_id INTEGER REFERENCES blood_requests(id),
+                    donated_at TEXT NOT NULL,
+                    donation_type TEXT NOT NULL DEFAULT 'Whole Blood',
+                    notes TEXT NOT NULL DEFAULT ''
+                );
+                CREATE INDEX IF NOT EXISTS idx_donation_history_donor_date
+                    ON donor_donation_history(donor_phone, donated_at DESC);
                 """
             )
             count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
@@ -1159,6 +1169,30 @@ async def donor_matching_requests(
     if district.lower() != "all":
         matches = [item for item in matches if item.get("district", "Dhaka").lower() == district.lower()]
     return {"status": "success", "count": len(matches), "requests": matches, "profile": profile}
+
+
+@app.get("/api/v1/donor/donations")
+async def get_donor_donation_history(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in required to access donation history.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can access donation history.")
+
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """SELECT history.id, history.donated_at, history.donation_type, history.notes,
+                      history.request_id, blood_requests.hospital_name,
+                      blood_requests.area, blood_requests.district
+               FROM donor_donation_history AS history
+               LEFT JOIN blood_requests ON blood_requests.id = history.request_id
+               WHERE history.donor_phone = ?
+               ORDER BY history.donated_at DESC, history.id DESC""",
+            (token["sub"],),
+        ).fetchall()
+    donations = [dict(row) for row in rows]
+    return {"status": "success", "count": len(donations), "donations": donations}
 
 
 @app.get("/donor/dashboard", response_class=HTMLResponse)

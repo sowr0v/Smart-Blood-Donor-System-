@@ -149,6 +149,75 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  const donationHistoryList = document.getElementById('donationHistoryList');
+  const donationHistoryCount = document.getElementById('donationHistoryCount');
+  const donationHistoryError = document.getElementById('donationHistoryError');
+
+  if (donationHistoryList && donationHistoryCount && donationHistoryError) {
+    function formatDonationDate(value) {
+      const datePart = String(value || '').split('T')[0];
+      const [year, month, day] = datePart.split('-').map(Number);
+      if (!year || !month || !day) return value || 'Date unavailable';
+      return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    }
+
+    function renderDonation(donation) {
+      const card = document.createElement('article');
+      card.className = 'donation-history-entry';
+
+      const date = document.createElement('time');
+      date.className = 'donation-history-date';
+      date.dateTime = donation.donated_at;
+      date.textContent = formatDonationDate(donation.donated_at);
+
+      const type = document.createElement('span');
+      type.className = 'donation-history-type';
+      type.textContent = donation.donation_type || 'Whole Blood';
+
+      const details = document.createElement('p');
+      const location = [donation.hospital_name, donation.area, donation.district]
+        .filter(Boolean)
+        .join(' · ');
+      details.textContent = location || 'Location not recorded';
+
+      card.append(date, type, details);
+      if (donation.notes) {
+        const notes = document.createElement('p');
+        notes.className = 'donation-history-notes';
+        notes.textContent = donation.notes;
+        card.append(notes);
+      }
+      return card;
+    }
+
+    fetch('/api/v1/donor/donations', { cache: 'no-store' })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || 'Unable to load donation history.');
+        const donations = Array.isArray(result.donations) ? result.donations : [];
+        donationHistoryCount.textContent = `${donations.length} donation${donations.length === 1 ? '' : 's'}`;
+        if (donations.length) {
+          donationHistoryList.replaceChildren(...donations.map(renderDonation));
+        } else {
+          donationHistoryList.replaceChildren();
+          const emptyMessage = document.createElement('p');
+          emptyMessage.className = 'donation-history-message';
+          emptyMessage.textContent = 'No completed donations have been recorded yet.';
+          donationHistoryList.append(emptyMessage);
+        }
+      })
+      .catch(error => {
+        donationHistoryCount.textContent = 'Unavailable';
+        donationHistoryList.replaceChildren();
+        donationHistoryError.textContent = error.message || 'Could not load donation history.';
+        donationHistoryError.hidden = false;
+      });
+  }
+
   const matchedFeed = document.getElementById('matched-request-feed');
   const matchedEmptyState = document.getElementById('matched-request-empty');
   const bloodGroupFilter = document.getElementById('matched-blood-group-filter');
