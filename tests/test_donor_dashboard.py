@@ -249,23 +249,51 @@ class DonorDashboardTests(unittest.TestCase):
         )
 
     def test_donor_respond_request_api(self):
+        import sqlite3
+        from datetime import datetime, timezone
+        from main import DATABASE_PATH
+
         donor_phone = f"+88017{uuid.uuid4().int % 10**9:09d}"
         cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
-        with TestClient(app) as client:
-            active_requests = client.get("/api/v1/requests/urgent").json()
-            self.assertTrue(active_requests)
-            request_id = active_requests[0]["id"]
-            response = client.post(
-                f"/api/v1/donor/requests/{request_id}/respond",
-                json={"action": "accept", "eta": "30 mins", "note": "On the way"},
-                cookies=cookies,
+        with sqlite3.connect(DATABASE_PATH) as conn:
+            cursor = conn.execute(
+                """INSERT INTO blood_requests (
+                       blood_group, hospital_name, district, area, distance_km,
+                       expires_at, contact_phone, is_emergency
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, 1)""",
+                (
+                    "O+",
+                    "Test General Hospital",
+                    "Dhaka",
+                    "Mirpur",
+                    2.5,
+                    (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
+                    "+8801700000000",
+                ),
             )
-            self.assertEqual(response.status_code, 200)
-            data = response.json()
-            self.assertEqual(data["status"], "success")
-            self.assertEqual(data["action"], "accept")
-            self.assertEqual(data["request_status"], "accepted")
-            self.assertEqual(data["notification"]["recipient"], "seeker")
+            created_req_id = cursor.lastrowid
+
+        try:
+            with TestClient(app) as client:
+                active_requests = client.get("/api/v1/requests/urgent").json()
+                self.assertTrue(active_requests)
+                request_id = created_req_id
+                response = client.post(
+                    f"/api/v1/donor/requests/{request_id}/respond",
+                    json={"action": "accept", "eta": "30 mins", "note": "On the way"},
+                    cookies=cookies,
+                )
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertEqual(data["status"], "success")
+                self.assertEqual(data["action"], "accept")
+                self.assertEqual(data["request_status"], "accepted")
+                self.assertEqual(data["notification"]["recipient"], "seeker")
+        finally:
+            with sqlite3.connect(DATABASE_PATH) as conn:
+                conn.execute("DELETE FROM donor_request_responses WHERE request_id = ?", (created_req_id,))
+                conn.execute("DELETE FROM seeker_notifications WHERE request_id = ?", (created_req_id,))
+                conn.execute("DELETE FROM blood_requests WHERE id = ?", (created_req_id,))
 
     def test_logout_redirects_to_login(self):
         response = self.client.get("/logout", follow_redirects=False)
