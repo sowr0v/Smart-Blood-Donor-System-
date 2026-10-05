@@ -108,15 +108,80 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertEqual(read_data["unread_count"], 0)
 
     def test_donor_availability_api(self):
+        token = _generate_jwt("+8801712345678", "donor")
         response = self.client.post(
             "/api/v1/donor/availability",
             json={"is_available": True, "radius_km": 15, "preferred_zones": ["Dhanmondi"]},
+            cookies={"access_token": token},
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertTrue(data["is_available"])
         self.assertEqual(data["radius_km"], 15)
+
+    def test_donor_availability_requires_authenticated_donor(self):
+        anonymous_response = self.client.post(
+            "/api/v1/donor/availability",
+            json={"is_available": False},
+        )
+        self.assertEqual(anonymous_response.status_code, 401)
+
+        seeker_response = self.client.post(
+            "/api/v1/donor/availability",
+            json={"is_available": False},
+            cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+        )
+        self.assertEqual(seeker_response.status_code, 403)
+
+    def test_availability_is_persisted_and_gates_matching(self):
+        import sqlite3
+        from main import AUTH_DATABASE_PATH
+
+        donor_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+
+        try:
+            initial_status = self.client.get(
+                "/api/v1/donor/availability",
+                cookies=cookies,
+            )
+            self.assertEqual(initial_status.status_code, 200)
+            self.assertTrue(initial_status.json()["is_available"])
+
+            disabled = self.client.post(
+                "/api/v1/donor/availability",
+                json={"is_available": False},
+                cookies=cookies,
+            )
+            self.assertEqual(disabled.status_code, 200)
+            self.assertFalse(disabled.json()["is_available"])
+
+            saved_status = self.client.get(
+                "/api/v1/donor/availability",
+                cookies=cookies,
+            )
+            self.assertFalse(saved_status.json()["is_available"])
+            matches_while_unavailable = self.client.get(
+                "/api/v1/donor/matches",
+                cookies=cookies,
+            )
+            self.assertEqual(matches_while_unavailable.json()["requests"], [])
+
+            enabled = self.client.post(
+                "/api/v1/donor/availability",
+                json={"is_available": True},
+                cookies=cookies,
+            )
+            self.assertTrue(enabled.json()["is_available"])
+            matches_when_available = self.client.get(
+                "/api/v1/donor/matches",
+                cookies=cookies,
+            )
+            self.assertTrue(matches_when_available.json()["requests"])
+        finally:
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.execute("DELETE FROM donor_profiles WHERE phone = ?", (donor_phone,))
 
     def test_donor_respond_request_api(self):
         import sqlite3
@@ -184,4 +249,3 @@ class DonorDashboardTests(unittest.TestCase):
         data = response.json()
         self.assertTrue(data["is_authenticated"])
         self.assertEqual(data["role"], "donor")
-

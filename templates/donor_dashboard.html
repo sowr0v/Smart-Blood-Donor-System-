@@ -313,7 +313,42 @@
       </section>
 
       <!-- ================= SECTION 1: DONOR AVAILABILITY ================= -->
-      <section class="dashboard-content-section" id="section-availability"></section>
+      <section class="dashboard-content-section" id="section-availability">
+        <div class="donor-card availability-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🩸</span>
+              <div>
+                <h2>Donor Availability</h2>
+                <div class="card-subtitle">Choose whether blood seekers can include you in donor matching.</div>
+              </div>
+            </div>
+            <span class="nav-pill-badge {{ 'pill-green' if profile.is_available else 'pill-amber' }}"
+                  id="availabilityStatusBadge">
+              {{ 'Available' if profile.is_available else 'Unavailable' }}
+            </span>
+          </div>
+          <div class="availability-setting">
+            <div>
+              <h3>Available to receive donation requests</h3>
+              <p id="availabilityStatusText" role="status" aria-live="polite">
+                {% if profile.is_available %}
+                You may appear in matching results for blood requests.
+                {% else %}
+                You will not appear in matching results while unavailable.
+                {% endif %}
+              </p>
+            </div>
+            <label class="switch-toggle-btn">
+              <input type="checkbox" id="donorAvailabilityToggle"
+                     aria-label="Available to receive donation requests"
+                     {% if profile.is_available %}checked{% endif %}>
+              <span class="switch-slider" aria-hidden="true"></span>
+            </label>
+          </div>
+          <p id="availabilityFormMessage" class="availability-message" role="status" aria-live="polite"></p>
+        </div>
+      </section>
 
       <!-- ================= SECTION 2: PROFILE & MEDICAL INFO ================= -->
       <section class="dashboard-content-section" id="section-profile">
