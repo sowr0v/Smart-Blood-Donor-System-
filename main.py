@@ -39,7 +39,6 @@ OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
-DONOR_TIMEZONE = timezone(timedelta(hours=6), name="Asia/Dhaka")
 
 
 def initialize_urgent_database():
@@ -93,15 +92,7 @@ def initialize_urgent_database():
 async def lifespan(_: FastAPI):
     initialize_auth_database()
     initialize_urgent_database()
-    expiry_task = asyncio.create_task(_scheduled_unavailability_expiry_loop())
-    try:
-        yield
-    finally:
-        expiry_task.cancel()
-        try:
-            await expiry_task
-        except asyncio.CancelledError:
-            pass
+    yield
 
 
 app = FastAPI(title="Smart Blood Donor System", lifespan=lifespan)
@@ -372,15 +363,6 @@ def initialize_auth_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_reset_challenges_phone
                     ON password_reset_challenges(phone, created_at);
-                CREATE TABLE IF NOT EXISTS donor_availability (
-                    donor_phone TEXT PRIMARY KEY,
-                    is_available INTEGER NOT NULL DEFAULT 0,
-                    radius_km INTEGER NOT NULL DEFAULT 10,
-                    preferred_zones TEXT NOT NULL DEFAULT '[]',
-                    updated_at TEXT NOT NULL,
-                    unavailable_start_date TEXT,
-                    unavailable_end_date TEXT
-                );
                 CREATE TABLE IF NOT EXISTS donor_profiles (
                     phone TEXT NOT NULL UNIQUE,
                     name TEXT NOT NULL,
@@ -402,18 +384,6 @@ def initialize_auth_database():
                 );
                 """
             )
-            availability_columns = {
-                row[1]
-                for row in connection.execute("PRAGMA table_info(donor_availability)")
-            }
-            if "unavailable_start_date" not in availability_columns:
-                connection.execute(
-                    "ALTER TABLE donor_availability ADD COLUMN unavailable_start_date TEXT"
-                )
-            if "unavailable_end_date" not in availability_columns:
-                connection.execute(
-                    "ALTER TABLE donor_availability ADD COLUMN unavailable_end_date TEXT"
-                )
 
 
 def _connection():
@@ -1243,207 +1213,17 @@ async def logout(request: Request):
 
 class DonorAvailabilityUpdate(BaseModel):
     is_available: bool
-    radius_km: int = Field(default=10, ge=1, le=500)
-    preferred_zones: list[str] = Field(default_factory=list)
-
-
-def _require_donor(request: Request) -> str:
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    if not token or not token.get("sub"):
-        raise HTTPException(status_code=401, detail="Authentication required.")
-    if token.get("role") != "donor":
-        raise HTTPException(status_code=403, detail="Donor access required.")
-    phone = token["sub"]
-    if USERS.get(phone, {}).get("role", "donor") != "donor":
-        raise HTTPException(status_code=403, detail="Donor access required.")
-    return phone
-
-
-def _current_donor_date() -> date:
-    return datetime.now(DONOR_TIMEZONE).date()
-
-
-def _expire_scheduled_unavailability(current_date: date | None = None) -> None:
-    today = (current_date or _current_donor_date()).isoformat()
-    with closing(_connection()) as connection:
-        with connection:
-            connection.execute(
-                """UPDATE donor_availability
-                   SET is_available = 0, updated_at = ?
-                   WHERE unavailable_start_date IS NOT NULL
-                     AND unavailable_end_date IS NOT NULL
-                     AND unavailable_start_date <= ?
-                     AND unavailable_end_date >= ?
-                     AND is_available != 0""",
-                (datetime.now(timezone.utc).isoformat(), today, today),
-            )
-            connection.execute(
-                """UPDATE donor_availability
-                   SET is_available = 1,
-                       unavailable_start_date = NULL,
-                       unavailable_end_date = NULL,
-                       updated_at = ?
-                   WHERE unavailable_end_date IS NOT NULL
-                     AND unavailable_end_date < ?""",
-                (datetime.now(timezone.utc).isoformat(), today),
-            )
-
-
-async def _scheduled_unavailability_expiry_loop() -> None:
-    while True:
-        await asyncio.to_thread(_expire_scheduled_unavailability)
-        await asyncio.sleep(60)
-
-
-class DonorUnavailabilitySchedule(BaseModel):
-    start_date: date
-    end_date: date
-
-
-def _read_donor_availability(phone: str) -> dict:
-    _expire_scheduled_unavailability()
-    with closing(_connection()) as connection:
-        row = connection.execute(
-            """SELECT is_available, radius_km, preferred_zones, updated_at,
-                      unavailable_start_date, unavailable_end_date
-               FROM donor_availability WHERE donor_phone = ?""",
-            (phone,),
-        ).fetchone()
-
-    if row is None:
-        return {
-            "is_available": False,
-            "radius_km": 10,
-            "preferred_zones": [],
-            "updated_at": None,
-            "unavailability_start_date": None,
-            "unavailability_end_date": None,
-            "unavailability_active": False,
-        }
-    today = _current_donor_date().isoformat()
-    scheduled_pause_active = bool(
-        row["unavailable_start_date"]
-        and row["unavailable_end_date"]
-        and row["unavailable_start_date"] <= today <= row["unavailable_end_date"]
-    )
-    return {
-        "is_available": bool(row["is_available"]) and not scheduled_pause_active,
-        "radius_km": row["radius_km"],
-        "preferred_zones": json.loads(row["preferred_zones"]),
-        "updated_at": row["updated_at"],
-        "unavailability_start_date": row["unavailable_start_date"],
-        "unavailability_end_date": row["unavailable_end_date"],
-        "unavailability_active": scheduled_pause_active,
-    }
-
-
-@app.get("/api/v1/donor/availability")
-async def get_donor_availability(request: Request):
-    phone = _require_donor(request)
-    response = JSONResponse({"status": "success", **_read_donor_availability(phone)})
-    response.headers["Cache-Control"] = "no-store"
-    return response
+    radius_km: int = 10
+    preferred_zones: list[str] = []
 
 
 @app.post("/api/v1/donor/availability")
 async def update_donor_availability(payload: DonorAvailabilityUpdate, request: Request):
-    phone = _require_donor(request)
-    updated_at = datetime.now(timezone.utc).isoformat()
-    with closing(_connection()) as connection:
-        with connection:
-            connection.execute(
-                """INSERT INTO donor_availability
-                       (donor_phone, is_available, radius_km, preferred_zones, updated_at)
-                   VALUES (?, ?, ?, ?, ?)
-                   ON CONFLICT(donor_phone) DO UPDATE SET
-                       is_available = excluded.is_available,
-                       radius_km = excluded.radius_km,
-                       preferred_zones = excluded.preferred_zones,
-                       updated_at = excluded.updated_at,
-                       unavailable_start_date = NULL,
-                       unavailable_end_date = NULL""",
-                (
-                    phone,
-                    int(payload.is_available),
-                    payload.radius_km,
-                    json.dumps(payload.preferred_zones),
-                    updated_at,
-                ),
-            )
-
     return {
         "status": "success",
         "is_available": payload.is_available,
         "radius_km": payload.radius_km,
-        "preferred_zones": payload.preferred_zones,
-        "updated_at": updated_at,
         "message": "Availability updated successfully.",
-    }
-
-
-@app.post("/api/v1/donor/availability/schedule")
-async def schedule_donor_unavailability(
-    payload: DonorUnavailabilitySchedule,
-    request: Request,
-):
-    phone = _require_donor(request)
-    today = _current_donor_date()
-    if payload.start_date < today:
-        raise HTTPException(status_code=422, detail="Start date cannot be in the past.")
-    if payload.end_date < payload.start_date:
-        raise HTTPException(status_code=422, detail="End date must be on or after the start date.")
-
-    updated_at = datetime.now(timezone.utc).isoformat()
-    with closing(_connection()) as connection:
-        with connection:
-            connection.execute(
-                """INSERT INTO donor_availability
-                       (donor_phone, is_available, radius_km, preferred_zones, updated_at,
-                        unavailable_start_date, unavailable_end_date)
-                   VALUES (?, 1, 10, '[]', ?, ?, ?)
-                   ON CONFLICT(donor_phone) DO UPDATE SET
-                       is_available = 1,
-                       updated_at = excluded.updated_at,
-                       unavailable_start_date = excluded.unavailable_start_date,
-                       unavailable_end_date = excluded.unavailable_end_date""",
-                (
-                    phone,
-                    updated_at,
-                    payload.start_date.isoformat(),
-                    payload.end_date.isoformat(),
-                ),
-            )
-
-    _expire_scheduled_unavailability()
-    availability = _read_donor_availability(phone)
-    return {
-        "status": "success",
-        **availability,
-        "message": "Temporary unavailability scheduled.",
-    }
-
-
-@app.delete("/api/v1/donor/availability/schedule")
-async def cancel_donor_unavailability_schedule(request: Request):
-    phone = _require_donor(request)
-    updated_at = datetime.now(timezone.utc).isoformat()
-    with closing(_connection()) as connection:
-        with connection:
-            connection.execute(
-                """UPDATE donor_availability
-                   SET is_available = 1,
-                       unavailable_start_date = NULL,
-                       unavailable_end_date = NULL,
-                       updated_at = ?
-                   WHERE donor_phone = ?""",
-                (updated_at, phone),
-            )
-
-    availability = _read_donor_availability(phone)
-    return {
-        "status": "success",
-        **availability,
-        "message": "Temporary unavailability cancelled.",
     }
 
 
