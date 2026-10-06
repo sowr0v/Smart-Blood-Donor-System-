@@ -386,6 +386,59 @@ input:checked + .switch-slider:before {
   padding-top: 12px;
 }
 
+.donation-history-card {
+  padding: 24px;
+}
+
+.donation-history-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.donation-history-entry {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px 20px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-page);
+}
+
+.donation-history-date {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.donation-history-type {
+  color: var(--primary-red);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.donation-history-entry p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.donation-history-entry .donation-history-notes {
+  color: var(--text-muted);
+}
+
+.donation-history-message {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.donation-history-error {
+  margin-top: 12px;
+  color: var(--primary-red);
+}
+
 /* Quick Metrics Row */
 .metrics-grid-4 {
   display: grid;

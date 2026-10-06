@@ -398,7 +398,24 @@
       </section>
 
       <!-- ================= SECTION 3: DONATION HISTORY ================= -->
-      <section class="dashboard-content-section" id="section-history"></section>
+      <section class="dashboard-content-section" id="section-history">
+        <div class="donor-card donation-history-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🗓️</span>
+              <div>
+                <h2>Donation History</h2>
+                <div class="card-subtitle">Your completed donations, newest first.</div>
+              </div>
+            </div>
+            <span class="nav-pill-badge pill-blue" id="donationHistoryCount">Loading...</span>
+          </div>
+          <div id="donationHistoryList" class="donation-history-list" aria-live="polite">
+            <p class="donation-history-message">Loading your donation history...</p>
+          </div>
+          <p id="donationHistoryError" class="donation-history-message donation-history-error" role="alert" hidden></p>
+        </div>
+      </section>
 
       <!-- ================= SECTION 4: MATCHED BLOOD REQUESTS ================= -->
       <section class="dashboard-content-section" id="section-matched-requests">
