@@ -84,6 +84,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const donorProfileForm = document.getElementById('donorProfileForm');
   const profileFormMessage = document.getElementById('profileFormMessage');
 
+  // Medical tag chips interactive selector
+  document.querySelectorAll('.medical-tag-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.preventDefault();
+      const parentRow = chip.closest('.medical-chips-row');
+      const targetId = parentRow ? parentRow.getAttribute('data-target') : null;
+      const targetInput = targetId ? document.getElementById(targetId) : null;
+      if (!targetInput) return;
+
+      const val = chip.getAttribute('data-val');
+      if (!val) return;
+
+      if (val.toLowerCase() === 'none') {
+        targetInput.value = 'None';
+      } else {
+        const current = (targetInput.value || '').trim();
+        if (!current || current.toLowerCase() === 'none') {
+          targetInput.value = val;
+        } else {
+          const parts = current.split(',').map(s => s.trim().toLowerCase());
+          if (!parts.includes(val.toLowerCase())) {
+            targetInput.value = `${current}, ${val}`;
+          }
+        }
+      }
+      targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+      targetInput.focus();
+    });
+  });
+
   if (donorProfileForm) {
     donorProfileForm.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -105,6 +135,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!response.ok) throw new Error(result.detail || 'Unable to save donor profile.');
         profileFormMessage.textContent = result.message || 'Profile saved successfully.';
         showToast(profileFormMessage.textContent, 'success');
+
+        // Dynamically update profile overview summary pills
+        const summaryMedConditions = document.getElementById('summaryMedicalConditions');
+        const summaryMedications = document.getElementById('summaryMedications');
+        const summaryAllergies = document.getElementById('summaryAllergies');
+        const summaryFitnessStatus = document.getElementById('summaryFitnessStatus');
+        const summaryLocation = document.getElementById('summaryLocation');
+        const summaryBloodBadge = document.getElementById('summaryBloodBadge');
+
+        if (summaryMedConditions) summaryMedConditions.textContent = payload.medical_conditions || 'None reported';
+        if (summaryMedications) summaryMedications.textContent = payload.medications || 'None';
+        if (summaryAllergies) summaryAllergies.textContent = payload.allergies || 'None';
+        if (summaryFitnessStatus) summaryFitnessStatus.textContent = payload.fitness_status || 'Eligible';
+        if (summaryLocation) summaryLocation.textContent = `${payload.area}, ${payload.district}`;
+        if (summaryBloodBadge) summaryBloodBadge.textContent = `Blood Group: ${payload.blood_group}`;
       } catch (error) {
         profileFormMessage.textContent = error.message || 'Could not save profile.';
         showToast(profileFormMessage.textContent, 'error');

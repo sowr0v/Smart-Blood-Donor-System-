@@ -42,6 +42,12 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn("Donor In-App Chat", html)
         self.assertIn("Donor Reviews", html)
         self.assertIn("Settings & Preferences", html)
+        self.assertIn('id="medicalConditionsInput"', html)
+        self.assertIn('id="medicationsInput"', html)
+        self.assertIn('id="allergiesInput"', html)
+        self.assertIn('id="summaryMedicalConditions"', html)
+        self.assertIn('id="summaryMedications"', html)
+        self.assertIn('id="summaryAllergies"', html)
 
     def test_donor_in_app_chat_rendered(self):
         token = _generate_jwt("+8801712345678", "donor")

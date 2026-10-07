@@ -1176,6 +1176,216 @@ input:checked + .switch-slider:before {
   border-color: var(--primary-red);
 }
 
+/* Detail Pills for Profile & Medical Summary */
+.detail-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.detail-pill:hover {
+  border-color: var(--primary-light, #e57373);
+}
+
+.detail-label {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.detail-pill strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  font-weight: 600;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+/* Form Section Headers */
+.form-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .form-section-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.form-section-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Dedicated Medical & Health Info Section */
+.medical-info-card {
+  background: rgba(211, 47, 47, 0.025);
+  border: 1px solid rgba(211, 47, 47, 0.18);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 22px;
+}
+
+[data-theme="dark"] .medical-info-card {
+  background: rgba(229, 57, 53, 0.06);
+  border-color: rgba(229, 57, 53, 0.3);
+}
+
+.medical-disclosure-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(33, 150, 243, 0.07);
+  border: 1px solid rgba(33, 150, 243, 0.22);
+  border-radius: 8px;
+  font-size: 0.83rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.medical-disclosure-banner svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: #1976d2;
+  margin-top: 2px;
+}
+
+.medical-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.medical-field-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 16px;
+  box-sizing: border-box;
+  height: 100%;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.medical-field-card:focus-within {
+  border-color: var(--primary, #d32f2f);
+  box-shadow: 0 0 0 3px rgba(211, 47, 47, 0.12);
+}
+
+.medical-field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.medical-field-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.medical-field-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+}
+
+.medical-field-card .field-block {
+  width: 100%;
+  margin: 0;
+  gap: 0;
+}
+
+.medical-field-card textarea {
+  width: 100% !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  resize: none !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.medical-field-card textarea:focus-visible {
+  outline: 2px solid rgba(211, 47, 47, 0.35);
+  outline-offset: 1px;
+}
+
+.medical-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  min-height: 54px;
+  align-content: flex-start;
+}
+
+.medical-tag-chip {
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.medical-tag-chip:hover {
+  background: var(--primary-red, #d32f2f);
+  color: #fff;
+  border-color: var(--primary-red, #d32f2f);
+  transform: translateY(-1px);
+}
+
+
 .donor-request-flow-header {
   margin-bottom: 20px;
 }

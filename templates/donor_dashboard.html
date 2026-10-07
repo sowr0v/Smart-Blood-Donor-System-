@@ -293,12 +293,12 @@
             </div>
 
             <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
-              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">🩺 Health & Eligibility</h4>
+              <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">🩺 Health &amp; Medical</h4>
               <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
-                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">Active & Ready</span><br>
-                <strong>Rest Window:</strong> 56-day gap completed<br>
-                <strong>Hemoglobin:</strong> Normal (13.5 g/dL)<br>
-                <strong>Last Donation:</strong> 14 Jan 2026
+                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</span><br>
+                <strong>Conditions:</strong> {{ profile.medical_conditions if profile and profile.medical_conditions else 'None reported' }}<br>
+                <strong>Medications:</strong> {{ profile.medications if profile and profile.medications else 'None' }}<br>
+                <strong>Allergies:</strong> {{ profile.allergies if profile and profile.allergies else 'None' }}
               </p>
             </div>
 
@@ -361,34 +361,155 @@
                 <div class="card-subtitle">Review and update your personal, location, and medical details used for safe donor matching.</div>
               </div>
             </div>
-            <span class="nav-pill-badge pill-red">Blood Group: {{ profile.blood_group if profile and profile.blood_group else 'A+' }}</span>
+            <span class="nav-pill-badge pill-red" id="summaryBloodBadge">Blood Group: {{ profile.blood_group if profile and profile.blood_group else 'A+' }}</span>
           </div>
 
+          <!-- Profile & Medical Summary Header Overview -->
           <div class="profile-overview-panel" style="margin-bottom: 24px;">
-            <div class="detail-pill"><span class="detail-label">Current status</span><strong>{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong></div>
-            <div class="detail-pill"><span class="detail-label">Last donation</span><strong>{{ profile.last_donation if profile and profile.last_donation else 'Not recorded' }}</strong></div>
-            <div class="detail-pill"><span class="detail-label">Location</span><strong>{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Current status</span><strong id="summaryFitnessStatus">{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Last donation</span><strong id="summaryLastDonation">{{ profile.last_donation if profile and profile.last_donation else 'Not recorded' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Location</span><strong id="summaryLocation">{{ profile.area if profile and profile.area else 'Dhanmondi' }}, {{ profile.district if profile and profile.district else 'Dhaka' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Medical conditions</span><strong id="summaryMedicalConditions">{{ profile.medical_conditions if profile and profile.medical_conditions else 'None reported' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Medications</span><strong id="summaryMedications">{{ profile.medications if profile and profile.medications else 'None' }}</strong></div>
+            <div class="detail-pill"><span class="detail-label">Allergies</span><strong id="summaryAllergies">{{ profile.allergies if profile and profile.allergies else 'None' }}</strong></div>
           </div>
 
           <form id="donorProfileForm" class="donor-profile-form">
+            <!-- Group 1: Personal & Contact Details -->
+            <div class="form-section-header">
+              <div class="form-section-title">
+                <span>👤</span>
+                <span>Personal &amp; Contact Details</span>
+              </div>
+              <span class="form-section-subtitle">Core identity information</span>
+            </div>
             <div class="profile-overview-panel">
               <label class="field-block"><span>Full name</span><input type="text" name="name" value="{{ profile.name if profile else user.name }}" required></label>
               <label class="field-block"><span>Phone number</span><input type="tel" name="phone" value="{{ profile.phone if profile else user.phone }}" required></label>
               <label class="field-block"><span>Email address</span><input type="email" name="email" value="{{ profile.email if profile else '' }}"></label>
               <label class="field-block"><span>Gender</span><select name="gender"><option value="Female" {% if profile.gender == 'Female' %}selected{% endif %}>Female</option><option value="Male" {% if profile.gender == 'Male' %}selected{% endif %}>Male</option><option value="Other" {% if profile.gender == 'Other' %}selected{% endif %}>Other</option></select></label>
-              <label class="field-block"><span>Blood group</span><select name="blood_group" required>{% for group in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}<option value="{{ group }}" {% if profile.blood_group == group %}selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
               <label class="field-block"><span>Date of birth</span><input type="date" name="date_of_birth" value="{{ profile.date_of_birth if profile else '' }}"></label>
+            </div>
+
+            <!-- Group 2: Location Information -->
+            <div class="form-section-header" style="margin-top: 18px;">
+              <div class="form-section-title">
+                <span>📍</span>
+                <span>Location &amp; Address</span>
+              </div>
+              <span class="form-section-subtitle">Used for proximity matching</span>
+            </div>
+            <div class="profile-overview-panel">
               <label class="field-block"><span>District</span><input type="text" name="district" value="{{ profile.district if profile else 'Dhaka' }}" required></label>
               <label class="field-block"><span>Area</span><input type="text" name="area" value="{{ profile.area if profile else 'Dhanmondi' }}" required></label>
-              <label class="field-block"><span>Address</span><input type="text" name="address" value="{{ profile.address if profile else '' }}" required></label>
+              <label class="field-block" style="grid-column: span 2;"><span>Address</span><input type="text" name="address" value="{{ profile.address if profile else '' }}" required></label>
+            </div>
+
+            <!-- Group 3: Donation Readiness & Preferences -->
+            <div class="form-section-header" style="margin-top: 18px;">
+              <div class="form-section-title">
+                <span>🩸</span>
+                <span>Donation Eligibility &amp; Preferences</span>
+              </div>
+              <span class="form-section-subtitle">Blood group and donation readiness</span>
+            </div>
+            <div class="profile-overview-panel">
+              <label class="field-block"><span>Blood group</span><select name="blood_group" required>{% for group in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}<option value="{{ group }}" {% if profile.blood_group == group %}selected{% endif %}>{{ group }}</option>{% endfor %}</select></label>
               <label class="field-block"><span>Last donation date</span><input type="date" name="last_donation" value="{{ profile.last_donation if profile else '' }}"></label>
               <label class="field-block"><span>Fitness status</span><select name="fitness_status"><option value="Eligible" {% if profile.fitness_status == 'Eligible' %}selected{% endif %}>Eligible</option><option value="Temporary Hold" {% if profile.fitness_status == 'Temporary Hold' %}selected{% endif %}>Temporary Hold</option><option value="Deferred" {% if profile.fitness_status == 'Deferred' %}selected{% endif %}>Deferred</option></select></label>
               <label class="field-block"><span>Preferred donation type</span><select name="preferred_donation_types"><option value="Whole Blood" {% if profile.preferred_donation_types == 'Whole Blood' %}selected{% endif %}>Whole Blood</option><option value="Platelets" {% if profile.preferred_donation_types == 'Platelets' %}selected{% endif %}>Platelets</option><option value="Plasma" {% if profile.preferred_donation_types == 'Plasma' %}selected{% endif %}>Plasma</option></select></label>
-              <label class="field-block"><span>Medical conditions</span><textarea name="medical_conditions" rows="3">{{ profile.medical_conditions if profile else '' }}</textarea></label>
-              <label class="field-block"><span>Medications</span><textarea name="medications" rows="2">{{ profile.medications if profile else '' }}</textarea></label>
-              <label class="field-block"><span>Allergies</span><textarea name="allergies" rows="2">{{ profile.allergies if profile else '' }}</textarea></label>
             </div>
-            <div class="profile-form-actions">
+
+            <!-- Group 4: Dedicated Medical & Health Information -->
+            <div class="medical-info-card">
+              <div class="form-section-header" style="margin-bottom: 10px;">
+                <div class="form-section-title">
+                  <span>🩺</span>
+                  <span>Medical &amp; Health Information</span>
+                </div>
+                <span class="nav-pill-badge pill-red" style="font-size: 0.76rem;">Health Safety Disclosure</span>
+              </div>
+
+              <div class="medical-disclosure-banner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <path d="m9 12 2 2 4-4"/>
+                </svg>
+                <div>
+                  <strong>Health &amp; Safety Screening:</strong> Accurate declaration of medical conditions, medications, and allergies protects both recipient safety and your health during blood donation.
+                </div>
+              </div>
+
+              <div class="medical-fields-grid">
+                <!-- Field 1: Medical Conditions -->
+                <div class="medical-field-card">
+                  <div class="medical-field-header">
+                    <span class="medical-field-title">
+                      <span>🩺</span>
+                      <span>Medical Conditions</span>
+                    </span>
+                    <span class="nav-pill-badge pill-blue" style="font-size: 0.72rem;">Diagnosis</span>
+                  </div>
+                  <p class="medical-field-hint">Chronic illness, hypertension, asthma, diabetes, heart diseases, or "None".</p>
+                  <label class="field-block">
+                    <textarea name="medical_conditions" id="medicalConditionsInput" rows="2" placeholder="e.g. No chronic illness, or specify: Asthma, Diabetes, Hypertension, etc.">{{ profile.medical_conditions if profile else '' }}</textarea>
+                  </label>
+                  <div class="medical-chips-row" data-target="medicalConditionsInput">
+                    <button type="button" class="medical-tag-chip" data-val="None">✓ None</button>
+                    <button type="button" class="medical-tag-chip" data-val="Hypertension">Hypertension</button>
+                    <button type="button" class="medical-tag-chip" data-val="Asthma">Asthma</button>
+                    <button type="button" class="medical-tag-chip" data-val="Diabetes">Diabetes</button>
+                    <button type="button" class="medical-tag-chip" data-val="Anemia">Anemia</button>
+                  </div>
+                </div>
+
+                <!-- Field 2: Medications -->
+                <div class="medical-field-card">
+                  <div class="medical-field-header">
+                    <span class="medical-field-title">
+                      <span>💊</span>
+                      <span>Current Medications</span>
+                    </span>
+                    <span class="nav-pill-badge pill-amber" style="font-size: 0.72rem;">Prescriptions</span>
+                  </div>
+                  <p class="medical-field-hint">Ongoing medicines, blood thinners, antibiotics, aspirin, insulin, or "None".</p>
+                  <label class="field-block">
+                    <textarea name="medications" id="medicationsInput" rows="2" placeholder="e.g. None, or specify: Blood pressure pills, Insulin, Aspirin, etc.">{{ profile.medications if profile else '' }}</textarea>
+                  </label>
+                  <div class="medical-chips-row" data-target="medicationsInput">
+                    <button type="button" class="medical-tag-chip" data-val="None">✓ None</button>
+                    <button type="button" class="medical-tag-chip" data-val="BP Meds">BP Meds</button>
+                    <button type="button" class="medical-tag-chip" data-val="Insulin">Insulin</button>
+                    <button type="button" class="medical-tag-chip" data-val="Antibiotics">Antibiotics</button>
+                    <button type="button" class="medical-tag-chip" data-val="Aspirin">Aspirin</button>
+                  </div>
+                </div>
+
+                <!-- Field 3: Allergies -->
+                <div class="medical-field-card">
+                  <div class="medical-field-header">
+                    <span class="medical-field-title">
+                      <span>⚠️</span>
+                      <span>Known Allergies</span>
+                    </span>
+                    <span class="nav-pill-badge pill-red" style="font-size: 0.72rem;">Reactions</span>
+                  </div>
+                  <p class="medical-field-hint">Drug allergies (Penicillin, etc.), latex, food allergies, or "None".</p>
+                  <label class="field-block">
+                    <textarea name="allergies" id="allergiesInput" rows="2" placeholder="e.g. None, or specify: Penicillin, Latex, Sulfa drugs, etc.">{{ profile.allergies if profile else '' }}</textarea>
+                  </label>
+                  <div class="medical-chips-row" data-target="allergiesInput">
+                    <button type="button" class="medical-tag-chip" data-val="None">✓ None</button>
+                    <button type="button" class="medical-tag-chip" data-val="Penicillin">Penicillin</button>
+                    <button type="button" class="medical-tag-chip" data-val="Latex">Latex</button>
+                    <button type="button" class="medical-tag-chip" data-val="Sulfa Drugs">Sulfa Drugs</button>
+                    <button type="button" class="medical-tag-chip" data-val="Dust / Pollen">Dust/Pollen</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="profile-form-actions" style="margin-top: 20px;">
               <p id="profileFormMessage" class="status-message" role="status" aria-live="polite"></p>
               <button type="reset" class="secondary-button">Reset</button>
               <button type="submit" id="profileSaveBtn" class="primary-button">Save profile</button>
