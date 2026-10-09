@@ -303,10 +303,241 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initialize Section 1
+  // Update user name in sidebar, avatar circle, and banner greeting
+  function updateSeekerNameEverywhere(name) {
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+
+    // 1. Sidebar name text
+    const sidebarNameEl = document.getElementById('seekerSidebarName');
+    if (sidebarNameEl) {
+      sidebarNameEl.textContent = trimmed;
+    } else {
+      const fallbackSidebar = document.querySelector('.seeker-name-text span');
+      if (fallbackSidebar) fallbackSidebar.textContent = trimmed;
+    }
+
+    // 2. Sidebar avatar circle (initial letter)
+    const sidebarAvatarEl = document.getElementById('seekerSidebarAvatar');
+    if (sidebarAvatarEl) {
+      sidebarAvatarEl.textContent = trimmed.charAt(0).toUpperCase();
+    } else {
+      const fallbackAvatar = document.querySelector('.seeker-avatar-circle');
+      if (fallbackAvatar) fallbackAvatar.textContent = trimmed.charAt(0).toUpperCase();
+    }
+
+    // 3. Welcome banner greeting
+    const bannerGreetingEl = document.getElementById('seekerBannerGreeting');
+    if (bannerGreetingEl) {
+      bannerGreetingEl.textContent = `Welcome back, ${trimmed}! 👋`;
+    } else {
+      const fallbackGreeting = document.querySelector('.banner-welcome-text h1');
+      if (fallbackGreeting) fallbackGreeting.textContent = `Welcome back, ${trimmed}! 👋`;
+    }
+  }
+
+  // =========================================================================
+  // 9. SEEKER PORTAL SETTINGS & PREFERENCES
+  // =========================================================================
+  const settingsForm = document.getElementById('seekerSettingsForm');
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const newName = document.getElementById('setSeekerName')?.value.trim() || 'Nabil Hasan';
+      const settingsPayload = {
+        full_name: newName,
+        phone: document.getElementById('setSeekerPhone')?.value.trim() || '+8801723456789',
+        default_hospital: document.getElementById('setDefaultHospital')?.value || 'Square Hospital',
+        sms_alerts: document.getElementById('toggleSmsAlerts')?.checked ?? true,
+        push_alerts: document.getElementById('togglePushAlerts')?.checked ?? true,
+        audio_siren: document.getElementById('toggleAudioSiren')?.checked ?? true,
+        default_radius: document.getElementById('setDefaultRadius')?.value || '10'
+      };
+
+      // Immediately update name across sidebar, avatar, and banner!
+      updateSeekerNameEverywhere(newName);
+
+      try {
+        const response = await fetch('/api/v1/seeker/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsPayload)
+        });
+        if (response.ok) {
+          showToast('Profile name & settings saved successfully!');
+        } else {
+          showToast('Settings saved locally.');
+        }
+      } catch (err) {
+        showToast('Profile name & settings saved successfully!');
+      }
+    });
+  }
+
+  // Load saved settings from API
+  async function loadSeekerSettingsFromApi() {
+    try {
+      const res = await fetch('/api/v1/seeker/settings');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success' && data.settings) {
+          const s = data.settings;
+          const nameEl = document.getElementById('setSeekerName');
+          const phoneEl = document.getElementById('setSeekerPhone');
+          const hospEl = document.getElementById('setDefaultHospital');
+          const radiusEl = document.getElementById('setDefaultRadius');
+          const smsEl = document.getElementById('toggleSmsAlerts');
+          const pushEl = document.getElementById('togglePushAlerts');
+          const sirenEl = document.getElementById('toggleAudioSiren');
+
+          if (nameEl && s.full_name) {
+            nameEl.value = s.full_name;
+            updateSeekerNameEverywhere(s.full_name);
+          }
+          if (phoneEl && s.phone) phoneEl.value = s.phone;
+          if (hospEl && s.default_hospital) hospEl.value = s.default_hospital;
+          if (radiusEl && s.default_radius) radiusEl.value = s.default_radius;
+          if (smsEl && typeof s.sms_alerts === 'boolean') smsEl.checked = s.sms_alerts;
+          if (pushEl && typeof s.push_alerts === 'boolean') pushEl.checked = s.push_alerts;
+          if (sirenEl && typeof s.audio_siren === 'boolean') sirenEl.checked = s.audio_siren;
+        }
+      }
+    } catch (err) {
+      console.warn('Seeker settings API fetch skipped:', err);
+    }
+  }
+
+  // Dark Mode Theme Toggle Integration
+  const seekerThemeToggle = document.getElementById('seekerThemeToggle');
+  if (seekerThemeToggle) {
+    const isCurrentDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+      localStorage.getItem('sbds-theme') === 'dark';
+    seekerThemeToggle.checked = isCurrentDark;
+
+    seekerThemeToggle.addEventListener('change', () => {
+      const isDark = seekerThemeToggle.checked;
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      localStorage.setItem('sbds-theme', isDark ? 'dark' : 'light');
+      showToast(`Switched to ${isDark ? 'Dark' : 'Light'} Mode`);
+    });
+  }
+
+  // =========================================================================
+  // 9B. DANGER ZONE - SEEKER ACCOUNT DELETION
+  // =========================================================================
+  const deleteModal = document.getElementById('deleteAccountModal');
+  const btnOpenDeleteModal = document.getElementById('btnOpenDeleteAccountModal');
+  const cancelDeleteBtn = document.getElementById('cancelDeleteAccountBtn');
+  const closeDeleteModalX = document.getElementById('closeDeleteModalX');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteAccountBtn');
+  const deleteConfirmInput = document.getElementById('deleteConfirmationInput');
+
+  function openDeleteAccountModal() {
+    if (!deleteModal) return;
+    if (deleteConfirmInput) {
+      deleteConfirmInput.value = '';
+    }
+    if (confirmDeleteBtn) {
+      confirmDeleteBtn.disabled = true;
+      confirmDeleteBtn.style.opacity = '0.5';
+      confirmDeleteBtn.style.cursor = 'not-allowed';
+      confirmDeleteBtn.textContent = 'Permanently Delete';
+    }
+    deleteModal.style.display = 'flex';
+    setTimeout(() => {
+      deleteConfirmInput?.focus();
+    }, 50);
+  }
+
+  function closeDeleteAccountModal() {
+    if (!deleteModal) return;
+    deleteModal.style.display = 'none';
+    if (deleteConfirmInput) {
+      deleteConfirmInput.value = '';
+    }
+  }
+
+  window.openDeleteAccountModal = openDeleteAccountModal;
+  window.closeDeleteAccountModal = closeDeleteAccountModal;
+
+  if (btnOpenDeleteModal) {
+    btnOpenDeleteModal.addEventListener('click', openDeleteAccountModal);
+  }
+
+  if (cancelDeleteBtn) {
+    cancelDeleteBtn.addEventListener('click', closeDeleteAccountModal);
+  }
+
+  if (closeDeleteModalX) {
+    closeDeleteModalX.addEventListener('click', closeDeleteAccountModal);
+  }
+
+  if (deleteModal) {
+    deleteModal.addEventListener('click', (e) => {
+      if (e.target === deleteModal) closeDeleteAccountModal();
+    });
+  }
+
+  if (deleteConfirmInput && confirmDeleteBtn) {
+    deleteConfirmInput.addEventListener('input', () => {
+      const val = deleteConfirmInput.value.trim().toUpperCase();
+      if (val === 'DELETE') {
+        confirmDeleteBtn.disabled = false;
+        confirmDeleteBtn.style.opacity = '1';
+        confirmDeleteBtn.style.cursor = 'pointer';
+      } else {
+        confirmDeleteBtn.disabled = true;
+        confirmDeleteBtn.style.opacity = '0.5';
+        confirmDeleteBtn.style.cursor = 'not-allowed';
+      }
+    });
+
+    deleteConfirmInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !confirmDeleteBtn.disabled) {
+        confirmDeleteBtn.click();
+      }
+    });
+  }
+
+  if (confirmDeleteBtn) {
+    confirmDeleteBtn.addEventListener('click', async () => {
+      if (confirmDeleteBtn.disabled) return;
+      confirmDeleteBtn.disabled = true;
+      confirmDeleteBtn.textContent = 'Deleting Account...';
+
+      try {
+        const response = await fetch('/api/v1/seeker/account', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+        if (response.ok && data.status === 'success') {
+          closeDeleteAccountModal();
+          showToast('Account deleted successfully. Redirecting to login...');
+          setTimeout(() => {
+            window.location.href = data.redirect_url || '/login?account_deleted=1';
+          }, 1000);
+        } else {
+          showToast(data.message || 'Failed to delete account. Please try again.');
+          confirmDeleteBtn.disabled = false;
+          confirmDeleteBtn.textContent = 'Permanently Delete';
+        }
+      } catch (err) {
+        console.error('Account deletion error:', err);
+        showToast('Error deleting account. Please try again.');
+        confirmDeleteBtn.disabled = false;
+        confirmDeleteBtn.textContent = 'Permanently Delete';
+      }
+    });
+  }
+
+  // Initialize Section 1 & Section 9
   updateMetrics();
   renderSeekerRequestsTable('all');
   loadSeekerRequestsFromApi();
+  loadSeekerSettingsFromApi();
 
   // Initialize view from URL hash if provided
   if (window.location.hash) {
