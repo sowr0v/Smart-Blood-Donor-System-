@@ -595,9 +595,10 @@ document.addEventListener('DOMContentLoaded', () => {
       { sender: 'coordinator', text: 'You completed your 56-day gap and are officially eligible right now!', time: 'Yesterday 4:00 PM', status: 'read' }
     ],
     'thread-nabil': [
-      { sender: 'coordinator', text: 'Assalamu Alaikum Ayesha apu, I am Nabil. You donated blood for my mother last month.', time: '2 days ago', status: 'read' },
-      { sender: 'coordinator', text: 'I just wanted to let you know she was discharged today and is healthy. We cannot thank you enough for saving her life.', time: '2 days ago', status: 'read' },
-      { sender: 'you', text: 'Alhamdulillah, so relieved to hear this news! Praying for her continued strength and health.', time: '2 days ago', status: 'read' }
+      { id: 'msg-sync-1', sender: 'coordinator', text: 'Assalamu Alaikum Ayesha apu, we urgently need 1 bag A+ blood at Square Hospital 3rd Floor.', time: '10:05 AM', status: 'read' },
+      { id: 'msg-sync-2', sender: 'you', text: 'Wa Alaikum Assalam Nabil bhai! I just saw the alert. I am eligible and nearby.', time: '10:08 AM', status: 'read' },
+      { id: 'msg-sync-3', sender: 'coordinator', text: 'Alhamdulillah! Can you please reach as soon as possible? Requisition is ready.', time: '10:10 AM', status: 'read' },
+      { id: 'msg-sync-4', sender: 'you', text: 'Leaving Dhanmondi now. Reaching Square Hospital in 20 mins.', time: '10:14 AM', status: 'read' }
     ],
     'thread-support': [
       { sender: 'coordinator', text: 'Welcome to the Smart Blood Donor System Donor Support channel.', time: '18 Jan', status: 'read' },
@@ -608,6 +609,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let activeThreadId = 'thread-square';
   let activeFilter = 'all';
+
+  function fetchThreadMessages(threadId, forceRender = false) {
+    if (!threadId) return;
+    fetch(`/api/v1/donor/chat/${threadId}/messages`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.status === 'success' && Array.isArray(data.messages)) {
+          const prevLen = (conversationStore[threadId] || []).length;
+          conversationStore[threadId] = data.messages;
+          if (forceRender || prevLen !== data.messages.length) {
+            if (activeThreadId === threadId) {
+              renderMessages(threadId);
+            }
+          }
+        }
+      })
+      .catch(() => {});
+  }
 
   function updateUnreadCounts() {
     let unreadCount = 0;
@@ -641,14 +660,18 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
 
+    const currentThread = document.querySelector(`.chat-thread-item[data-thread-id="${threadId}"]`);
+    const category = currentThread?.getAttribute('data-category') || 'hospital';
+    const otherLabel = category === 'seeker' ? 'Nabil Hasan (Seeker)' : (category === 'support' ? 'Support Officer' : 'Coordinator');
+
     messages.forEach(msg => {
       const bubble = document.createElement('div');
       const isYou = msg.sender === 'you';
       bubble.className = `chat-bubble ${isYou ? 'bubble-sent' : 'bubble-received'}`;
       const receiptHtml = isYou ? '<span class="read-receipt">✓✓</span>' : '';
       bubble.innerHTML = `
-        <div>${msg.text}</div>
-        <div class="chat-bubble-time">${msg.time} · ${isYou ? 'You' : 'Coordinator'} ${receiptHtml}</div>
+        <div>${escapeHtml(msg.text)}</div>
+        <div class="chat-bubble-time">${msg.time} · ${isYou ? 'You' : otherLabel} ${receiptHtml}</div>
       `;
       chatMessagesContainer.appendChild(bubble);
     });
@@ -733,6 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     updateUnreadCounts();
     renderMessages(threadId);
+    fetchThreadMessages(threadId, true);
   }
 
   // Bind thread selection
@@ -783,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Show realistic typing indicator
-    if (typingIndicator) {
+    if (typingIndicator && activeThreadId !== 'thread-nabil') {
       const activeName = currentChatUserTitle ? currentChatUserTitle.textContent : 'Coordinator';
       const typingText = typingIndicator.querySelector('.typing-text');
       if (typingText) typingText.textContent = `${activeName.split(' ')[0]} is typing`;
@@ -799,6 +823,12 @@ document.addEventListener('DOMContentLoaded', () => {
     })
       .then(res => res.json())
       .then(data => {
+        if (activeThreadId === 'thread-nabil') {
+          // Connected live with real Seeker; real responses arrive via WebSocket / sync
+          if (typingIndicator) typingIndicator.style.display = 'none';
+          return;
+        }
+
         setTimeout(() => {
           if (typingIndicator) typingIndicator.style.display = 'none';
 
@@ -824,7 +854,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1200);
       })
       .catch(() => {
-        // Fallback simulation
+        if (activeThreadId === 'thread-nabil') {
+          if (typingIndicator) typingIndicator.style.display = 'none';
+          return;
+        }
+        // Fallback simulation for offline testing
         setTimeout(() => {
           if (typingIndicator) typingIndicator.style.display = 'none';
           let replyText = 'Received your message! Coordinator has been notified.';
@@ -832,8 +866,6 @@ document.addEventListener('DOMContentLoaded', () => {
             replyText = 'Coordinator Dr. Farhan: "Received! Transfusion unit is waiting. See you shortly!"';
           } else if (activeThreadId === 'thread-dmc') {
             replyText = 'Desk Officer: "Thank you! Feel free to reach out anytime."';
-          } else if (activeThreadId === 'thread-nabil') {
-            replyText = 'Nabil: "Thank you again Ayesha apu, truly indebted to donors like you!"';
           } else if (activeThreadId === 'thread-support') {
             replyText = 'SBDS Support: "We have updated your record. Let us know if you need assistance."';
           }
@@ -957,6 +989,224 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize unread counts
   updateUnreadCounts();
+
+  // =========================================================
+  // DONOR REAL-TIME CHAT WEBSOCKET & LIVE SYNC (SBDS-89)
+  // =========================================================
+  let donorWs = null;
+  let donorWsReconnectTimer = null;
+  let donorWsPingInterval = null;
+  let donorTypingTimeout = null;
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return String(text).replace(/[&<>"']/g, m => map[m]);
+  }
+
+  function playChatNotificationSound() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.16);
+    } catch (e) {}
+  }
+
+  function initDonorChatWebSocket() {
+    if (donorWs && (donorWs.readyState === WebSocket.OPEN || donorWs.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat/donor`;
+
+    try {
+      donorWs = new WebSocket(wsUrl);
+
+      donorWs.onopen = () => {
+        clearInterval(donorWsPingInterval);
+        donorWsPingInterval = setInterval(() => {
+          if (donorWs && donorWs.readyState === WebSocket.OPEN) {
+            donorWs.send(JSON.stringify({ action: 'ping' }));
+          }
+        }, 25000);
+
+        const statusBadge = document.getElementById('donorWsStatusBadge');
+        if (statusBadge) {
+          statusBadge.className = 'nav-pill-badge pill-green';
+          statusBadge.innerHTML = '<span class="pulse-dot"></span> Real-Time Messaging Active';
+        }
+      };
+
+      donorWs.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'pong') return;
+
+          if (data.type === 'presence' && data.role === 'seeker') {
+            const seekerThread = document.querySelector('.chat-thread-item[data-thread-id="thread-nabil"]');
+            if (seekerThread) {
+              let dot = seekerThread.querySelector('.avatar-online-dot');
+              if (data.status === 'online') {
+                if (!dot) {
+                  const wrap = seekerThread.querySelector('.thread-avatar-wrap');
+                  if (wrap) {
+                    dot = document.createElement('span');
+                    dot.className = 'avatar-online-dot';
+                    wrap.appendChild(dot);
+                  }
+                }
+              } else if (dot) {
+                dot.remove();
+              }
+            }
+          }
+
+          if (data.type === 'typing') {
+            if (data.thread_id === activeThreadId && typingIndicator) {
+              const typingText = typingIndicator.querySelector('.typing-text');
+              if (typingText) typingText.textContent = `${data.sender_name || 'Seeker'} is typing`;
+              if (data.typing) {
+                typingIndicator.style.display = 'inline-flex';
+                if (chatMessagesContainer) chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+                clearTimeout(donorTypingTimeout);
+                donorTypingTimeout = setTimeout(() => {
+                  if (typingIndicator) typingIndicator.style.display = 'none';
+                }, 3500);
+              } else {
+                typingIndicator.style.display = 'none';
+              }
+            }
+            return;
+          }
+
+          if (data.type === 'chat_message') {
+            const threadId = data.thread_id || 'thread-nabil';
+            if (!conversationStore[threadId]) {
+              conversationStore[threadId] = [];
+            }
+
+            const msgId = data.message?.id || ('msg-' + Date.now());
+            const alreadyExists = conversationStore[threadId].some(m => m.id === msgId || (m.text === data.text && m.sender !== 'you'));
+            if (!alreadyExists) {
+              const incomingMsg = {
+                id: msgId,
+                sender: data.sender || 'coordinator',
+                text: data.text,
+                time: data.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                status: 'delivered'
+              };
+              conversationStore[threadId].push(incomingMsg);
+            }
+
+            // Update thread list preview in sidebar
+            const threadItem = document.querySelector(`.chat-thread-item[data-thread-id="${threadId}"]`);
+            if (threadItem) {
+              const snippet = threadItem.querySelector('.thread-preview-snippet');
+              if (snippet) snippet.textContent = data.text;
+              const timeElem = threadItem.querySelector('.thread-time');
+              if (timeElem) timeElem.textContent = data.time || 'Just now';
+            }
+
+            // If active thread is currently visible
+            const isChatActive = document.getElementById('section-chat')?.classList.contains('active-section');
+            if (activeThreadId === threadId && isChatActive) {
+              if (typingIndicator) typingIndicator.style.display = 'none';
+              if (chatMessagesContainer) {
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble bubble-received';
+                const senderDisplay = data.sender_name || (threadId === 'thread-nabil' ? 'Nabil Hasan (Seeker)' : 'Coordinator');
+                bubble.innerHTML = `
+                  <div>${escapeHtml(data.text)}</div>
+                  <div class="chat-bubble-time">${data.time || 'Just now'} · ${senderDisplay}</div>
+                `;
+                if (typingIndicator) {
+                  chatMessagesContainer.insertBefore(bubble, typingIndicator);
+                } else {
+                  chatMessagesContainer.appendChild(bubble);
+                }
+                chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+              }
+              // Mark as read on server
+              fetch(`/api/v1/donor/chat/${threadId}/read`, { method: 'POST' }).catch(() => {});
+            } else {
+              // Increment unread count on thread
+              if (threadItem) {
+                let badge = threadItem.querySelector('.chat-unread-count');
+                if (!badge) {
+                  badge = document.createElement('span');
+                  badge.className = 'chat-unread-count';
+                  badge.id = `unread-${threadId}`;
+                  const previewLine = threadItem.querySelector('.thread-preview-line');
+                  if (previewLine) previewLine.appendChild(badge);
+                }
+                const cur = parseInt(badge.textContent || '0', 10) + 1;
+                badge.textContent = cur;
+                badge.style.display = 'inline-flex';
+              }
+              updateUnreadCounts();
+              playChatNotificationSound();
+              showToast(`💬 New message from ${data.sender_name || 'Seeker'}: "${data.text.substring(0, 45)}"`);
+            }
+          }
+        } catch (err) {}
+      };
+
+      donorWs.onclose = () => {
+        clearInterval(donorWsPingInterval);
+        clearTimeout(donorWsReconnectTimer);
+        donorWsReconnectTimer = setTimeout(() => {
+          initDonorChatWebSocket();
+        }, 3000);
+      };
+
+      donorWs.onerror = () => {
+        donorWs?.close();
+      };
+    } catch (e) {
+      clearTimeout(donorWsReconnectTimer);
+      donorWsReconnectTimer = setTimeout(() => {
+        initDonorChatWebSocket();
+      }, 3000);
+    }
+  }
+
+  // Hook up typing emitter on chat input
+  if (chatInput) {
+    let lastTypingSent = 0;
+    chatInput.addEventListener('input', () => {
+      const now = Date.now();
+      if (now - lastTypingSent > 1800 && donorWs && donorWs.readyState === WebSocket.OPEN) {
+        lastTypingSent = now;
+        donorWs.send(JSON.stringify({
+          action: 'typing',
+          thread_id: activeThreadId,
+          typing: true
+        }));
+      }
+    });
+  }
+
+  // Initialize live WebSocket and sync threads
+  initDonorChatWebSocket();
+
+  // Poll fallback if WebSocket isn't open
+  setInterval(() => {
+    const isChatActive = document.getElementById('section-chat')?.classList.contains('active-section');
+    if (isChatActive && (!donorWs || donorWs.readyState !== WebSocket.OPEN)) {
+      fetchThreadMessages(activeThreadId);
+    }
+  }, 4000);
 
   // =========================================================
   // DONOR PORTAL SETTINGS & PREFERENCES MODULE

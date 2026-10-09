@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Blood Seeker Portal - Smart Blood Donor System" }}</title>
+  <meta name="description" content="Dedicated portal for blood seekers to create standard and emergency blood requests, explore nearby donors on interactive radar map, review donor credentials, initiate direct calls/WhatsApp, and chat in real time.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/seeker_dashboard.css">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+</head>
+<body>
+  <!-- Global Top Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <button class="theme-toggle-btn" aria-label="Toggle Dark Mode"></button>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Drawer for global nav -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+      <div class="mobile-auth-actions">
+        <a href="/logout" class="btn btn-outline btn-full">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Seeker App Shell -->
+  <div class="seeker-dashboard-wrapper">
+    <!-- ================= LEFT SIDEBAR ================= -->
+    <aside class="seeker-sidebar" id="seekerSidebar" aria-label="Blood Seeker Dashboard Sidebar">
+      <!-- Seeker Profile Quick Widget -->
+      <div class="seeker-profile-card-mini">
+        <div class="seeker-avatar-wrap">
+          <div class="seeker-avatar-circle">
+            {{ user.name[0] if user and user.name else "N" }}
+          </div>
+          <span class="seeker-role-badge">Seeker</span>
+        </div>
+        <div class="seeker-meta-info">
+          <div class="seeker-name-text">
+            <span>{{ user.name if user and user.name else "Nabil Hasan" }}</span>
+            <svg class="verified-icon" width="16" height="16" viewBox="0 0 20 20" fill="#0284C7">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+          </div>
+          <div class="seeker-badge-sub">
+            <span>Verified Seeker</span> · <span>Dhaka Zone</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="seeker-sidebar-nav">
+        <div class="sidebar-section-title">Seeker Overview</div>
+
+        <!-- 1. Blood Seeker Personal Dashboard -->
+        <button type="button" class="seeker-nav-item active" data-target="section-seeker-dashboard" id="nav-item-seeker-dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          <span class="nav-item-title">Blood Seeker Personal Dashboard</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 8px;">Request Creation</div>
+
+        <!-- 2. Create Standard Blood Request -->
+        <button type="button" class="seeker-nav-item" data-target="section-standard-request" id="nav-item-standard-request">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+          <span class="nav-item-title">Create Standard Blood Request</span>
+        </button>
+
+        <!-- 3. Create Emergency Blood Request -->
+        <button type="button" class="seeker-nav-item" data-target="section-emergency-request" id="nav-item-emergency-request">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #E11D48;">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span class="nav-item-title">Create Emergency Blood Request</span>
+          <span class="nav-badge-emergency">SOS</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 8px;">Donor Discovery &amp; Radar</div>
+
+        <!-- 4. Nearby Donors Interactive Map View -->
+        <button type="button" class="seeker-nav-item" data-target="section-nearby-map" id="nav-item-nearby-map">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+            <line x1="8" y1="2" x2="8" y2="18"/>
+            <line x1="16" y1="6" x2="16" y2="22"/>
+          </svg>
+          <span class="nav-item-title">Nearby Donors Interactive Map View</span>
+        </button>
+
+        <!-- 5. Donor Directory Search & Proximity Filtering -->
+        <button type="button" class="seeker-nav-item" data-target="section-donor-directory" id="nav-item-donor-directory">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span class="nav-item-title">Donor Directory Search &amp; Proximity Filtering</span>
+        </button>
+
+        <!-- 6. Donor Public Profile & Credentials View -->
+        <button type="button" class="seeker-nav-item" data-target="section-donor-credentials" id="nav-item-donor-credentials">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+          <span class="nav-item-title">Donor Public Profile &amp; Credentials View</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 8px;">Direct Engagement</div>
+
+        <!-- 7. Direct Contact Action (Call / WhatsApp CTA) -->
+        <button type="button" class="seeker-nav-item" data-target="section-direct-contact" id="nav-item-direct-contact">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          <span class="nav-item-title">Direct Contact Action (Call / WhatsApp CTA)</span>
+        </button>
+
+        <!-- 8. Real-Time In-App 1-on-1 Chat -->
+        <button type="button" class="seeker-nav-item" data-target="section-seeker-chat" id="nav-item-seeker-chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="nav-item-title">Real-Time In-App 1-on-1 Chat</span>
+          <span class="nav-badge-count" id="sidebarSeekerChatBadge">2</span>
+        </button>
+
+        <!-- 9. Seeker Portal Settings & Preferences -->
+        <button type="button" class="seeker-nav-item" data-target="section-seeker-settings" id="nav-item-seeker-settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+          <span class="nav-item-title">Seeker Portal Settings &amp; Preferences</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Emergency Assistance Card -->
+      <div class="sidebar-help-card">
+        <div class="help-card-title">
+          <span>🆘</span>
+          <span>Emergency Blood Desk</span>
+        </div>
+        <p class="help-card-desc">Need urgent blood coordination or hospital donor dispatch?</p>
+        <a href="tel:+8801700000000" class="help-card-hotline">📞 +880 1700-000000</a>
+      </div>
+    </aside>
+
+    <!-- ================= RIGHT MAIN VIEWPORT ================= -->
+    <main class="seeker-main-viewport">
+      <!-- Mobile Sidebar Toggle -->
+      <button type="button" class="mobile-sidebar-toggle-btn" id="mobileSidebarToggle" aria-label="Open Seeker Navigation Menu">
+        <span>☰</span>
+        <span>Seeker Menu</span>
+      </button>
+
+      <!-- ================= 1. BLOOD SEEKER PERSONAL DASHBOARD ================= -->
+      <section class="dashboard-content-section active-section" id="section-seeker-dashboard">
+        <!-- Welcome Banner -->
+        <div class="seeker-banner-header">
+          <div class="banner-welcome-text">
+            <h1>Welcome back, {{ user.name if user and user.name else "Nabil" }}! 👋</h1>
+            <p>Your blood seeker control hub is ready. Active donor broadcasts are monitored 24/7 across Dhaka.</p>
+          </div>
+          <div class="banner-controls-group">
+            <button type="button" class="btn btn-outline" data-goto="section-standard-request" style="font-size: 0.86rem; padding: 8px 14px;">
+              + Standard Request
+            </button>
+            <button type="button" class="btn btn-primary" data-goto="section-emergency-request" style="font-size: 0.86rem; padding: 8px 16px; background: #DC2626;">
+              🚨 Emergency SOS
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards -->
+        <div class="metrics-grid-4">
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-red">
+              <span>🩸</span>
+            </div>
+            <div>
+              <div class="metric-value-text" id="metricActiveReqs">2 Active</div>
+              <div class="metric-title-text">Blood Requests In Progress</div>
+            </div>
+          </article>
+
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-green">
+              <span>👥</span>
+            </div>
+            <div>
+              <div class="metric-value-text" id="metricMatchedDonors">14 Nearby</div>
+              <div class="metric-title-text">Verified Donors Within 5 km</div>
+            </div>
+          </article>
+
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-amber">
+              <span>⚡</span>
+            </div>
+            <div>
+              <div class="metric-value-text" id="metricEmergencyAlerts">1 Broadcast</div>
+              <div class="metric-title-text">Active SOS Emergency Alert</div>
+            </div>
+          </article>
+
+          <article class="metric-stat-box">
+            <div class="metric-icon-bubble bubble-blue">
+              <span>✅</span>
+            </div>
+            <div>
+              <div class="metric-value-text" id="metricFulfilledUnits">5 Bags</div>
+              <div class="metric-title-text">Fulfilled Transfusions Saved</div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Quick Action Strip -->
+        <div class="quick-action-strip">
+          <button type="button" class="quick-action-btn btn-sos-pulse" data-goto="section-emergency-request">
+            <span style="font-size: 1.3rem;">🚨</span>
+            <div>
+              <div style="font-weight: 700;">Broadcast Emergency SOS</div>
+              <div style="font-size: 0.76rem; color: #BE123C;">Alert nearby matching donors instantly</div>
+            </div>
+          </button>
+
+          <button type="button" class="quick-action-btn" data-goto="section-standard-request">
+            <span style="font-size: 1.3rem;">📝</span>
+            <div>
+              <div style="font-weight: 700;">Create Standard Request</div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary);">Post planned surgery or scheduled need</div>
+            </div>
+          </button>
+
+          <button type="button" class="quick-action-btn" data-goto="section-nearby-map">
+            <span style="font-size: 1.3rem;">🗺️</span>
+            <div>
+              <div style="font-weight: 700;">Explore Donors on Map</div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary);">Live radar around Dhaka hospitals</div>
+            </div>
+          </button>
+
+          <button type="button" class="quick-action-btn" data-goto="section-seeker-chat">
+            <span style="font-size: 1.3rem;">💬</span>
+            <div>
+              <div style="font-weight: 700;">Open In-App Donor Chat</div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary);">Coordinate transit &amp; ward arrival</div>
+            </div>
+          </button>
+        </div>
+
+        <!-- My Blood Requests Table -->
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.4rem;">📋</span>
+              <div>
+                <h2>My Posted Blood Requests</h2>
+                <div class="card-subtitle">Real-time status of your active and past blood donation requests</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn btn-outline request-tab-btn active" data-filter="all" style="padding: 5px 12px; font-size: 0.8rem;">All</button>
+              <button type="button" class="btn btn-outline request-tab-btn" data-filter="active" style="padding: 5px 12px; font-size: 0.8rem;">Active</button>
+              <button type="button" class="btn btn-outline request-tab-btn" data-filter="emergency" style="padding: 5px 12px; font-size: 0.8rem;">SOS</button>
+              <button type="button" class="btn btn-outline request-tab-btn" data-filter="fulfilled" style="padding: 5px 12px; font-size: 0.8rem;">Fulfilled</button>
+            </div>
+          </div>
+
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary);">
+                  <th style="padding: 10px 12px;">Req ID</th>
+                  <th style="padding: 10px 12px;">Patient</th>
+                  <th style="padding: 10px 12px;">Group</th>
+                  <th style="padding: 10px 12px;">Hospital &amp; Location</th>
+                  <th style="padding: 10px 12px;">Status</th>
+                  <th style="padding: 10px 12px;">Responses</th>
+                  <th style="padding: 10px 12px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="seekerRequestsTableBody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 2. CREATE STANDARD BLOOD REQUEST ================= -->
+      <section class="dashboard-content-section" id="section-standard-request">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">📝</span>
+              <div>
+                <h2>Create Standard Blood Request</h2>
+                <div class="card-subtitle">Fill in patient, hospital, and timing details for regular or scheduled transfusions</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px;">
+            <!-- Form Column -->
+            <form id="createStandardRequestForm">
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="stdPatientName">Patient Full Name *</label>
+                  <input type="text" id="stdPatientName" placeholder="e.g. Salma Begum" required>
+                </div>
+                <div class="form-field-group">
+                  <label for="stdPatientAge">Patient Age &amp; Gender</label>
+                  <input type="text" id="stdPatientAge" placeholder="e.g. 45 Years, Female">
+                </div>
+              </div>
+
+              <!-- Blood Group Selection -->
+              <div class="form-field-group">
+                <label>Select Required Blood Group *</label>
+                <div class="blood-chip-group">
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="A+" checked><span>A+</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="A-"><span>A-</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="B+"><span>B+</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="B-"><span>B-</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="AB+"><span>AB+</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="AB-"><span>AB-</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="O+"><span>O+</span></label>
+                  <label class="blood-chip-item"><input type="radio" name="blood_group" value="O-"><span>O-</span></label>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="stdUnitsCount">Number of Units (Bags) Needed *</label>
+                  <select id="stdUnitsCount" required>
+                    <option value="1">1 Unit (Bag)</option>
+                    <option value="2" selected>2 Units (Bags)</option>
+                    <option value="3">3 Units (Bags)</option>
+                    <option value="4">4 Units (Bags)</option>
+                    <option value="5">5+ Units</option>
+                  </select>
+                </div>
+                <div class="form-field-group">
+                  <label for="stdBloodComponent">Component Type</label>
+                  <select id="stdBloodComponent">
+                    <option value="Whole Blood">Whole Blood</option>
+                    <option value="Platelets">Platelets (PRP)</option>
+                    <option value="RBC">Packed Red Blood Cells (PRBC)</option>
+                    <option value="Plasma">Fresh Frozen Plasma (FFP)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="stdHospitalName">Hospital / Clinic Name *</label>
+                  <input type="text" id="stdHospitalName" placeholder="e.g. Square Hospital / DMCH" required>
+                </div>
+                <div class="form-field-group">
+                  <label for="stdWardBed">Ward / Room / Cabin No.</label>
+                  <input type="text" id="stdWardBed" placeholder="e.g. 3rd Floor, Cabin 304">
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="stdDistrictName">District</label>
+                  <select id="stdDistrictName">
+                    <option value="Dhaka">Dhaka</option>
+                    <option value="Chittagong">Chittagong</option>
+                    <option value="Sylhet">Sylhet</option>
+                    <option value="Rajshahi">Rajshahi</option>
+                    <option value="Khulna">Khulna</option>
+                  </select>
+                </div>
+                <div class="form-field-group">
+                  <label for="stdAreaName">Thana / Area *</label>
+                  <input type="text" id="stdAreaName" placeholder="e.g. Panthapath / Dhanmondi" required>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="stdRequiredDate">Required Date &amp; Time *</label>
+                  <input type="text" id="stdRequiredDate" placeholder="e.g. Tomorrow 10:00 AM">
+                </div>
+                <div class="form-field-group">
+                  <label for="stdContactPhone">Contact Phone Number *</label>
+                  <input type="tel" id="stdContactPhone" placeholder="+88017..." value="{{ user.phone if user and user.phone else '+8801723456789' }}" required>
+                </div>
+              </div>
+
+              <div class="form-field-group">
+                <label for="stdCaseReason">Medical Reason / Special Instructions</label>
+                <textarea id="stdCaseReason" rows="2" placeholder="e.g. Scheduled cesarean section, donor must have hemoglobin >= 13.0"></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-weight: 700; font-size: 0.98rem; margin-top: 10px;">
+                Post Standard Blood Request
+              </button>
+            </form>
+
+            <!-- Live Card Preview Column -->
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px;">
+                Live Request Preview
+              </div>
+              <div class="donor-card" style="border: 2px dashed #0284C7; background: #F0F9FF;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                  <div>
+                    <span class="nav-pill-badge pill-blue">Standard Request</span>
+                    <h3 id="previewPatientName" style="margin: 6px 0 2px; font-size: 1.15rem; color: var(--text-primary);">Patient Name</h3>
+                    <div id="previewHospital" style="font-size: 0.85rem; color: var(--text-secondary);">Hospital / Clinic</div>
+                  </div>
+                  <span id="previewBloodGroup" style="background: #E11D48; color: #FFF; font-weight: 800; font-size: 1.2rem; padding: 4px 12px; border-radius: 8px;">
+                    A+
+                  </span>
+                </div>
+                <div style="font-size: 0.84rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 14px;">
+                  <div>📦 <span id="previewUnits">2 Bags Needed</span></div>
+                  <div>🕒 <span id="previewDate">Schedule: Pending</span></div>
+                  <div>📍 Location: Dhaka Metro</div>
+                </div>
+                <div style="padding: 10px; background: #FFFFFF; border-radius: 8px; border: 1px solid #BAE6FD; font-size: 0.8rem; color: #0369A1;">
+                  ℹ️ Once posted, verified matching donors within 10 km will be immediately notified via SMS and App.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
+      <section class="dashboard-content-section" id="section-emergency-request">
+        <div class="seeker-card emergency-form-panel">
+          <div class="sos-alert-banner">
+            <span class="sos-alert-banner-icon">🚨</span>
+            <div class="sos-alert-banner-text">
+              <strong>HIGH URGENCY SOS DISPATCH MODE</strong>
+              <span>Emergency requests bypass standard moderation and trigger rapid siren broadcast alerts to all available donors in your radius.</span>
+            </div>
+          </div>
+
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem; color: #DC2626;">⚡</span>
+              <div>
+                <h2 style="color: #991B1B;">Create Emergency Blood Request</h2>
+                <div class="card-subtitle">Immediate life-saving broadcast for ICU, emergency surgery, or severe trauma</div>
+              </div>
+            </div>
+            <span class="nav-badge-emergency">CODE RED READY</span>
+          </div>
+
+          <form id="createEmergencyRequestForm">
+            <!-- Blood Group Selection -->
+            <div class="form-field-group" style="margin-bottom: 18px;">
+              <label style="color: #991B1B; font-weight: 700; font-size: 0.95rem;">Select Required Blood Group *</label>
+              <div class="blood-chip-group">
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="A+"><span>A+</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="A-"><span>A-</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="B+"><span>B+</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="B-"><span>B-</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="AB+"><span>AB+</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="AB-"><span>AB-</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="O+" checked><span>O+</span></label>
+                <label class="blood-chip-item"><input type="radio" name="emg_blood_group" value="O-"><span>O-</span></label>
+              </div>
+            </div>
+
+            <!-- Urgency Level -->
+            <div class="form-field-group" style="margin-bottom: 18px;">
+              <label style="font-weight: 700; font-size: 0.9rem;">Urgency Level / Timeframe *</label>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                <label style="border: 2px solid #FDA4AF; padding: 12px; border-radius: 10px; background: #FFF1F2; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="emg_urgency" value="Code Red (Within 1 Hour)" checked>
+                  <div>
+                    <strong style="color: #BE123C; font-size: 0.88rem; display: block;">CODE RED: &lt; 1 Hour</strong>
+                    <small style="color: #881337;">Immediate life threat</small>
+                  </div>
+                </label>
+                <label style="border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; background: var(--bg-card); cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="emg_urgency" value="Urgent (Within 2 Hours)">
+                  <div>
+                    <strong style="color: var(--text-primary); font-size: 0.88rem; display: block;">Within 2 Hours</strong>
+                    <small style="color: var(--text-secondary);">Ongoing surgery / OT</small>
+                  </div>
+                </label>
+                <label style="border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; background: var(--bg-card); cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                  <input type="radio" name="emg_urgency" value="Critical (Within 4 Hours)">
+                  <div>
+                    <strong style="color: var(--text-primary); font-size: 0.88rem; display: block;">Within 4 Hours</strong>
+                    <small style="color: var(--text-secondary);">ICU stabilizing</small>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="emgPatientName">Patient Full Name *</label>
+                <input type="text" id="emgPatientName" placeholder="e.g. Arif Chowdhury" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emgEmergencyCase">Emergency Case / Department</label>
+                <input type="text" id="emgEmergencyCase" placeholder="e.g. ICU / Accident Trauma / Emergency OT">
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="emgHospitalName">Hospital &amp; Emergency Room *</label>
+                <input type="text" id="emgHospitalName" placeholder="e.g. Dhaka Medical College Hospital (ICU Bed 4)" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emgAreaName">Hospital Locality / Area *</label>
+                <input type="text" id="emgAreaName" placeholder="e.g. Shahbagh, Dhaka" required>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="emgEmergencyPhone">Attendant Emergency Hotline (Call/WhatsApp) *</label>
+                <input type="tel" id="emgEmergencyPhone" placeholder="+88017..." value="{{ user.phone if user and user.phone else '+8801723456789' }}" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emgSecondaryPhone">Secondary Backup Phone</label>
+                <input type="tel" id="emgSecondaryPhone" placeholder="+88018...">
+              </div>
+            </div>
+
+            <div style="margin-top: 16px;">
+              <button type="submit" class="btn-broadcast-emergency" id="btnBroadcastEmergency">
+                <span>🚨</span>
+                <span>BROADCAST SOS EMERGENCY ALERT NOW</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= 4. NEARBY DONORS INTERACTIVE MAP VIEW ================= -->
+      <section class="dashboard-content-section" id="section-nearby-map">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🗺️</span>
+              <div>
+                <h2>Nearby Donors Interactive Map View</h2>
+                <div class="card-subtitle">Live geographic radar showing verified available donors situated near Dhaka medical centres</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline" onclick="filterNearbyMap()" style="font-size: 0.8rem; padding: 6px 12px;">
+              🔄 Refresh Radar
+            </button>
+          </div>
+
+          <!-- Map & List Layout -->
+          <div style="display: grid; grid-template-columns: 1fr 340px; gap: 18px;">
+            <!-- Map Viewport -->
+            <div class="map-viewport-wrapper">
+              <div id="seekerDonorMap"></div>
+
+              <!-- Floating Map Filter Control -->
+              <div class="map-floating-filter-panel">
+                <div style="font-weight: 700; font-size: 0.84rem; color: var(--text-primary);">Radar Radius Filter</div>
+                <label style="font-size: 0.78rem; color: var(--text-secondary); display: flex; justify-content: space-between;">
+                  <span>Search Distance:</span>
+                  <strong id="mapRadiusValue" style="color: var(--primary-red);">15 km</strong>
+                </label>
+                <input type="range" id="mapRadiusSlider" min="1" max="25" value="15" style="width: 100%;">
+
+                <label style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                  <span>Filter Blood Group:</span>
+                </label>
+                <select id="mapBloodGroupFilter" style="padding: 6px; border-radius: 6px; font-size: 0.82rem; border: 1px solid var(--border-color);">
+                  <option value="">All Blood Groups</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
+
+              <!-- Map Legend -->
+              <div class="map-legend">
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #10B981;"></span>
+                  <span>Available Now</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #E11D48;"></span>
+                  <span>On Call</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-dot" style="background: #0284C7;"></span>
+                  <span>Your Location</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side Quick List -->
+            <div style="border: 1px solid var(--border-color); border-radius: 14px; background: var(--bg-card); display: flex; flex-direction: column; overflow: hidden; height: 520px;">
+              <div style="padding: 14px 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-page); font-weight: 700; font-size: 0.88rem;">
+                📍 Nearest Donors in Radius
+              </div>
+              <div id="mapNearbyDonorsList" style="flex: 1; overflow-y: auto;">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
+      <section class="dashboard-content-section" id="section-donor-directory">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🔍</span>
+              <div>
+                <h2>Donor Directory Search &amp; Proximity Filtering</h2>
+                <div class="card-subtitle">Search registered donors across Dhaka by blood compatibility, proximity distance, and verified badges</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Filters Bar -->
+          <div class="directory-filters-bar">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" id="dirSearchInput" placeholder="Search by donor name, area (e.g. Dhanmondi), or hospital...">
+            </div>
+
+            <div>
+              <select id="dirBloodFilter" style="padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-card); font-size: 0.88rem; font-weight: 600;">
+                <option value="">All Blood Groups</option>
+                <option value="A+">Blood Group: A+</option>
+                <option value="A-">Blood Group: A-</option>
+                <option value="B+">Blood Group: B+</option>
+                <option value="B-">Blood Group: B-</option>
+                <option value="AB+">Blood Group: AB+</option>
+                <option value="AB-">Blood Group: AB-</option>
+                <option value="O+">Blood Group: O+</option>
+                <option value="O-">Blood Group: O-</option>
+              </select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 170px;">
+              <span style="font-size: 0.8rem; color: var(--text-secondary); white-space: nowrap;">Radius:</span>
+              <input type="range" id="dirRadiusSlider" min="1" max="30" value="30" style="width: 80px;">
+              <span id="dirRadiusValue" style="font-size: 0.82rem; font-weight: 700; color: var(--primary-red); min-width: 44px;">30 km</span>
+            </div>
+
+            <label style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem; font-weight: 600; cursor: pointer;">
+              <input type="checkbox" id="dirAvailFilter">
+              <span>Available Now Only</span>
+            </label>
+
+            <div>
+              <select id="dirSortSelect" style="padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-card); font-size: 0.88rem;">
+                <option value="proximity">Sort by Nearest Proximity</option>
+                <option value="rating">Sort by Highest Rating</option>
+                <option value="donations">Sort by Most Donations</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="dirResultsCount" style="font-size: 0.86rem; color: var(--text-secondary); margin-bottom: 16px; font-weight: 500;">
+            Showing 8 verified donors near Dhaka
+          </div>
+
+          <!-- Donors Grid -->
+          <div class="donor-directory-grid" id="donorDirectoryGrid">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW ================= -->
+      <section class="dashboard-content-section" id="section-donor-credentials">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">🛡️</span>
+              <div>
+                <h2>Donor Public Profile &amp; Credentials View</h2>
+                <div class="card-subtitle">Examine certified medical screenings, lab clearance, and past recipient testimonials</div>
+              </div>
+            </div>
+            <!-- Quick Switcher -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <label for="credDonorSelect" style="font-size: 0.82rem; color: var(--text-secondary);">Select Donor:</label>
+              <select id="credDonorSelect" style="padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.84rem;">
+                <option value="dn-001">Ayesha Rahman (A+)</option>
+                <option value="dn-002">Tanvir Ahmed (O+)</option>
+                <option value="dn-003">Sadia Islam (B+)</option>
+                <option value="dn-004">Rafiqul Islam (O-)</option>
+                <option value="dn-005">Farhan Kabir (AB+)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Hero Profile Header -->
+          <div class="credentials-hero-panel">
+            <div class="credentials-hero-left">
+              <div class="credentials-large-avatar" id="credHeroAvatar">A</div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <h3 id="credHeroName" style="font-size: 1.45rem; font-weight: 800; color: var(--text-primary); margin: 0;">Ayesha Rahman</h3>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="#0284C7">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                  </svg>
+                  <span class="nav-pill-badge pill-green" id="credHeroTier">Gold Life Saver</span>
+                </div>
+                <div id="credHeroLoc" style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 4px;">
+                  📍 Dhanmondi, Dhaka (1.2 km away)
+                </div>
+                <div style="display: flex; gap: 14px; margin-top: 8px; font-size: 0.84rem;">
+                  <span id="credHeroDonations" style="font-weight: 700; color: var(--text-primary);">8 Completed Donations</span>
+                  <span id="credHeroRating" style="color: #F59E0B; font-weight: 700;">★ 4.9 / 5.0 (18 reviews)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align: right;">
+              <span id="credHeroBlood" style="background: #E11D48; color: #FFF; font-weight: 800; font-size: 1.6rem; padding: 6px 18px; border-radius: 12px; display: inline-block;">
+                A+
+              </span>
+              <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">Blood Group Certified</div>
+            </div>
+          </div>
+
+          <!-- Credentials Checklist Board -->
+          <div style="font-weight: 700; font-size: 1rem; color: var(--text-primary); margin-bottom: 12px;">
+            Verified Credentials &amp; Medical Clearance
+          </div>
+          <div class="credentials-badges-board">
+            <div class="badge-item-box">
+              <span class="badge-icon">🪪</span>
+              <div>
+                <div class="badge-item-title">Govt NID Verified</div>
+                <div class="badge-item-desc">National ID #8273910294 verified through Election Commission API.</div>
+              </div>
+            </div>
+
+            <div class="badge-item-box">
+              <span class="badge-icon">🔬</span>
+              <div>
+                <div class="badge-item-title">Pathology Lab Screening</div>
+                <div class="badge-item-desc" id="credScreening">Hepatitis B/C, HIV, Syphilis Tested Negative (Sept 2026).</div>
+              </div>
+            </div>
+
+            <div class="badge-item-box">
+              <span class="badge-icon">🩸</span>
+              <div>
+                <div class="badge-item-title">Hemoglobin Vital Check</div>
+                <div class="badge-item-desc" id="credHemoglobin">14.2 g/dL (Above clinical requirement of 12.5 g/dL).</div>
+              </div>
+            </div>
+
+            <div class="badge-item-box">
+              <span class="badge-icon">⚖️</span>
+              <div>
+                <div class="badge-item-title">Weight &amp; Blood Pressure</div>
+                <div class="badge-item-desc" id="credWeightBp">58 kg | BP 118/78 mmHg (Optimal donor vitals).</div>
+              </div>
+            </div>
+
+            <div class="badge-item-box">
+              <span class="badge-icon">⏱️</span>
+              <div>
+                <div class="badge-item-title">Donor Reliability Score</div>
+                <div class="badge-item-desc" id="credHeroReliability">100% attendance rate without no-shows.</div>
+              </div>
+            </div>
+
+            <div class="badge-item-box">
+              <span class="badge-icon">🏥</span>
+              <div>
+                <div class="badge-item-title">Clinical Eligibility</div>
+                <div class="badge-item-desc">Over 90 days elapsed since last whole blood donation.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bio & Testimonials -->
+          <div style="margin-bottom: 24px;">
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 6px;">Donor Biography</div>
+            <p id="credHeroBio" style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin: 0; background: var(--bg-page); padding: 14px; border-radius: 10px;">
+              Voluntary blood donor for 4 years. Close to Square &amp; Bangladesh Medical. Ready for emergencies.
+            </p>
+          </div>
+
+          <!-- Testimonials -->
+          <div style="margin-bottom: 24px;">
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px;">
+              Verified Recipient Reviews &amp; Testimonials
+            </div>
+            <div id="credReviewsList">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+
+          <!-- Action Bar -->
+          <div style="display: flex; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 18px;">
+            <a id="credCallBtn" href="tel:+8801712345678" class="btn-cta-call" style="padding: 12px 24px; font-size: 0.95rem;">
+              📞 Call Donor Now
+            </a>
+            <a id="credWaBtn" href="https://wa.me/8801712345678" target="_blank" class="btn-cta-wa" style="padding: 12px 24px; font-size: 0.95rem;">
+              💬 WhatsApp Chat
+            </a>
+            <button id="credChatBtn" type="button" class="btn btn-outline" style="padding: 12px 24px; font-size: 0.95rem;">
+              💬 In-App 1-on-1 Chat
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
+      <section class="dashboard-content-section" id="section-direct-contact">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">📞</span>
+              <div>
+                <h2>Direct Contact Action (Call / WhatsApp CTA)</h2>
+                <div class="card-subtitle">One-click speed dial and pre-formatted emergency WhatsApp dispatch to available donors</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Speed Dial Section -->
+          <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 12px;">
+            ⚡ Quick Speed-Dial to Matching Donors
+          </div>
+          <div class="speed-dial-grid" id="speedDialGrid">
+            <!-- Populated via JS -->
+          </div>
+
+          <!-- Pre-formatted Templates -->
+          <div style="margin-bottom: 28px;">
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px;">
+              📱 Pre-Composed WhatsApp Emergency Templates
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+              <div style="background: var(--bg-page); border: 1px solid var(--border-color); padding: 14px; border-radius: 10px;">
+                <div style="font-weight: 700; font-size: 0.88rem; color: var(--primary-red); margin-bottom: 4px;">🚨 Template 1: Immediate SOS</div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 10px 0;">"Urgent SOS: Need 1 bag blood immediately at ICU. Our attendants are waiting at the gate. Can you respond?"</p>
+                <button type="button" class="btn-card-action" onclick="window.copyPhoneToClipboard('Urgent SOS: Need 1 bag blood immediately at ICU. Our attendants are waiting at the gate. Can you respond?')" style="font-size: 0.76rem;">📋 Copy Template</button>
+              </div>
+
+              <div style="background: var(--bg-page); border: 1px solid var(--border-color); padding: 14px; border-radius: 10px;">
+                <div style="font-weight: 700; font-size: 0.88rem; color: #0284C7; margin-bottom: 4px;">📋 Template 2: Scheduled Transfusion</div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 10px 0;">"Hello! We found your donor profile on SBDS. Surgery is scheduled tomorrow 10 AM. Would you be able to assist?"</p>
+                <button type="button" class="btn-card-action" onclick="window.copyPhoneToClipboard('Hello! We found your donor profile on SBDS. Surgery is scheduled tomorrow 10 AM. Would you be able to assist?')" style="font-size: 0.76rem;">📋 Copy Template</button>
+              </div>
+
+              <div style="background: var(--bg-page); border: 1px solid var(--border-color); padding: 14px; border-radius: 10px;">
+                <div style="font-weight: 700; font-size: 0.88rem; color: #047857; margin-bottom: 4px;">🚗 Template 3: Hospital Arrival Assistance</div>
+                <p style="font-size: 0.82rem; color: var(--text-secondary); margin: 0 0 10px 0;">"Our attendant Mr. Kamal is waiting at the Blood Bank entrance (Ground Floor). He will assist with your entry slip."</p>
+                <button type="button" class="btn-card-action" onclick="window.copyPhoneToClipboard('Our attendant Mr. Kamal is waiting at the Blood Bank entrance (Ground Floor). He will assist with your entry slip.')" style="font-size: 0.76rem;">📋 Copy Template</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contact Logs -->
+          <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 10px;">
+              📋 Dispatched Call &amp; WhatsApp History
+            </div>
+            <div style="overflow-x: auto;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.86rem; text-align: left;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary);">
+                    <th style="padding: 8px 10px;">Donor</th>
+                    <th style="padding: 8px 10px;">Blood Group</th>
+                    <th style="padding: 8px 10px;">Phone Number</th>
+                    <th style="padding: 8px 10px;">Action Type</th>
+                    <th style="padding: 8px 10px;">Outcome</th>
+                    <th style="padding: 8px 10px;">Time</th>
+                  </tr>
+                </thead>
+                <tbody id="contactLogsTableBody">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 8. REAL-TIME IN-APP 1-ON-1 CHAT ================= -->
+      <section class="dashboard-content-section" id="section-seeker-chat">
+        <div class="seeker-card" style="padding: 0; overflow: hidden;">
+          <div class="chat-module-shell">
+            <!-- Left Thread List -->
+            <div class="chat-threads-sidebar">
+              <div class="chat-threads-header">
+                <span>💬 Conversations</span>
+                <span class="nav-pill-badge pill-blue">Real-Time</span>
+              </div>
+              <div class="threads-scroll-list" id="chatThreadsScrollList">
+                <!-- Populated via JS -->
+              </div>
+            </div>
+
+            <!-- Right Conversation Viewport -->
+            <div class="chat-conversation-viewport">
+              <div class="chat-header-bar">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                  <div class="chat-thread-avatar" style="width: 38px; height: 38px;">💬</div>
+                  <div>
+                    <strong id="activeChatDonorName" style="font-size: 0.98rem; color: var(--text-primary); display: block;">Ayesha Rahman</strong>
+                    <span id="activeChatDonorInfo" style="font-size: 0.78rem; color: var(--text-secondary);">A+ Donor • +880 1712-345678</span>
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <a id="activeChatCallBtn" href="tel:+8801712345678" class="btn-cta-call" style="padding: 6px 12px; font-size: 0.78rem;">
+                    📞 Direct Call
+                  </a>
+                </div>
+              </div>
+
+              <!-- Message Stream -->
+              <div class="chat-messages-container" id="chatMessagesContainer">
+                <!-- Messages populated via JS -->
+              </div>
+
+              <!-- Quick Replies -->
+              <div class="chat-quick-chips">
+                <button type="button" class="quick-chip-btn">"What is your ETA?"</button>
+                <button type="button" class="quick-chip-btn">"Please come to Ward 4, Bed 12"</button>
+                <button type="button" class="quick-chip-btn">"Attendant waiting at main gate"</button>
+                <button type="button" class="quick-chip-btn">"Doctor signed blood requisition"</button>
+                <button type="button" class="quick-chip-btn">"Thank you so much!"</button>
+              </div>
+
+              <!-- Input Row -->
+              <form class="chat-input-row" id="chatMessageForm">
+                <input type="text" id="chatMessageInput" placeholder="Type message to donor..." autocomplete="off">
+                <button type="submit" class="btn-chat-send" aria-label="Send message">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"/>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 9. SEEKER PORTAL SETTINGS & PREFERENCES ================= -->
+      <section class="dashboard-content-section" id="section-seeker-settings">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">⚙️</span>
+              <div>
+                <h2>Seeker Portal Settings &amp; Preferences</h2>
+                <div class="card-subtitle">Manage seeker profile details, emergency notifications, and discovery radius</div>
+              </div>
+            </div>
+          </div>
+
+          <form id="seekerSettingsForm">
+            <!-- Account & Profile -->
+            <div class="settings-section-card">
+              <h3 style="font-size: 1.05rem; color: var(--text-primary); margin-bottom: 14px;">👤 Seeker Profile Information</h3>
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="setSeekerName">Full Name</label>
+                  <input type="text" id="setSeekerName" value="{{ user.name if user and user.name else 'Nabil Hasan' }}" required>
+                </div>
+                <div class="form-field-group">
+                  <label for="setSeekerPhone">Primary Phone Number</label>
+                  <input type="tel" id="setSeekerPhone" value="{{ user.phone if user and user.phone else '+8801723456789' }}" required>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="setDefaultHospital">Default Hospital / Clinic</label>
+                  <input type="text" id="setDefaultHospital" value="Square Hospital, Dhaka">
+                </div>
+                <div class="form-field-group">
+                  <label for="setDefaultRadius">Default Donor Search Radius</label>
+                  <select id="setDefaultRadius">
+                    <option value="5">Within 5 km</option>
+                    <option value="10" selected>Within 10 km</option>
+                    <option value="20">Within 20 km</option>
+                    <option value="30">All Metro Dhaka (30 km)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notification & Alert Settings -->
+            <div class="settings-section-card">
+              <h3 style="font-size: 1.05rem; color: var(--text-primary); margin-bottom: 14px;">🔔 Emergency Broadcast &amp; Alert Preferences</h3>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>SMS Alert Dispatch</h4>
+                  <p>Send automated SMS alerts to matching donors whenever you post an emergency blood request.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="toggleSmsAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>In-App Push Notifications</h4>
+                  <p>Receive immediate alerts on screen when a donor accepts or responds to your blood request.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="togglePushAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Emergency Audio Siren</h4>
+                  <p>Play acoustic notification chime when an emergency request receives donor arrival confirmation.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="toggleAudioSiren" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Dark Mode Theme</h4>
+                  <p>Switch between modern dark aesthetic and high-contrast light theme.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="seekerThemeToggle">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="padding: 12px 28px; font-weight: 700; font-size: 0.95rem;">
+              Save Settings &amp; Preferences
+            </button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Global Feedback Toast Notification -->
+  <div class="dashboard-toast" id="dashboardToast" role="status" aria-live="polite">
+    <span>ℹ️</span>
+    <span id="toastText">Action completed successfully.</span>
+  </div>
+
+  <!-- SOS Broadcast Confirmation Modal -->
+  <div id="sosBroadcastModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: var(--bg-card); border-radius: 18px; max-width: 480px; width: 100%; padding: 28px; border: 2px solid #E11D48; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,0.3);">
+      <div style="font-size: 3rem; margin-bottom: 10px;">🚨</div>
+      <h3 style="font-size: 1.4rem; color: #991B1B; margin: 0 0 8px 0; font-weight: 800;">SOS Emergency Alert Dispatched!</h3>
+      <p style="font-size: 0.92rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 18px;">
+        Broadcast transmitted to <strong>18 matching donors</strong> within 5 km for <strong id="sosBroadcastGroup" style="color: #BE123C;">O+</strong> blood at <strong id="sosBroadcastHospital">Hospital</strong>.
+      </p>
+      <div style="background: #FFF1F2; border: 1px dashed #FDA4AF; padding: 12px; border-radius: 10px; margin-bottom: 20px; font-size: 0.85rem; color: #881337;">
+        ⏳ Keep your phone line active. Responses will appear under Active Requests and In-App Chat immediately.
+      </div>
+      <button type="button" class="btn btn-primary" onclick="window.closeSosModal()" style="width: 100%; padding: 12px; font-weight: 700; background: #DC2626;">
+        Go to Seeker Dashboard
+      </button>
+    </div>
+  </div>
+
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/seeker_dashboard.js"></script>
+</body>
+</html>
