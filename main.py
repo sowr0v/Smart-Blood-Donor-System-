@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Form, Query, Request
+from fastapi import FastAPI, Form, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -303,13 +303,22 @@ def _public_request(request: dict) -> dict:
 async def _render_login_page(
     request: Request,
     error: str | None = None,
+    success_message: str | None = None,
     admin_console: bool = False,
     next_url: str = "",
 ):
+    if not success_message and request.query_params.get("registered"):
+        success_message = "Registration successful! Please log in with your phone number and password."
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"request": request, "error": error, "admin_console": admin_console, "next_url": next_url},
+        context={
+            "request": request,
+            "error": error,
+            "success_message": success_message,
+            "admin_console": admin_console,
+            "next_url": next_url,
+        },
     )
 
 
@@ -403,6 +412,16 @@ def initialize_auth_database():
                 connection.execute(
                     "ALTER TABLE donor_profiles ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1"
                 )
+            auth_user_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(auth_users)").fetchall()
+            }
+            if "role" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN role TEXT DEFAULT 'donor'")
+            if "name" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN name TEXT DEFAULT ''")
+            if "blood_group" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN blood_group TEXT DEFAULT ''")
 
 
 def _connection():
@@ -410,6 +429,29 @@ def _connection():
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+
+def _get_user_by_phone(phone: str) -> dict | None:
+    if phone in USERS:
+        return USERS[phone]
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            "SELECT phone, password_hash, role, name, blood_group FROM auth_users WHERE phone = ?",
+            (phone,),
+        ).fetchone()
+        if row:
+            role = row["role"] or "donor"
+            user_data = {
+                "password": "",
+                "password_hash": row["password_hash"],
+                "role": role,
+                "name": row["name"] or ("Blood Seeker" if role == "seeker" else "Blood Donor"),
+                "blood_group": row["blood_group"] or "A+",
+            }
+            USERS[phone] = user_data
+            return user_data
+    return None
 
 
 def normalize_phone(phone: str) -> str:
@@ -704,14 +746,43 @@ def reset_password(payload: ResetPasswordRequest, response: Response, request: R
 
 def _get_current_user(request: Request) -> dict | None:
     token = _decode_jwt(request.cookies.get("access_token", ""))
-    if not token or not token.get("sub"):
-        return None
-    phone = token.get("sub")
-    user = USERS.get(phone)
-    if not user:
-        user = {"password": "", "role": token.get("role", "donor"), "name": "Ayesha Rahman"}
-        USERS[phone] = user
-    return user
+    if token and token.get("sub"):
+        phone = token.get("sub")
+        token_role = token.get("role", "donor")
+        user = _get_user_by_phone(phone)
+        if not user:
+            default_name = "Blood Seeker" if token_role == "seeker" else "Ayesha Rahman"
+            user = {"password": "", "role": token_role, "name": default_name, "phone": phone}
+            USERS[phone] = user
+        if not user.get("role"):
+            user["role"] = token_role
+        if not user.get("phone"):
+            user["phone"] = phone
+        return user
+
+    session_token = request.cookies.get(SESSION_COOKIE)
+    if session_token:
+        token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+        now = int(time.time())
+        with closing(_connection()) as connection:
+            session = connection.execute(
+                """SELECT users.phone, users.role, users.full_name
+                   FROM auth_sessions AS sessions
+                   JOIN auth_users AS users ON users.id = sessions.user_id
+                   WHERE sessions.token_hash = ? AND sessions.expires_at > ?""",
+                (token_hash, now),
+            ).fetchone()
+            if session:
+                phone = session["phone"]
+                user = _get_user_by_phone(phone)
+                if user:
+                    return user
+                return {
+                    "phone": phone,
+                    "role": session["role"] if "role" in session.keys() and session["role"] else "donor",
+                    "name": session["full_name"] if "full_name" in session.keys() else "User",
+                }
+    return None
 
 
 @app.get("/api/v1/auth/status")
@@ -719,11 +790,11 @@ async def get_auth_status(request: Request):
     user = _get_current_user(request)
     if user:
         role = user.get("role", "donor")
-        dashboard_url = ROLE_DASHBOARDS.get(role, "/donor/dashboard")
+        dashboard_url = ROLE_DASHBOARDS.get(role, "/seeker/dashboard" if role == "seeker" else "/donor/dashboard")
         return {
             "is_authenticated": True,
             "role": role,
-            "name": user.get("name", "Donor"),
+            "name": user.get("name", "User"),
             "dashboard_url": dashboard_url,
         }
     return {"is_authenticated": False}
@@ -834,6 +905,136 @@ async def serve_registration(request: Request, role: str = "donor"):
         context={"request": request, "current_year": datetime.now(timezone.utc).year, "selected_role": selected_role},
     )
 
+
+class UserRegisterRequest(BaseModel):
+    role: str = "seeker"
+    name: str = ""
+    phone: str
+    password: str
+    nid: str | None = ""
+    blood_group: str | None = "A+"
+    address: str | None = ""
+    org_name: str | None = ""
+    govt_reg: str | None = ""
+    manager_number: str | None = ""
+
+
+def _register_user_record(
+    phone_raw: str,
+    password: str,
+    role: str = "seeker",
+    name: str = "",
+    blood_group: str = "A+",
+    nid: str = "",
+    address: str = "",
+) -> tuple[dict, str, str]:
+    try:
+        phone = normalize_phone(phone_raw.strip())
+    except Exception:
+        phone = phone_raw.strip()
+
+    clean_role = role.lower().strip() if role else "seeker"
+    if clean_role not in {"seeker", "donor", "hospital", "bank", "admin"}:
+        clean_role = "seeker"
+
+    user_name = name.strip() or ("Blood Seeker" if clean_role == "seeker" else "Blood Donor")
+    USERS[phone] = {
+        "password": password,
+        "role": clean_role,
+        "name": user_name,
+        "blood_group": blood_group or "A+",
+    }
+
+    # Save to auth.db
+    initialize_auth_database()
+    pw_hash = hash_password(password)
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        with connection:
+            existing = connection.execute(
+                "SELECT id FROM auth_users WHERE phone = ?", (phone,)
+            ).fetchone()
+            if existing:
+                connection.execute(
+                    "UPDATE auth_users SET password_hash = ?, role = ?, name = ?, blood_group = ?, updated_at = ? WHERE id = ?",
+                    (pw_hash, clean_role, user_name, blood_group or "A+", now, existing["id"]),
+                )
+            else:
+                connection.execute(
+                    "INSERT INTO auth_users (phone, password_hash, role, name, blood_group, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (phone, pw_hash, clean_role, user_name, blood_group or "A+", now, now),
+                )
+
+    if clean_role == "seeker":
+        if phone not in SEEKER_SETTINGS:
+            SEEKER_SETTINGS[phone] = {
+                "full_name": user_name,
+                "phone": phone,
+                "default_hospital": "Square Hospital, Dhaka",
+                "sms_alerts": True,
+                "push_alerts": True,
+                "audio_siren": True,
+                "default_radius": "10",
+            }
+    elif clean_role == "donor":
+        _default_donor_profile(phone)
+
+    token = _generate_jwt(phone, clean_role)
+    destination = "/login?registered=1"
+    return USERS[phone], destination, token
+
+
+@app.post("/api/v1/auth/register")
+async def api_register(payload: UserRegisterRequest, response: Response):
+    user, destination, _ = _register_user_record(
+        phone_raw=payload.phone,
+        password=payload.password,
+        role=payload.role,
+        name=payload.name or payload.org_name or "",
+        blood_group=payload.blood_group or "A+",
+        nid=payload.nid or "",
+        address=payload.address or "",
+    )
+    # Ensure existing session/token cookies are cleared so user is not automatically logged in
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    return {
+        "status": "success",
+        "message": f"Successfully registered as {user['role'].title()}! Please sign in to continue.",
+        "role": user["role"],
+        "redirect_url": "/login?registered=1",
+    }
+
+
+@app.post("/auth/register")
+async def form_register(
+    request: Request,
+    phone: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("seeker"),
+    name: str = Form(""),
+    blood_group: str = Form("A+"),
+    nid: str = Form(""),
+    address: str = Form(""),
+    org_name: str = Form(""),
+    govt_reg: str = Form(""),
+    manager_number: str = Form(""),
+):
+    actual_name = name or org_name or ("Blood Seeker" if role == "seeker" else "Blood Donor")
+    user, destination, _ = _register_user_record(
+        phone_raw=phone,
+        password=password,
+        role=role,
+        name=actual_name,
+        blood_group=blood_group,
+        nid=nid,
+        address=address,
+    )
+    resp = RedirectResponse(url="/login?registered=1", status_code=303)
+    resp.delete_cookie(key="access_token", path="/")
+    resp.delete_cookie(key=SESSION_COOKIE, path="/")
+    return resp
+
 @app.get("/api/v1/requests/urgent")
 def get_urgent_requests(request: Request):
     now = datetime.now(timezone.utc)
@@ -896,11 +1097,16 @@ async def find_blood(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, admin_console: bool = False, next: str = ""):
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    if token and token.get("role") and not request.query_params.get("force"):
-        destination = _safe_local_path(next) or ROLE_DASHBOARDS.get(token.get("role"), "/donor/dashboard")
-        return RedirectResponse(url=destination, status_code=303)
-    return await _render_login_page(request, admin_console=admin_console, next_url=_safe_local_path(next) or "")
+    if not request.query_params.get("registered") and not request.query_params.get("force"):
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        if token and token.get("role"):
+            destination = _safe_local_path(next) or ROLE_DASHBOARDS.get(token.get("role"), "/donor/dashboard")
+            return RedirectResponse(url=destination, status_code=303)
+    resp = await _render_login_page(request, admin_console=admin_console, next_url=_safe_local_path(next) or "")
+    if request.query_params.get("registered"):
+        resp.delete_cookie(key="access_token", path="/")
+        resp.delete_cookie(key=SESSION_COOKIE, path="/")
+    return resp
 
 
 @app.post("/login", response_class=HTMLResponse)
@@ -920,7 +1126,7 @@ async def login_submit(
     except Exception:
         normalized_phone = raw_phone
 
-    user = USERS.get(normalized_phone) or USERS.get(raw_phone)
+    user = _get_user_by_phone(normalized_phone) or _get_user_by_phone(raw_phone)
     clean_otp = otp.strip()
 
     if not user:
@@ -935,7 +1141,13 @@ async def login_submit(
 
     # Any random 4+ digit OTP is accepted for SMS OTP verification gateway
     is_valid_otp = bool(clean_otp and len(clean_otp) >= 4)
-    valid_password = (bool(password) and password == user["password"]) or is_valid_otp
+    valid_password = False
+    if password:
+        if user.get("password") and password == user["password"]:
+            valid_password = True
+        elif user.get("password_hash") and verify_password(password, user["password_hash"]):
+            valid_password = True
+    valid_password = valid_password or is_valid_otp
     if not valid_password:
         return await _render_login_page(
             request, error="Invalid credentials", admin_console=is_admin_console,
@@ -970,11 +1182,13 @@ async def api_otp_login(payload: OtpLoginRequest, response: Response):
     except Exception:
         normalized_phone = raw_phone
 
-    user = USERS.get(normalized_phone, {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"})
-    USERS[normalized_phone] = user
+    user = _get_user_by_phone(normalized_phone) or _get_user_by_phone(raw_phone)
+    if not user:
+        user = {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"}
+        USERS[normalized_phone] = user
 
     token = _generate_jwt(normalized_phone, user["role"])
-    destination = ROLE_DASHBOARDS.get(user["role"], "/donor/dashboard")
+    destination = ROLE_DASHBOARDS.get(user["role"], "/seeker/dashboard" if user["role"] == "seeker" else "/donor/dashboard")
     response.set_cookie(
         key="access_token",
         value=token,
@@ -1198,18 +1412,23 @@ async def get_donor_donation_history(request: Request):
 @app.get("/donor/dashboard", response_class=HTMLResponse)
 async def donor_dashboard(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
+    if token and token.get("role") == "seeker":
+        return RedirectResponse(url="/seeker/dashboard", status_code=303)
+
     phone = token.get("sub") if token and token.get("role") == "donor" else None
     user = USERS.get(phone) if phone else None
+    should_set_cookie = False
 
     if not user:
         if request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1":
             phone = "+8801712345678"
             user = USERS.get(phone, {"name": "Ayesha Rahman", "role": "donor", "phone": phone})
+            should_set_cookie = True
         else:
             return RedirectResponse(url="/login?next=/donor/dashboard", status_code=303)
 
     profile = _get_donor_profile(phone)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name="donor_dashboard.html",
         context={
@@ -1219,15 +1438,59 @@ async def donor_dashboard(request: Request):
             "title": "Donor Personal Dashboard - Smart Blood Donor System",
         },
     )
+    if should_set_cookie or not request.cookies.get("access_token"):
+        jwt_token = _generate_jwt(phone, "donor")
+        response.set_cookie(
+            key="access_token",
+            value=jwt_token,
+            httponly=True,
+            samesite="lax",
+            max_age=TOKEN_TTL_SECONDS,
+            expires=int(time.time()) + TOKEN_TTL_SECONDS,
+            path="/",
+        )
+    return response
 
 
 @app.get("/seeker/dashboard", response_class=HTMLResponse)
 async def seeker_dashboard(request: Request):
-    return templates.TemplateResponse(
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if token and token.get("role") == "donor":
+        return RedirectResponse(url="/donor/dashboard", status_code=303)
+
+    phone = token.get("sub") if token and token.get("role") == "seeker" else None
+    user = USERS.get(phone) if phone else None
+    should_set_cookie = False
+
+    if not user:
+        if request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1":
+            phone = "+8801723456789"
+            user = USERS.get(phone, {"name": "Nabil Hasan", "role": "seeker", "phone": phone})
+            should_set_cookie = True
+        else:
+            return RedirectResponse(url="/login?next=/seeker/dashboard", status_code=303)
+
+    response = templates.TemplateResponse(
         request=request,
-        name="dashboard.html",
-        context={"request": request, "role": "Seeker", "title": "Seeker Dashboard"},
+        name="seeker_dashboard.html",
+        context={
+            "request": request,
+            "user": user,
+            "title": "Blood Seeker Portal - Smart Blood Donor System",
+        },
     )
+    if should_set_cookie or not request.cookies.get("access_token"):
+        jwt_token = _generate_jwt(phone, "seeker")
+        response.set_cookie(
+            key="access_token",
+            value=jwt_token,
+            httponly=True,
+            samesite="lax",
+            max_age=TOKEN_TTL_SECONDS,
+            expires=int(time.time()) + TOKEN_TTL_SECONDS,
+            path="/",
+        )
+    return response
 
 
 @app.get("/hospital/dashboard", response_class=HTMLResponse)
@@ -1251,7 +1514,7 @@ async def admin_dashboard(request: Request):
 @app.get("/logout")
 async def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("access_token")
+    response.delete_cookie("access_token", path="/")
     response.delete_cookie(SESSION_COOKIE, path="/")
     return response
 
@@ -1407,6 +1670,33 @@ async def update_donor_settings(payload: DonorSettingsPreferences, request: Requ
 # SBDS-89: Donor In-App Chat List Data Models & API Endpoints
 # ======================================================================
 
+class ChatConnectionManager:
+    def __init__(self):
+        self.active_connections: dict[str, list[WebSocket]] = {
+            "donor": [],
+            "seeker": [],
+        }
+
+    async def connect(self, role: str, websocket: WebSocket):
+        await websocket.accept()
+        if role not in self.active_connections:
+            self.active_connections[role] = []
+        self.active_connections[role].append(websocket)
+
+    def disconnect(self, role: str, websocket: WebSocket):
+        if role in self.active_connections and websocket in self.active_connections[role]:
+            self.active_connections[role].remove(websocket)
+
+    async def broadcast(self, role: str, message: dict):
+        if role in self.active_connections:
+            for connection in list(self.active_connections[role]):
+                try:
+                    await connection.send_json(message)
+                except Exception:
+                    self.disconnect(role, connection)
+
+chat_manager = ChatConnectionManager()
+
 DONOR_CHAT_THREADS = [
     {
         "id": "thread-square",
@@ -1454,16 +1744,16 @@ DONOR_CHAT_THREADS = [
         "avatar_bg": "rgba(16, 185, 129, 0.15)",
         "avatar_color": "#10B981",
         "status": "● Matched Recipient Guardian",
-        "is_online": False,
+        "is_online": True,
         "phone": "+8801723456789",
         "request_id": "REQ-004",
         "blood_group": "A+",
-        "urgency": "Resolved",
-        "patient_name": "Begum Rokeya (Discharged)",
-        "last_message": "Thank you sister Ayesha! Patient is stable now.",
-        "last_time": "2d ago",
-        "unread_count": 1,
-        "is_emergency": False,
+        "urgency": "Immediate",
+        "patient_name": "Emergency Recipient at Square",
+        "last_message": "Leaving Dhanmondi now. Reaching Square Hospital in 20 mins.",
+        "last_time": "10:14 AM",
+        "unread_count": 0,
+        "is_emergency": True,
     },
     {
         "id": "thread-support",
@@ -1499,9 +1789,10 @@ DONOR_CHAT_MESSAGES = {
         {"id": "msg-7", "sender": "coordinator", "text": "You completed your 56-day gap and are officially eligible right now!", "time": "Yesterday 4:00 PM", "status": "read"},
     ],
     "thread-nabil": [
-        {"id": "msg-8", "sender": "coordinator", "text": "Assalamu Alaikum Ayesha apu, I am Nabil. You donated blood for my mother last month.", "time": "2 days ago", "status": "read"},
-        {"id": "msg-9", "sender": "coordinator", "text": "I just wanted to let you know she was discharged today and is healthy. We cannot thank you enough for saving her life.", "time": "2 days ago", "status": "read"},
-        {"id": "msg-10", "sender": "you", "text": "Alhamdulillah, so relieved to hear this news! Praying for her continued strength and health.", "time": "2 days ago", "status": "read"},
+        {"id": "msg-sync-1", "sender": "coordinator", "text": "Assalamu Alaikum Ayesha apu, we urgently need 1 bag A+ blood at Square Hospital 3rd Floor.", "time": "10:05 AM", "status": "read"},
+        {"id": "msg-sync-2", "sender": "you", "text": "Wa Alaikum Assalam Nabil bhai! I just saw the alert. I am eligible and nearby.", "time": "10:08 AM", "status": "read"},
+        {"id": "msg-sync-3", "sender": "coordinator", "text": "Alhamdulillah! Can you please reach as soon as possible? Requisition is ready.", "time": "10:10 AM", "status": "read"},
+        {"id": "msg-sync-4", "sender": "you", "text": "Leaving Dhanmondi now. Reaching Square Hospital in 20 mins.", "time": "10:14 AM", "status": "read"},
     ],
     "thread-support": [
         {"id": "msg-11", "sender": "coordinator", "text": "Welcome to the Smart Blood Donor System Donor Support channel.", "time": "18 Jan", "status": "read"},
@@ -1514,6 +1805,68 @@ DONOR_CHAT_MESSAGES = {
 class SendChatMessagePayload(BaseModel):
     text: str
     sender: str = "you"
+
+
+@app.websocket("/ws/chat/{role}")
+async def websocket_chat_endpoint(websocket: WebSocket, role: str):
+    normalized_role = role.strip().lower()
+    await chat_manager.connect(normalized_role, websocket)
+    try:
+        await websocket.send_json({
+            "type": "connection_established",
+            "role": normalized_role,
+            "status": "connected",
+        })
+        # Broadcast presence
+        other_role = "seeker" if normalized_role == "donor" else "donor"
+        await chat_manager.broadcast(other_role, {
+            "type": "presence",
+            "role": normalized_role,
+            "status": "online",
+        })
+        while True:
+            text_data = await websocket.receive_text()
+            try:
+                data = json.loads(text_data)
+                action = data.get("action")
+                if action == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif action == "send_message":
+                    thread_id = data.get("thread_id", "")
+                    text = data.get("text", "")
+                    if normalized_role == "donor":
+                        await send_donor_chat_message(thread_id, SendChatMessagePayload(text=text, sender="you"))
+                    elif normalized_role == "seeker":
+                        await send_seeker_chat_message(thread_id, SendChatMessagePayload(text=text, sender="you"))
+                elif action == "typing":
+                    thread_id = data.get("thread_id", "")
+                    is_typing = bool(data.get("typing", True))
+                    target_thread = "thread-ayesha" if normalized_role == "donor" else "thread-nabil"
+                    sender_name = "Ayesha Rahman" if normalized_role == "donor" else "Nabil Hasan"
+                    await chat_manager.broadcast(other_role, {
+                        "type": "typing",
+                        "thread_id": target_thread,
+                        "typing": is_typing,
+                        "sender_name": sender_name,
+                    })
+                elif action == "read":
+                    thread_id = data.get("thread_id", "")
+                    if normalized_role == "donor":
+                        await mark_donor_chat_read(thread_id)
+                    elif normalized_role == "seeker":
+                        await mark_seeker_chat_read(thread_id)
+            except Exception:
+                pass
+    except WebSocketDisconnect:
+        chat_manager.disconnect(normalized_role, websocket)
+        other_role = "seeker" if normalized_role == "donor" else "donor"
+        await chat_manager.broadcast(other_role, {
+            "type": "presence",
+            "role": normalized_role,
+            "status": "offline",
+        })
+    except Exception:
+        chat_manager.disconnect(normalized_role, websocket)
 
 
 @app.get("/api/v1/donor/chat/threads")
@@ -1551,8 +1904,9 @@ async def send_donor_chat_message(thread_id: str, payload: SendChatMessagePayloa
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     now_str = datetime.now(timezone.utc).strftime("%I:%M %p")
+    msg_id = f"msg-{secrets.token_hex(4)}"
     new_msg = {
-        "id": f"msg-{secrets.token_hex(4)}",
+        "id": msg_id,
         "sender": payload.sender,
         "text": text,
         "time": now_str,
@@ -1569,25 +1923,73 @@ async def send_donor_chat_message(thread_id: str, payload: SendChatMessagePayloa
             thread["last_time"] = "Just now"
             break
 
-    # Automated coordinator reply based on context
-    replies_map = {
-        "thread-square": "Coordinator Dr. Farhan (Square Hospital): \"Received your update! Attendants are waiting at Transfusion Desk, 2nd floor.\"",
-        "thread-dmc": "Desk Officer (DMCH): \"Thank you Ayesha! Your record has been flagged for prioritized scheduling.\"",
-        "thread-nabil": "Nabil (Seeker): \"Thank you so much Ayesha apu, truly indebted to donors like you!\"",
-        "thread-support": "SBDS Support: \"Your message has been logged. A support coordinator will assist you shortly if needed.\"",
-    }
-    auto_reply_text = replies_map.get(
-        thread_id,
-        "Coordinator: \"Message received! Our on-duty blood bank supervisor has been notified.\"",
-    )
-    reply_msg = {
-        "id": f"msg-{secrets.token_hex(4)}",
-        "sender": "coordinator",
-        "text": auto_reply_text,
+    # Real-time bridge: If donor messages Seeker Nabil (thread-nabil), deliver to Seeker (thread-ayesha)
+    if thread_id == "thread-nabil":
+        if "thread-ayesha" not in SEEKER_CHAT_MESSAGES:
+            SEEKER_CHAT_MESSAGES["thread-ayesha"] = []
+        seeker_incoming_msg = {
+            "id": msg_id,
+            "sender": "donor",
+            "text": text,
+            "time": now_str,
+            "status": "delivered",
+        }
+        SEEKER_CHAT_MESSAGES["thread-ayesha"].append(seeker_incoming_msg)
+
+        for st in SEEKER_CHAT_THREADS:
+            if st["id"] == "thread-ayesha":
+                st["last_message"] = text
+                st["last_time"] = "Just now"
+                st["unread_count"] = st.get("unread_count", 0) + 1
+                break
+
+        # Broadcast live to connected seekers
+        await chat_manager.broadcast("seeker", {
+            "type": "chat_message",
+            "thread_id": "thread-ayesha",
+            "sender": "donor",
+            "sender_name": "Ayesha Rahman (A+ Donor)",
+            "text": text,
+            "time": now_str,
+            "message": seeker_incoming_msg,
+        })
+
+        reply_msg = {
+            "id": f"msg-{secrets.token_hex(4)}",
+            "sender": "coordinator",
+            "text": "Delivered to Nabil Hasan (Seeker)",
+            "time": now_str,
+            "status": "delivered",
+        }
+    else:
+        # Automated coordinator reply based on context for simulated hospital/desk threads
+        replies_map = {
+            "thread-square": "Coordinator Dr. Farhan (Square Hospital): \"Received your update! Attendants are waiting at Transfusion Desk, 2nd floor.\"",
+            "thread-dmc": "Desk Officer (DMCH): \"Thank you Ayesha! Your record has been flagged for prioritized scheduling.\"",
+            "thread-support": "SBDS Support: \"Your message has been logged. A support coordinator will assist you shortly if needed.\"",
+        }
+        auto_reply_text = replies_map.get(
+            thread_id,
+            "Coordinator: \"Message received! Our on-duty blood bank supervisor has been notified.\"",
+        )
+        reply_msg = {
+            "id": f"msg-{secrets.token_hex(4)}",
+            "sender": "coordinator",
+            "text": auto_reply_text,
+            "time": now_str,
+            "status": "delivered",
+        }
+        DONOR_CHAT_MESSAGES[thread_id].append(reply_msg)
+
+    # Sync other connected donor tabs/clients
+    await chat_manager.broadcast("donor", {
+        "type": "message_sent",
+        "thread_id": thread_id,
+        "sender": "you",
+        "text": text,
         "time": now_str,
-        "status": "delivered",
-    }
-    DONOR_CHAT_MESSAGES[thread_id].append(reply_msg)
+        "message": new_msg,
+    })
 
     return {
         "status": "success",
@@ -1609,3 +2011,560 @@ async def mark_donor_chat_read(thread_id: str):
         "unread_count": 0,
         "total_unread": total_unread,
     }
+
+
+# =============================================================================
+# BLOOD SEEKER PORTAL APIS & DATA
+# =============================================================================
+
+class SeekerBloodRequestCreate(BaseModel):
+    patient_name: str
+    blood_group: str
+    hospital_name: str
+    area: str = "Dhaka"
+    district: str = "Dhaka"
+    units: int = 1
+    contact_phone: str
+    reason: str = ""
+    is_emergency: bool = False
+
+
+class SeekerEmergencyBroadcastCreate(BaseModel):
+    patient_name: str
+    blood_group: str
+    hospital_name: str
+    area: str = "Dhaka"
+    urgency_level: str = "Code Red (Within 1 Hour)"
+    contact_phone: str
+
+
+class SeekerContactLogPayload(BaseModel):
+    donor_name: str
+    donor_phone: str
+    blood_group: str
+    contact_type: str
+    notes: str = ""
+
+
+class SeekerSettingsPayload(BaseModel):
+    full_name: str
+    phone: str
+    default_hospital: str = "Square Hospital"
+    sms_alerts: bool = True
+    push_alerts: bool = True
+    audio_siren: bool = True
+    default_radius: str = "10"
+
+
+SEEKER_CONTACT_LOGS = [
+    {
+        "donor_name": "Ayesha Rahman",
+        "donor_phone": "+880 1712-345678",
+        "blood_group": "A+",
+        "contact_type": "call",
+        "notes": "Donor answered • Confirmed arriving in 35 mins",
+        "created_at": "20 mins ago",
+    },
+    {
+        "donor_name": "Tanvir Ahmed",
+        "donor_phone": "+880 1711-223344",
+        "blood_group": "O+",
+        "contact_type": "whatsapp",
+        "notes": "Message delivered • Awaiting acknowledgment",
+        "created_at": "1 hour ago",
+    },
+]
+
+SEEKER_SETTINGS = {
+    "+8801723456789": {
+        "full_name": "Nabil Hasan",
+        "phone": "+8801723456789",
+        "default_hospital": "Square Hospital, Dhaka",
+        "sms_alerts": True,
+        "push_alerts": True,
+        "audio_siren": True,
+        "default_radius": "10",
+    }
+}
+
+SEEKER_MOCK_DONORS = [
+    {
+        "id": "dn-001",
+        "name": "Ayesha Rahman",
+        "blood_group": "A+",
+        "phone": "+8801712345678",
+        "formatted_phone": "+880 1712-345678",
+        "district": "Dhaka",
+        "area": "Dhanmondi",
+        "lat": 23.7461,
+        "lng": 90.3742,
+        "distance_km": 1.2,
+        "is_available": True,
+        "badge_tier": "Gold Life Saver",
+        "total_donations": 8,
+        "rating": 4.9,
+        "reviews_count": 18,
+        "last_donation": "110 days ago",
+        "response_time": "6 mins",
+        "bio": "Voluntary blood donor for 4 years. Close to Square & Bangladesh Medical. Ready for emergencies.",
+        "nid_verified": True,
+        "hemoglobin": "14.2 g/dL",
+        "weight_bp": "58 kg | BP 118/78 mmHg",
+        "screening": "Hepatitis B/C, HIV, Syphilis Tested Negative (Sept 2026)",
+        "reliability": "100% (No no-shows)",
+        "reviews": [
+            {"author": "Nabil Hasan", "text": "Ayesha apu responded within 10 minutes when my mother needed blood at Square Hospital. Lifesaver!", "rating": 5, "date": "1 month ago"},
+            {"author": "Dr. Farhan (Square)", "text": "Punctual, cooperative donor with clean screening reports.", "rating": 5, "date": "3 months ago"},
+        ],
+    },
+    {
+        "id": "dn-002",
+        "name": "Tanvir Ahmed",
+        "blood_group": "O+",
+        "phone": "+8801711223344",
+        "formatted_phone": "+880 1711-223344",
+        "district": "Dhaka",
+        "area": "Panthapath",
+        "lat": 23.7518,
+        "lng": 90.3879,
+        "distance_km": 0.8,
+        "is_available": True,
+        "badge_tier": "Platinum Donor",
+        "total_donations": 12,
+        "rating": 5.0,
+        "reviews_count": 26,
+        "last_donation": "95 days ago",
+        "response_time": "4 mins",
+        "bio": "Registered universal donor. Works near Panthapath. Available anytime for critical trauma/surgery.",
+        "nid_verified": True,
+        "hemoglobin": "15.1 g/dL",
+        "weight_bp": "72 kg | BP 120/80 mmHg",
+        "screening": "All blood tests cleared (Oct 2026)",
+        "reliability": "100%",
+        "reviews": [
+            {"author": "Kamrul Islam", "text": "Tanvir brother arrived within 25 minutes of calling him for my brother's ICU emergency.", "rating": 5, "date": "2 weeks ago"},
+        ],
+    },
+    {
+        "id": "dn-003",
+        "name": "Sadia Islam",
+        "blood_group": "B+",
+        "phone": "+8801722334455",
+        "formatted_phone": "+880 1722-334455",
+        "district": "Dhaka",
+        "area": "Shahbagh",
+        "lat": 23.7380,
+        "lng": 90.3956,
+        "distance_km": 2.1,
+        "is_available": True,
+        "badge_tier": "Silver Donor",
+        "total_donations": 5,
+        "rating": 4.8,
+        "reviews_count": 12,
+        "last_donation": "130 days ago",
+        "response_time": "8 mins",
+        "bio": "DU student, situated 5 mins away from DMCH and BSMMU (PG Hospital).",
+        "nid_verified": True,
+        "hemoglobin": "13.8 g/dL",
+        "weight_bp": "54 kg | BP 115/75 mmHg",
+        "screening": "Cleared & verified at DMCH Transfusion",
+        "reliability": "98%",
+        "reviews": [
+            {"author": "Rehana Begum", "text": "Very polite student, came straight from campus to donate for child surgery.", "rating": 5, "date": "2 months ago"},
+        ],
+    },
+    {
+        "id": "dn-004",
+        "name": "Rafiqul Islam",
+        "blood_group": "O-",
+        "phone": "+8801733445566",
+        "formatted_phone": "+880 1733-445566",
+        "district": "Dhaka",
+        "area": "Farmgate",
+        "lat": 23.7561,
+        "lng": 90.3872,
+        "distance_km": 1.5,
+        "is_available": True,
+        "badge_tier": "Rare Hero Tier",
+        "total_donations": 15,
+        "rating": 5.0,
+        "reviews_count": 32,
+        "last_donation": "105 days ago",
+        "response_time": "5 mins",
+        "bio": "Rare O- donor. Dedicated to critical neonatal and emergency transfusions across Dhaka.",
+        "nid_verified": True,
+        "hemoglobin": "14.9 g/dL",
+        "weight_bp": "68 kg | BP 118/76 mmHg",
+        "screening": "Certified Rare Donor Certificate by Red Crescent",
+        "reliability": "100%",
+        "reviews": [
+            {"author": "Dr. Shamim", "text": "Saved a preterm baby with emergency O negative blood in NICU.", "rating": 5, "date": "1 month ago"},
+        ],
+    },
+]
+
+SEEKER_CHAT_THREADS = [
+    {
+        "id": "thread-ayesha",
+        "name": "Ayesha Rahman",
+        "donor_id": "dn-001",
+        "blood_group": "A+",
+        "phone": "+880 1712-345678",
+        "last_message": "Leaving Dhanmondi now. Reaching Square Hospital in 20 mins.",
+        "last_time": "10:14 AM",
+        "unread_count": 1,
+    },
+    {
+        "id": "thread-tanvir",
+        "name": "Tanvir Ahmed",
+        "donor_id": "dn-002",
+        "blood_group": "O+",
+        "phone": "+880 1711-223344",
+        "last_message": "Please keep the blood test requisition slip ready at counter.",
+        "last_time": "9:45 AM",
+        "unread_count": 0,
+    },
+    {
+        "id": "thread-desk",
+        "name": "Square Blood Desk Coordinator",
+        "donor_id": "coord-01",
+        "blood_group": "Hospital",
+        "phone": "+880 1700-000001",
+        "last_message": "Donor verification room 204 is open for your recipient.",
+        "last_time": "Yesterday",
+        "unread_count": 0,
+    },
+]
+
+SEEKER_CHAT_MESSAGES = {
+    "thread-ayesha": [
+        {"id": "msg-sync-1", "sender": "you", "text": "Assalamu Alaikum Ayesha apu, we urgently need 1 bag A+ blood at Square Hospital 3rd Floor.", "time": "10:05 AM"},
+        {"id": "msg-sync-2", "sender": "donor", "text": "Wa Alaikum Assalam Nabil bhai! I just saw the alert. I am eligible and nearby.", "time": "10:08 AM"},
+        {"id": "msg-sync-3", "sender": "you", "text": "Alhamdulillah! Can you please reach as soon as possible? Requisition is ready.", "time": "10:10 AM"},
+        {"id": "msg-sync-4", "sender": "donor", "text": "Leaving Dhanmondi now. Reaching Square Hospital in 20 mins.", "time": "10:14 AM"},
+    ],
+    "thread-tanvir": [
+        {"id": "msg-s5", "sender": "you", "text": "Hello Tanvir brother, are you available for O+ donation today?", "time": "9:30 AM"},
+        {"id": "msg-s6", "sender": "donor", "text": "Yes Nabil brother, I am free after 11 AM.", "time": "9:35 AM"},
+        {"id": "msg-s7", "sender": "donor", "text": "Please keep the blood test requisition slip ready at counter.", "time": "9:45 AM"},
+    ],
+    "thread-desk": [
+        {"id": "msg-s8", "sender": "donor", "text": "Donor verification room 204 is open for your recipient.", "time": "Yesterday"},
+    ],
+}
+
+
+@app.get("/api/v1/seeker/requests")
+async def get_seeker_requests():
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        rows = connection.execute(
+            """SELECT id, blood_group, hospital_name, district, area, distance_km,
+                      expires_at, contact_phone, is_emergency
+               FROM blood_requests ORDER BY id DESC LIMIT 20"""
+        ).fetchall()
+        requests_list = [
+            {
+                "id": r[0],
+                "blood_group": r[1],
+                "hospital_name": r[2],
+                "district": r[3],
+                "area": r[4],
+                "distance_km": r[5],
+                "expires_at": r[6],
+                "contact_phone": r[7],
+                "is_emergency": bool(r[8]),
+            }
+            for r in rows
+        ]
+    return {"status": "success", "count": len(requests_list), "requests": requests_list}
+
+
+@app.post("/api/v1/seeker/requests")
+async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
+    group = payload.blood_group.strip().upper()
+    if group not in VALID_BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Invalid blood group")
+
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(hours=24)).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            cursor = connection.execute(
+                """INSERT INTO blood_requests (
+                       blood_group, hospital_name, district, area, distance_km,
+                       expires_at, contact_phone, is_emergency
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    group,
+                    payload.hospital_name.strip(),
+                    payload.district.strip() or "Dhaka",
+                    payload.area.strip() or "Dhaka",
+                    2.0,
+                    expires_at,
+                    payload.contact_phone.strip(),
+                    1 if payload.is_emergency else 0,
+                ),
+            )
+            new_id = cursor.lastrowid
+
+    return {
+        "status": "success",
+        "message": "Blood request created successfully",
+        "request": {
+            "id": new_id,
+            "patient_name": payload.patient_name,
+            "blood_group": group,
+            "hospital_name": payload.hospital_name,
+            "area": payload.area,
+            "units": payload.units,
+            "is_emergency": payload.is_emergency,
+            "expires_at": expires_at,
+        },
+    }
+
+
+@app.post("/api/v1/seeker/requests/emergency")
+async def create_seeker_emergency_broadcast(payload: SeekerEmergencyBroadcastCreate):
+    group = payload.blood_group.strip().upper()
+    if group not in VALID_BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Invalid blood group")
+
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(hours=3)).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            cursor = connection.execute(
+                """INSERT INTO blood_requests (
+                       blood_group, hospital_name, district, area, distance_km,
+                       expires_at, contact_phone, is_emergency
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    group,
+                    payload.hospital_name.strip(),
+                    "Dhaka",
+                    payload.area.strip() or "Dhaka",
+                    1.5,
+                    expires_at,
+                    payload.contact_phone.strip(),
+                    1,
+                ),
+            )
+            new_id = cursor.lastrowid
+
+    return {
+        "status": "success",
+        "message": "Emergency SOS broadcast alert dispatched to nearby donors",
+        "broadcast_count": 18,
+        "request": {
+            "id": new_id,
+            "patient_name": payload.patient_name,
+            "blood_group": group,
+            "hospital_name": payload.hospital_name,
+            "urgency_level": payload.urgency_level,
+            "is_emergency": True,
+            "expires_at": expires_at,
+        },
+    }
+
+
+@app.get("/api/v1/seeker/donors")
+async def get_seeker_donors(
+    blood_group: str | None = None,
+    radius_km: float = 30.0,
+    available_only: bool = False,
+    query: str | None = None,
+):
+    donors = list(SEEKER_MOCK_DONORS)
+    if blood_group:
+        bg = blood_group.strip().replace(" ", "+").upper()
+        donors = [d for d in donors if d["blood_group"] == bg]
+    if available_only:
+        donors = [d for d in donors if d["is_available"]]
+    if query:
+        q = query.strip().lower()
+        donors = [d for d in donors if q in d["name"].lower() or q in d["area"].lower() or q in d["district"].lower()]
+
+    donors = [d for d in donors if d["distance_km"] <= radius_km]
+    return {"status": "success", "count": len(donors), "donors": donors}
+
+
+@app.get("/api/v1/seeker/donors/{donor_id}")
+async def get_seeker_donor_detail(donor_id: str):
+    donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
+    if not donor:
+        donor = SEEKER_MOCK_DONORS[0]
+    return {"status": "success", "donor": donor}
+
+
+@app.post("/api/v1/seeker/contact/log")
+async def log_seeker_contact(payload: SeekerContactLogPayload):
+    log_entry = {
+        "donor_name": payload.donor_name,
+        "donor_phone": payload.donor_phone,
+        "blood_group": payload.blood_group,
+        "contact_type": payload.contact_type,
+        "notes": payload.notes or "Contact action dispatched via Seeker Portal",
+        "created_at": "Just now",
+    }
+    SEEKER_CONTACT_LOGS.insert(0, log_entry)
+    return {"status": "success", "log": log_entry}
+
+
+@app.get("/api/v1/seeker/contact/logs")
+async def get_seeker_contact_logs():
+    return {"status": "success", "count": len(SEEKER_CONTACT_LOGS), "logs": SEEKER_CONTACT_LOGS}
+
+
+@app.get("/api/v1/seeker/chat/threads")
+async def get_seeker_chat_threads():
+    return {
+        "status": "success",
+        "threads": SEEKER_CHAT_THREADS,
+        "total_unread": sum(t["unread_count"] for t in SEEKER_CHAT_THREADS),
+    }
+
+
+@app.get("/api/v1/seeker/chat/{thread_id}/messages")
+async def get_seeker_chat_messages(thread_id: str):
+    messages = SEEKER_CHAT_MESSAGES.get(thread_id, [])
+    thread_meta = next((t for t in SEEKER_CHAT_THREADS if t["id"] == thread_id), None)
+    return {
+        "status": "success",
+        "thread_id": thread_id,
+        "thread": thread_meta,
+        "messages": messages,
+    }
+
+
+@app.post("/api/v1/seeker/chat/{thread_id}/send")
+async def send_seeker_chat_message(thread_id: str, payload: SendChatMessagePayload):
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    now_str = datetime.now(timezone.utc).strftime("%I:%M %p")
+    msg_id = f"msg-s-{secrets.token_hex(4)}"
+    new_msg = {
+        "id": msg_id,
+        "sender": "you",
+        "text": text,
+        "time": now_str,
+        "status": "sent",
+    }
+    if thread_id not in SEEKER_CHAT_MESSAGES:
+        SEEKER_CHAT_MESSAGES[thread_id] = []
+    SEEKER_CHAT_MESSAGES[thread_id].append(new_msg)
+
+    # Update seeker thread last message
+    for t in SEEKER_CHAT_THREADS:
+        if t["id"] == thread_id:
+            t["last_message"] = text
+            t["last_time"] = "Just now"
+            break
+
+    # Real-time bridge: If seeker messages Donor Ayesha (thread-ayesha / thread-dn-001), deliver to Donor (thread-nabil)
+    if thread_id in ("thread-ayesha", "thread-dn-001"):
+        if "thread-nabil" not in DONOR_CHAT_MESSAGES:
+            DONOR_CHAT_MESSAGES["thread-nabil"] = []
+        donor_incoming_msg = {
+            "id": msg_id,
+            "sender": "coordinator",
+            "text": text,
+            "time": now_str,
+            "status": "delivered",
+        }
+        DONOR_CHAT_MESSAGES["thread-nabil"].append(donor_incoming_msg)
+
+        for dt in DONOR_CHAT_THREADS:
+            if dt["id"] == "thread-nabil":
+                dt["last_message"] = text
+                dt["last_time"] = "Just now"
+                dt["unread_count"] = dt.get("unread_count", 0) + 1
+                break
+
+        # Broadcast live to connected donors over WebSocket
+        await chat_manager.broadcast("donor", {
+            "type": "chat_message",
+            "thread_id": "thread-nabil",
+            "sender": "coordinator",
+            "sender_name": "Nabil Hasan (Emergency Seeker)",
+            "text": text,
+            "time": now_str,
+            "message": donor_incoming_msg,
+        })
+
+        reply_msg = {
+            "id": f"msg-s-{secrets.token_hex(4)}",
+            "sender": "donor",
+            "text": "Message delivered to Ayesha Rahman",
+            "time": now_str,
+            "status": "delivered",
+        }
+    else:
+        auto_replies = {
+            "thread-tanvir": "Tanvir: \"Understood, preparing donor registration card. See you shortly!\"",
+            "thread-desk": "Square Blood Desk: \"Attendant notified. Please head to Transfusion Counter Room 204.\"",
+        }
+        reply_text = auto_replies.get(
+            thread_id,
+            "Donor: \"Message received! Heading to the hospital now.\"",
+        )
+        reply_msg = {
+            "id": f"msg-s-{secrets.token_hex(4)}",
+            "sender": "donor",
+            "text": reply_text,
+            "time": now_str,
+            "status": "delivered",
+        }
+        SEEKER_CHAT_MESSAGES[thread_id].append(reply_msg)
+
+    # Sync other connected seeker tabs/clients
+    await chat_manager.broadcast("seeker", {
+        "type": "message_sent",
+        "thread_id": thread_id,
+        "sender": "you",
+        "text": text,
+        "time": now_str,
+        "message": new_msg,
+    })
+
+    return {"status": "success", "sent": new_msg, "reply": reply_msg}
+
+
+@app.post("/api/v1/seeker/chat/{thread_id}/read")
+async def mark_seeker_chat_read(thread_id: str):
+    for thread in SEEKER_CHAT_THREADS:
+        if thread["id"] == thread_id:
+            thread["unread_count"] = 0
+            break
+    total_unread = sum(t.get("unread_count", 0) for t in SEEKER_CHAT_THREADS)
+    return {
+        "status": "success",
+        "thread_id": thread_id,
+        "unread_count": 0,
+        "total_unread": total_unread,
+    }
+
+
+@app.get("/api/v1/seeker/settings")
+async def get_seeker_settings(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "seeker" else "+8801723456789"
+    settings = SEEKER_SETTINGS.get(phone, {
+        "full_name": "Nabil Hasan",
+        "phone": phone,
+        "default_hospital": "Square Hospital, Dhaka",
+        "sms_alerts": True,
+        "push_alerts": True,
+        "audio_siren": True,
+        "default_radius": "10",
+    })
+    return {"status": "success", "settings": settings}
+
+
+@app.post("/api/v1/seeker/settings")
+async def save_seeker_settings(payload: SeekerSettingsPayload, request: Request):
+    phone = payload.phone.strip()
+    SEEKER_SETTINGS[phone] = payload.model_dump()
+    return {"status": "success", "message": "Settings saved successfully", "settings": SEEKER_SETTINGS[phone]}
+

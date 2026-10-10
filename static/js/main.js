@@ -43,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       if (data && data.is_authenticated) {
-        const dashUrl = data.dashboard_url || "/donor/dashboard";
+        const dashUrl = data.dashboard_url || (data.role === "seeker" ? "/seeker/dashboard" : "/donor/dashboard");
         const isCurrentDashboard = window.location.pathname.includes("/dashboard");
         document.querySelectorAll(".nav-auth-actions").forEach((el) => {
           const existingBtn = el.querySelector(".theme-toggle-btn");
@@ -1177,37 +1177,78 @@ document.addEventListener("DOMContentLoaded", () => {
     
     // Form submission logic
     document.querySelectorAll(".multi-role-form").forEach(form => {
-      form.addEventListener("submit", (e) => {
+      form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        // Require real-time location before successful registration
-        if (navigator.geolocation) {
-          const submitBtn = form.querySelector('button[type="submit"]');
-          const originalBtnText = submitBtn.innerHTML;
-          submitBtn.innerHTML = "Getting Location...";
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn ? submitBtn.innerHTML : "Register";
+        if (submitBtn) {
+          submitBtn.innerHTML = "Creating Account...";
           submitBtn.disabled = true;
+        }
 
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              // Hide forms on success
-              formIndividual.style.display = "none";
-              formOrganization.style.display = "none";
-              document.querySelector(".role-switcher").style.display = "none";
-              
-              // Show success message
-              const successMsg = document.getElementById("registration-success-msg");
-              if (successMsg) {
-                successMsg.style.display = "block";
-              }
-            },
-            (error) => {
-              alert("Real-time location is required to register. Please allow location access in your browser.");
-              submitBtn.innerHTML = originalBtnText;
-              submitBtn.disabled = false;
-            }
-          );
-        } else {
-          alert("Geolocation is not supported by this browser.");
+        const formData = new FormData(form);
+        const role = roleSelect ? roleSelect.value : (formData.get("role") || "seeker");
+        const payload = {
+          role: role,
+          name: formData.get("name") || formData.get("org_name") || "",
+          phone: formData.get("phone") || "",
+          password: formData.get("password") || "",
+          nid: formData.get("nid") || "",
+          blood_group: formData.get("blood_group") || "A+",
+          address: formData.get("address") || "",
+          org_name: formData.get("org_name") || "",
+          govt_reg: formData.get("govt_reg") || "",
+          manager_number: formData.get("manager_number") || "",
+        };
+
+        try {
+          const res = await fetch("/api/v1/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.detail || "Registration failed. Please check your information.");
+          }
+
+          const data = await res.json();
+          const targetUrl = data.redirect_url || "/login?registered=1";
+
+          // Hide forms on success
+          formIndividual.style.display = "none";
+          formOrganization.style.display = "none";
+          const roleSwitcher = document.querySelector(".role-switcher");
+          if (roleSwitcher) roleSwitcher.style.display = "none";
+
+          // Show success message with direct link to login
+          const successMsg = document.getElementById("registration-success-msg");
+          if (successMsg) {
+            successMsg.innerHTML = `
+              🎉 Registration successful! Your account has been created.
+              <p style="margin-top: 8px; font-size: 0.95rem; color: var(--text-secondary, #666);">Please log in to your account with your phone number and password.</p>
+              <div style="margin-top: 14px;">
+                <a href="${targetUrl}" class="btn btn-primary" style="display: inline-block; padding: 10px 22px; font-weight: 700;">
+                  Go to Login &rarr;
+                </a>
+              </div>
+            `;
+            successMsg.style.display = "block";
+          }
+
+          // Auto-redirect to login after 1.5s
+          setTimeout(() => {
+            window.location.href = targetUrl;
+          }, 1500);
+
+        } catch (err) {
+          alert(err.message || "Registration failed. Please try again.");
+          if (submitBtn) {
+            submitBtn.innerHTML = originalBtnText;
+            submitBtn.disabled = false;
+          }
         }
       });
     });
@@ -1216,43 +1257,55 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ================= THEME TOGGLE (Dark/Light Mode) =================
 (function() {
-  const currentTheme = localStorage.getItem('theme') || 'light';
+  const currentTheme = localStorage.getItem('theme') || localStorage.getItem('sbds-theme') || 'light';
   document.documentElement.setAttribute('data-theme', currentTheme);
 
   function getSunIcon() {
-    return `<svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>`;
+    return `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>`;
   }
 
   function getMoonIcon() {
-    return `<svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7c.18 0 .35.02.51.05-.2.53-.31 1.1-.31 1.69 0 2.87 2.33 5.2 5.2 5.2.59 0 1.16-.11 1.69-.31.03.16.05.33.05.51 0 3.86-3.14 7-7 7z"/></svg>`;
+    return `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-3.03 0-5.5-2.47-5.5-5.5 0-1.82.89-3.42 2.26-4.4C12.92 3.04 12.46 3 12 3zm0 16c-3.86 0-7-3.14-7-7s3.14-7 7-7c.18 0 .35.02.51.05-.2.53-.31 1.1-.31 1.69 0 2.87 2.33 5.2 5.2 5.2.59 0 1.16-.11 1.69-.31.03.16.05.33.05.51 0 3.86-3.14 7-7 7z"/></svg>`;
+  }
+
+  function toggleThemeGlobal() {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const nextTheme = (current === 'dark') ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('theme', nextTheme);
+    localStorage.setItem('sbds-theme', nextTheme);
+    syncAllThemeButtons(nextTheme);
+  }
+
+  function syncAllThemeButtons(theme) {
+    document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+      btn.innerHTML = (theme === 'dark') ? getSunIcon() : getMoonIcon();
+      btn.setAttribute('title', theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+      btn.setAttribute('aria-label', theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+      if (!btn._themeListenerAttached) {
+        // If the button already has an inline onclick, DO NOT attach a duplicate listener!
+        if (!btn.getAttribute('onclick')) {
+          btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleThemeGlobal();
+          });
+        }
+        btn._themeListenerAttached = true;
+      }
+    });
   }
 
   function setupThemeToggle() {
-    const activeTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || 'light';
-    let btn = document.querySelector('.theme-toggle-btn');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.className = 'theme-toggle-btn';
-      btn.setAttribute('aria-label', 'Toggle Dark Mode');
-    }
+    const activeTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('theme') || localStorage.getItem('sbds-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', activeTheme);
 
-    btn.innerHTML = (activeTheme === 'dark') ? getSunIcon() : getMoonIcon();
-
-    if (!btn._themeListenerAttached) {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-        const newTheme = isDark ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        btn.innerHTML = (newTheme === 'dark') ? getSunIcon() : getMoonIcon();
-      });
-      btn._themeListenerAttached = true;
-    }
-
-    // Attach to navbar if not already attached
+    // If navbar does not have a theme toggle button, create one
     const navActions = document.querySelector('.nav-auth-actions') || document.querySelector('.nav-container');
-    if (navActions && !navActions.contains(btn)) {
+    if (navActions && !navActions.querySelector('.theme-toggle-btn')) {
+      const btn = document.createElement('button');
+      btn.className = 'theme-toggle-btn';
+      btn.setAttribute('type', 'button');
+      btn.setAttribute('aria-label', activeTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
       if (navActions.classList.contains('nav-auth-actions')) {
         navActions.style.display = 'flex';
         navActions.style.alignItems = 'center';
@@ -1261,8 +1314,23 @@ document.addEventListener("DOMContentLoaded", () => {
         navActions.appendChild(btn);
       }
     }
+
+    // Also support mobile menu drawer if present
+    const mobileActions = document.querySelector('.mobile-auth-actions');
+    if (mobileActions && !mobileActions.querySelector('.theme-toggle-btn')) {
+      const mBtn = document.createElement('button');
+      mBtn.className = 'theme-toggle-btn';
+      mBtn.setAttribute('type', 'button');
+      mBtn.setAttribute('aria-label', activeTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode');
+      mBtn.style.marginBottom = '12px';
+      mobileActions.insertBefore(mBtn, mobileActions.firstChild);
+    }
+
+    syncAllThemeButtons(activeTheme);
   }
 
+  window.toggleTheme = toggleThemeGlobal;
+  window.syncAllThemeButtons = syncAllThemeButtons;
   window.setupThemeToggle = setupThemeToggle;
 
   if (document.readyState === 'loading') {

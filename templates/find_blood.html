@@ -33,7 +33,7 @@
 
             <div class="nav-auth-actions">
         {% if user or logged_in_user %}
-          <a href="/donor/dashboard" class="btn btn-outline">Dashboard</a>
+          <a href="{{ '/seeker/dashboard' if ((user and user.role == 'seeker') or (logged_in_user and logged_in_user.role == 'seeker')) else '/donor/dashboard' }}" class="btn btn-outline">Dashboard</a>
           <a href="/logout" class="btn btn-primary">Logout</a>
         {% else %}
           <a href="/login" class="btn btn-outline">Login</a>
@@ -58,7 +58,7 @@
 
             <div class="mobile-auth-actions">
         {% if user or logged_in_user %}
-          <a href="/donor/dashboard" class="btn btn-outline btn-full">Dashboard</a>
+          <a href="{{ '/seeker/dashboard' if ((user and user.role == 'seeker') or (logged_in_user and logged_in_user.role == 'seeker')) else '/donor/dashboard' }}" class="btn btn-outline btn-full">Dashboard</a>
           <a href="/logout" class="btn btn-primary btn-full">Logout</a>
         {% else %}
           <a href="/login" class="btn btn-outline btn-full">Login</a>
