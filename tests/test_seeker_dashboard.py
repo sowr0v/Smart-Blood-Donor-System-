@@ -261,3 +261,52 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertEqual(login_resp.status_code, 303)
         self.assertEqual(login_resp.headers.get("location"), "/seeker/dashboard")
         self.assertNotEqual(login_resp.headers.get("location"), "/donor/dashboard")
+
+    def test_seeker_settings_has_delete_account_danger_zone_and_modal(self):
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.get("/seeker/dashboard", cookies={"access_token": token})
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+
+        # Verify Danger Zone card exists in settings
+        self.assertIn("Danger Zone: Delete Seeker Account", html)
+        self.assertIn('id="dangerZoneSection"', html)
+        self.assertIn('id="btnOpenDeleteAccountModal"', html)
+        self.assertIn("Delete Account", html)
+
+        # Verify Confirmation Modal elements
+        self.assertIn('id="deleteAccountModal"', html)
+        self.assertIn('id="deleteConfirmationInput"', html)
+        self.assertIn('id="confirmDeleteAccountBtn"', html)
+        self.assertIn('id="cancelDeleteAccountBtn"', html)
+
+    def test_delete_seeker_account_api_flow(self):
+        unique_phone = "+8801755554444"
+        # Register new seeker
+        reg_resp = self.client.post(
+            "/api/v1/auth/register",
+            json={
+                "name": "Delete Test Seeker",
+                "phone": unique_phone,
+                "password": "delpass1234",
+                "role": "seeker",
+            },
+        )
+        self.assertEqual(reg_resp.status_code, 200)
+
+        # Generate seeker JWT token
+        token = _generate_jwt(unique_phone, "seeker")
+
+        # Call delete endpoint
+        del_resp = self.client.delete("/api/v1/seeker/account", cookies={"access_token": token})
+        self.assertEqual(del_resp.status_code, 200)
+        data = del_resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("deleted", data["message"].lower())
+        self.assertEqual(data["redirect_url"], "/login?account_deleted=1")
+
+        # Verify redirected login page displays success banner
+        login_view = self.client.get("/login?account_deleted=1")
+        self.assertEqual(login_view.status_code, 200)
+        self.assertIn("Your seeker account has been permanently deleted.", login_view.text)
+

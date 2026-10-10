@@ -282,8 +282,14 @@ def _decode_jwt(token: str) -> dict | None:
         sub = payload.get("sub")
         if not sub or payload.get("exp", 0) <= int(time.time()):
             return None
+        role = payload.get("role", "donor")
         if sub not in USERS:
-            USERS[sub] = {"password": "", "role": payload.get("role", "donor"), "name": "Ayesha Rahman"}
+            db_user = _get_user_by_phone(sub) if "_get_user_by_phone" in globals() else None
+            if db_user:
+                USERS[sub] = db_user
+            else:
+                default_name = "Nabil Hasan" if role == "seeker" else "Ayesha Rahman"
+                USERS[sub] = {"password": "", "role": role, "name": default_name, "phone": sub}
         return payload
     except (ValueError, TypeError, json.JSONDecodeError):
         return None
@@ -309,6 +315,8 @@ async def _render_login_page(
 ):
     if not success_message and request.query_params.get("registered"):
         success_message = "Registration successful! Please log in with your phone number and password."
+    if not success_message and request.query_params.get("account_deleted"):
+        success_message = "Your seeker account has been permanently deleted."
     return templates.TemplateResponse(
         request=request,
         name="login.html",
@@ -1097,13 +1105,13 @@ async def find_blood(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, admin_console: bool = False, next: str = ""):
-    if not request.query_params.get("registered") and not request.query_params.get("force"):
+    if not request.query_params.get("registered") and not request.query_params.get("force") and not request.query_params.get("account_deleted"):
         token = _decode_jwt(request.cookies.get("access_token", ""))
         if token and token.get("role"):
             destination = _safe_local_path(next) or ROLE_DASHBOARDS.get(token.get("role"), "/donor/dashboard")
             return RedirectResponse(url=destination, status_code=303)
     resp = await _render_login_page(request, admin_console=admin_console, next_url=_safe_local_path(next) or "")
-    if request.query_params.get("registered"):
+    if request.query_params.get("registered") or request.query_params.get("account_deleted"):
         resp.delete_cookie(key="access_token", path="/")
         resp.delete_cookie(key=SESSION_COOKIE, path="/")
     return resp
@@ -1459,16 +1467,21 @@ async def seeker_dashboard(request: Request):
         return RedirectResponse(url="/donor/dashboard", status_code=303)
 
     phone = token.get("sub") if token and token.get("role") == "seeker" else None
-    user = USERS.get(phone) if phone else None
+    user = _get_user_by_phone(phone) if phone else None
+    if not user and phone:
+        user = USERS.get(phone)
     should_set_cookie = False
 
     if not user:
         if request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1":
             phone = "+8801723456789"
-            user = USERS.get(phone, {"name": "Nabil Hasan", "role": "seeker", "phone": phone})
+            user = _get_user_by_phone(phone) or USERS.get(phone, {"name": "Nabil Hasan", "role": "seeker", "phone": phone})
             should_set_cookie = True
         else:
             return RedirectResponse(url="/login?next=/seeker/dashboard", status_code=303)
+
+    if user and phone and phone in SEEKER_SETTINGS and SEEKER_SETTINGS[phone].get("full_name"):
+        user = {**user, "name": SEEKER_SETTINGS[phone]["full_name"]}
 
     response = templates.TemplateResponse(
         request=request,
@@ -2550,8 +2563,10 @@ async def mark_seeker_chat_read(thread_id: str):
 async def get_seeker_settings(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
     phone = token.get("sub") if token and token.get("role") == "seeker" else "+8801723456789"
+    user = _get_user_by_phone(phone) or USERS.get(phone)
+    default_name = (user.get("name") if user else None) or "Nabil Hasan"
     settings = SEEKER_SETTINGS.get(phone, {
-        "full_name": "Nabil Hasan",
+        "full_name": default_name,
         "phone": phone,
         "default_hospital": "Square Hospital, Dhaka",
         "sms_alerts": True,
@@ -2565,6 +2580,88 @@ async def get_seeker_settings(request: Request):
 @app.post("/api/v1/seeker/settings")
 async def save_seeker_settings(payload: SeekerSettingsPayload, request: Request):
     phone = payload.phone.strip()
+    full_name = payload.full_name.strip()
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    token_phone = token.get("sub") if token and token.get("role") == "seeker" else phone
+
     SEEKER_SETTINGS[phone] = payload.model_dump()
+    if token_phone and token_phone != phone:
+        SEEKER_SETTINGS[token_phone] = payload.model_dump()
+
+    # Update in-memory USERS cache
+    for p in (phone, token_phone):
+        if p in USERS:
+            USERS[p]["name"] = full_name
+        else:
+            USERS[p] = {"name": full_name, "role": "seeker", "phone": p}
+
+    # Persist updated name to auth.db
+    try:
+        with closing(_connection()) as connection:
+            with connection:
+                connection.execute("UPDATE auth_users SET name = ? WHERE phone = ?", (full_name, phone))
+                if token_phone and token_phone != phone:
+                    connection.execute("UPDATE auth_users SET name = ? WHERE phone = ?", (full_name, token_phone))
+    except Exception as exc:
+        logger.warning(f"Could not persist seeker name to auth_users: {exc}")
+
     return {"status": "success", "message": "Settings saved successfully", "settings": SEEKER_SETTINGS[phone]}
+
+
+@app.delete("/api/v1/seeker/account")
+async def delete_seeker_account(request: Request, response: Response):
+    user = _get_current_user(request)
+    phone = user.get("phone") if user and user.get("role") == "seeker" else None
+
+    if not phone:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        phone = token.get("sub") if token and token.get("role") == "seeker" else None
+
+    if not phone and (request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1"):
+        phone = "+8801723456789"
+
+    if not phone:
+        phone = request.query_params.get("phone", "+8801723456789")
+
+    # 1. Remove from database auth_users and sessions
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+            if user_row:
+                user_id = user_row["id"]
+                connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+                connection.execute("DELETE FROM password_reset_challenges WHERE user_id = ?", (user_id,))
+                connection.execute("DELETE FROM auth_users WHERE id = ?", (user_id,))
+
+    # 2. Clean blood_requests and notifications for this seeker phone
+    try:
+        initialize_urgent_database()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            with u_conn:
+                req_rows = u_conn.execute("SELECT id FROM blood_requests WHERE contact_phone = ?", (phone,)).fetchall()
+                for r in req_rows:
+                    req_id = r[0]
+                    u_conn.execute("DELETE FROM donor_request_responses WHERE request_id = ?", (req_id,))
+                    u_conn.execute("DELETE FROM seeker_notifications WHERE request_id = ?", (req_id,))
+                u_conn.execute("DELETE FROM blood_requests WHERE contact_phone = ?", (phone,))
+    except Exception as exc:
+        logger.warning(f"Error cleaning seeker blood requests on delete: {exc}")
+
+    # 3. Clean in-memory user caches
+    if phone in USERS:
+        del USERS[phone]
+    if phone in SEEKER_SETTINGS:
+        del SEEKER_SETTINGS[phone]
+
+    # 4. Clear authentication cookies
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+
+    return {
+        "status": "success",
+        "message": "Seeker account has been permanently deleted.",
+        "redirect_url": "/login?account_deleted=1",
+    }
+
 

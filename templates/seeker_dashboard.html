@@ -69,14 +69,14 @@
       <!-- Seeker Profile Quick Widget -->
       <div class="seeker-profile-card-mini">
         <div class="seeker-avatar-wrap">
-          <div class="seeker-avatar-circle">
+          <div class="seeker-avatar-circle" id="seekerSidebarAvatar">
             {{ user.name[0] if user and user.name else "N" }}
           </div>
           <span class="seeker-role-badge">Seeker</span>
         </div>
         <div class="seeker-meta-info">
           <div class="seeker-name-text">
-            <span>{{ user.name if user and user.name else "Nabil Hasan" }}</span>
+            <span id="seekerSidebarName">{{ user.name if user and user.name else "Nabil Hasan" }}</span>
             <svg class="verified-icon" width="16" height="16" viewBox="0 0 20 20" fill="#0284C7">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
             </svg>
@@ -209,7 +209,7 @@
         <!-- Welcome Banner -->
         <div class="seeker-banner-header">
           <div class="banner-welcome-text">
-            <h1>Welcome back, {{ user.name if user and user.name else "Nabil" }}! 👋</h1>
+            <h1 id="seekerBannerGreeting">Welcome back, {{ user.name if user and user.name else "Nabil" }}! 👋</h1>
             <p>Your blood seeker control hub is ready. Active donor broadcasts are monitored 24/7 across Dhaka.</p>
           </div>
           <div class="banner-controls-group">
@@ -361,7 +361,122 @@
       <section class="dashboard-content-section" id="section-seeker-chat"></section>
 
       <!-- ================= 9. SEEKER PORTAL SETTINGS & PREFERENCES ================= -->
-      <section class="dashboard-content-section" id="section-seeker-settings"></section>
+      <section class="dashboard-content-section" id="section-seeker-settings">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;">⚙️</span>
+              <div>
+                <h2>Seeker Portal Settings &amp; Preferences</h2>
+                <div class="card-subtitle">Manage seeker profile details, emergency notifications, and discovery radius</div>
+              </div>
+            </div>
+          </div>
+
+          <form id="seekerSettingsForm">
+            <!-- Account & Profile -->
+            <div class="settings-section-card">
+              <h3 style="font-size: 1.05rem; color: var(--text-primary); margin-bottom: 14px;">👤 Seeker Profile Information</h3>
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="setSeekerName">Full Name</label>
+                  <input type="text" id="setSeekerName" value="{{ user.name if user and user.name else 'Nabil Hasan' }}" required>
+                </div>
+                <div class="form-field-group">
+                  <label for="setSeekerPhone">Primary Phone Number</label>
+                  <input type="tel" id="setSeekerPhone" value="{{ user.phone if user and user.phone else '+8801723456789' }}" required>
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-field-group">
+                  <label for="setDefaultHospital">Default Hospital / Clinic</label>
+                  <input type="text" id="setDefaultHospital" value="Square Hospital, Dhaka">
+                </div>
+                <div class="form-field-group">
+                  <label for="setDefaultRadius">Default Donor Search Radius</label>
+                  <select id="setDefaultRadius">
+                    <option value="5">Within 5 km</option>
+                    <option value="10" selected>Within 10 km</option>
+                    <option value="20">Within 20 km</option>
+                    <option value="30">All Metro Dhaka (30 km)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notification & Alert Settings -->
+            <div class="settings-section-card">
+              <h3 style="font-size: 1.05rem; color: var(--text-primary); margin-bottom: 14px;">🔔 Emergency Broadcast &amp; Alert Preferences</h3>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>SMS Alert Dispatch</h4>
+                  <p>Send automated SMS alerts to matching donors whenever you post an emergency blood request.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="toggleSmsAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>In-App Push Notifications</h4>
+                  <p>Receive immediate alerts on screen when a donor accepts or responds to your blood request.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="togglePushAlerts" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Emergency Audio Siren</h4>
+                  <p>Play acoustic notification chime when an emergency request receives donor arrival confirmation.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="toggleAudioSiren" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Dark Mode Theme</h4>
+                  <p>Switch between modern dark aesthetic and high-contrast light theme.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" id="seekerThemeToggle">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="padding: 12px 28px; font-weight: 700; font-size: 0.95rem;">
+              Save Settings &amp; Preferences
+            </button>
+          </form>
+
+          <!-- Danger Zone: Account Deletion -->
+          <div class="settings-danger-card" id="dangerZoneSection">
+            <div class="danger-zone-header">
+              <div class="danger-zone-title-wrap">
+                <span class="danger-icon">⚠️</span>
+                <div>
+                  <h3 class="danger-zone-title">Danger Zone: Delete Seeker Account</h3>
+                  <p class="danger-zone-desc">
+                    Permanently delete your seeker account, active emergency blood requests, donor chat histories, and profile records. This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <button type="button" class="btn-delete-account" id="btnOpenDeleteAccountModal" aria-haspopup="dialog">
+                <span class="trash-icon">🗑️</span> Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -369,6 +484,50 @@
   <div class="dashboard-toast" id="dashboardToast" role="status" aria-live="polite">
     <span>ℹ️</span>
     <span id="toastText">Action completed successfully.</span>
+  </div>
+
+  <!-- Delete Account Confirmation Modal -->
+  <div id="deleteAccountModal" class="dashboard-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px); z-index: 10000; align-items: center; justify-content: center; padding: 20px;" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <div class="delete-modal-content" style="background: var(--bg-card); border-radius: 18px; max-width: 490px; width: 100%; padding: 28px; border: 2px solid #E11D48; box-shadow: 0 16px 48px rgba(0,0,0,0.35); text-align: left; position: relative;">
+      <button type="button" id="closeDeleteModalX" aria-label="Close modal" style="position: absolute; top: 16px; right: 16px; background: transparent; border: none; font-size: 1.25rem; color: var(--text-secondary); cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+
+      <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 16px;">
+        <div class="delete-icon-bubble">
+          🗑️
+        </div>
+        <div>
+          <h3 id="deleteModalTitle" style="font-size: 1.25rem; font-weight: 800; color: #BE123C; margin: 0;">Delete Seeker Account?</h3>
+          <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px;">Permanent &amp; Irreversible Action</div>
+        </div>
+      </div>
+
+      <div class="delete-warning-box">
+        <strong style="display: block; margin-bottom: 4px;">⚠️ Warning:</strong>
+        Deleting your account will immediately and permanently erase:
+        <ul style="margin: 6px 0 0 18px; padding: 0;">
+          <li>Your seeker profile &amp; saved preferences</li>
+          <li>All active and past emergency blood broadcast requests</li>
+          <li>All 1-on-1 donor chat transcripts and notifications</li>
+          <li>Active login sessions on all devices</li>
+        </ul>
+      </div>
+
+      <div style="margin-bottom: 22px;">
+        <label for="deleteConfirmationInput" style="display: block; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+          To confirm, please type <strong style="color: #BE123C; letter-spacing: 1px;">DELETE</strong> below:
+        </label>
+        <input type="text" id="deleteConfirmationInput" placeholder="DELETE" autocomplete="off" style="width: 100%; padding: 11px 14px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-page); color: var(--text-primary); font-size: 0.95rem; font-weight: 600; box-sizing: border-box;">
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 12px;">
+        <button type="button" class="btn btn-outline" id="cancelDeleteAccountBtn" style="padding: 10px 18px; font-weight: 600; cursor: pointer; border-radius: 8px;">
+          Cancel
+        </button>
+        <button type="button" id="confirmDeleteAccountBtn" class="btn" disabled style="padding: 10px 22px; font-weight: 700; background: #DC2626; color: #ffffff; border: none; border-radius: 8px; cursor: not-allowed; opacity: 0.5; transition: all 0.2s ease;">
+          Permanently Delete
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- SOS Broadcast Confirmation Modal -->
