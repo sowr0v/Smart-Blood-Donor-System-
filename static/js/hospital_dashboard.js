@@ -283,6 +283,330 @@ document.addEventListener("DOMContentLoaded", () => {
   // Poll network feed every 15 seconds
   setInterval(loadRegionalEmergencyFeed, 15000);
 
+  // ================= 5. FACILITY PROFILE & PORTAL SETTINGS CONTROLLER =================
+  const facilitySettingsForm = document.getElementById("facilitySettingsForm");
+  const btnResetSettings = document.getElementById("btnResetFacilitySettings");
+  const btnExportAccreditation = document.getElementById("btnExportAccreditation");
+  const btnDetectGps = document.getElementById("btnDetectGps");
+
+  // Live preview elements
+  const elPrevName = document.getElementById("previewFacilityName");
+  const elPrevType = document.getElementById("previewFacilityType");
+  const elPrevLicense = document.getElementById("previewLicenseNo");
+  const elPrevDirector = document.getElementById("previewDirector");
+  const elPrevHotline = document.getElementById("previewHotline");
+  const elPrevAddress = document.getElementById("previewAddress");
+  const elPrevColdTemp = document.getElementById("previewColdTemp");
+  const elPrevChairs = document.getElementById("previewChairsCount");
+  const elPrevChips = document.getElementById("previewComponentChips");
+  const elPrevAvatar = document.getElementById("previewAvatar");
+
+  // Form inputs
+  const inputName = document.getElementById("facilityName");
+  const inputType = document.getElementById("facilityType");
+  const inputLicense = document.getElementById("facilityLicense");
+  const inputDirector = document.getElementById("facilityDirectorName");
+  const inputHotline = document.getElementById("facilityHotline");
+  const inputAddress = document.getElementById("facilityAddress");
+  const inputColdTemp = document.getElementById("facilityColdTemp");
+  const inputChairs = document.getElementById("facilityChairs");
+  const inputGps = document.getElementById("facilityGps");
+  const inputPhone = document.getElementById("facilityPhone");
+
+  function syncLivePreview() {
+    if (elPrevName && inputName) elPrevName.textContent = inputName.value || "Facility Name";
+    if (elPrevType && inputType) elPrevType.textContent = inputType.value || "Hospital";
+    if (elPrevLicense && inputLicense) elPrevLicense.textContent = inputLicense.value || "Pending License";
+    if (elPrevDirector && inputDirector) elPrevDirector.textContent = inputDirector.value || "Duty Desk";
+    if (elPrevHotline && inputHotline) elPrevHotline.textContent = inputHotline.value || "N/A";
+    if (elPrevAddress && inputAddress) elPrevAddress.textContent = inputAddress.value || "Address";
+    if (elPrevColdTemp && inputColdTemp) elPrevColdTemp.textContent = inputColdTemp.value ? `${inputColdTemp.value} (Optimal)` : "3.8°C (Optimal)";
+    if (elPrevChairs && inputChairs) elPrevChairs.textContent = `${inputChairs.value || 8} Chairs`;
+
+    if (elPrevAvatar && inputName) {
+      const words = (inputName.value || "").trim().split(/\s+/);
+      const initials = words.length > 1 ? (words[0][0] + words[1][0]).toUpperCase() : (inputName.value.substring(0, 2) || "HP").toUpperCase();
+      elPrevAvatar.textContent = initials;
+    }
+
+    if (elPrevChips) {
+      const checkedBoxes = document.querySelectorAll('#facilityComponentChips input[type="checkbox"]:checked');
+      elPrevChips.innerHTML = "";
+      checkedBoxes.forEach((cb) => {
+        const chip = document.createElement("span");
+        chip.className = "preview-comp-chip";
+        chip.textContent = cb.value;
+        elPrevChips.appendChild(chip);
+      });
+    }
+  }
+
+  // Bind live listeners
+  [inputName, inputType, inputLicense, inputDirector, inputHotline, inputAddress, inputColdTemp, inputChairs].forEach((el) => {
+    if (el) {
+      el.addEventListener("input", syncLivePreview);
+      el.addEventListener("change", syncLivePreview);
+    }
+  });
+
+  const compCheckboxes = document.querySelectorAll('#facilityComponentChips input[type="checkbox"]');
+  compCheckboxes.forEach((cb) => cb.addEventListener("change", syncLivePreview));
+
+  // Geolocation detection button
+  if (btnDetectGps) {
+    btnDetectGps.addEventListener("click", () => {
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude.toFixed(4);
+            const lng = pos.coords.longitude.toFixed(4);
+            if (inputGps) inputGps.value = `${lat}° N, ${lng}° E`;
+            showMasterToast(`GPS detected: ${lat}° N, ${lng}° E`, "📍");
+          },
+          () => {
+            if (inputGps) inputGps.value = "23.7257° N, 90.3980° E";
+            showMasterToast("GPS pinned to Shahbagh Metro Grid (23.7257° N, 90.3980° E)", "📍");
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        if (inputGps) inputGps.value = "23.7257° N, 90.3980° E";
+        showMasterToast("GPS pinned to Shahbagh Metro Grid", "📍");
+      }
+    });
+  }
+
+  // Form submit handler
+  if (facilitySettingsForm) {
+    facilitySettingsForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const btnSave = document.getElementById("btnSaveFacilitySettings");
+      if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.style.opacity = "0.7";
+      }
+
+      const components = Array.from(
+        document.querySelectorAll('#facilityComponentChips input[type="checkbox"]:checked')
+      ).map((cb) => cb.value);
+
+      const payload = {
+        phone: inputPhone?.value || "+8801734567890",
+        facility_name: inputName?.value || "General Hospital",
+        facility_type: inputType?.value || "Tertiary Care Teaching Hospital",
+        license_no: inputLicense?.value || "",
+        est_year: document.getElementById("facilityEstYear")?.value || "",
+        director_name: inputDirector?.value || "",
+        director_title: document.getElementById("facilityDirectorTitle")?.value || "",
+        hotline: inputHotline?.value || "",
+        email: document.getElementById("facilityEmail")?.value || "",
+        address: inputAddress?.value || "",
+        division: document.getElementById("facilityDivision")?.value || "Dhaka",
+        area: document.getElementById("facilityArea")?.value || "",
+        gps_coords: inputGps?.value || "",
+        landmark: document.getElementById("facilityLandmark")?.value || "",
+        phlebotomy_chairs: parseInt(inputChairs?.value || "8", 10),
+        components: components.length > 0 ? components : ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
+        apheresis_active: document.getElementById("toggleApheresis")?.checked ?? true,
+        cold_storage_temp: inputColdTemp?.value || "3.8°C",
+        ultra_freezer_active: document.getElementById("toggleUltraFreezer")?.checked ?? true,
+        nat_screening: document.getElementById("toggleNatScreening")?.checked ?? true,
+        continuous_shift: document.getElementById("toggleContinuousShift")?.checked ?? true,
+        low_stock_threshold: parseInt(document.getElementById("facilityStockThreshold")?.value || "5", 10),
+        auto_sos_dispatch: document.getElementById("toggleAutoSos")?.checked ?? true,
+        inter_facility_network: document.getElementById("toggleInterFacility")?.checked ?? true,
+        audio_siren: document.getElementById("toggleAudioSiren")?.checked ?? true,
+        sms_doctor_alerts: document.getElementById("toggleSmsAlerts")?.checked ?? true,
+        daily_inventory_audit: document.getElementById("toggleDailyAudit")?.checked ?? true,
+        two_factor_auth: document.getElementById("toggle2FA")?.checked ?? true,
+        maintenance_mode: document.getElementById("toggleMaintenance")?.checked ?? false,
+      };
+
+      try {
+        const resp = await fetch("/api/v1/hospital/settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (resp.ok) {
+          const resData = await resp.json();
+          showMasterToast("Facility Profile & Portal Settings saved successfully!", "💾");
+
+          const heroTitle = document.querySelector(".master-hero-title");
+          if (heroTitle && payload.facility_name) {
+            heroTitle.textContent = payload.facility_name;
+          }
+          const sidebarName = document.querySelector(".hospital-name-text");
+          if (sidebarName && payload.facility_name) {
+            sidebarName.textContent = payload.facility_name;
+          }
+
+          const syncEl = document.getElementById("settingsLastSynced");
+          if (syncEl) syncEl.textContent = new Date().toLocaleTimeString();
+
+          syncLivePreview();
+        } else {
+          showMasterToast("Error saving facility settings. Please try again.", "⚠️");
+        }
+      } catch (err) {
+        showMasterToast("Network error saving facility settings.", "❌");
+      } finally {
+        if (btnSave) {
+          btnSave.disabled = false;
+          btnSave.style.opacity = "";
+        }
+      }
+    });
+  }
+
+  // Reset to Baseline
+  if (btnResetSettings) {
+    btnResetSettings.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to reset facility profile and settings to the DGHS baseline?")) {
+        return;
+      }
+      try {
+        const resp = await fetch("/api/v1/hospital/settings/reset", {
+          method: "POST",
+          headers: { "Accept": "application/json" },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          const s = data.settings || {};
+          if (inputName && s.facility_name) inputName.value = s.facility_name;
+          if (inputType && s.facility_type) inputType.value = s.facility_type;
+          if (inputLicense && s.license_no) inputLicense.value = s.license_no;
+          if (inputDirector && s.director_name) inputDirector.value = s.director_name;
+          if (inputHotline && s.hotline) inputHotline.value = s.hotline;
+          if (inputAddress && s.address) inputAddress.value = s.address;
+          if (inputColdTemp && s.cold_storage_temp) inputColdTemp.value = s.cold_storage_temp;
+          if (inputChairs && s.phlebotomy_chairs) inputChairs.value = s.phlebotomy_chairs;
+          syncLivePreview();
+          showMasterToast("Settings reset to DGHS certified baseline.", "🔄");
+        }
+      } catch {
+        showMasterToast("Failed to reset settings.", "⚠️");
+      }
+    });
+  }
+
+  // Export Accreditation Summary
+  if (btnExportAccreditation) {
+    btnExportAccreditation.addEventListener("click", () => {
+      showMasterToast("Generating DGHS accreditation certificate summary...", "📋");
+      setTimeout(() => {
+        window.print();
+      }, 600);
+    });
+  }
+
+  // Delete Facility Account Modal Logic
+  const deleteFacilityModal = document.getElementById('deleteFacilityModal');
+  const btnOpenDeleteFacilityModal = document.getElementById('btnOpenDeleteFacilityModal');
+  const btnCloseDeleteFacilityModal = document.getElementById('btnCloseDeleteFacilityModal');
+  const btnCancelDeleteFacilityModal = document.getElementById('btnCancelDeleteFacilityModal');
+  const btnConfirmDeleteFacility = document.getElementById('btnConfirmDeleteFacility');
+  const deleteFacilityConfirmationInput = document.getElementById('deleteFacilityConfirmationInput');
+
+  function closeDeleteFacilityModal() {
+    if (deleteFacilityModal) {
+      deleteFacilityModal.style.display = 'none';
+      deleteFacilityModal.classList.remove('active');
+    }
+    if (deleteFacilityConfirmationInput) {
+      deleteFacilityConfirmationInput.value = '';
+    }
+    if (btnConfirmDeleteFacility) {
+      btnConfirmDeleteFacility.disabled = true;
+      btnConfirmDeleteFacility.style.opacity = '0.5';
+      btnConfirmDeleteFacility.style.cursor = 'not-allowed';
+    }
+  }
+
+  if (btnOpenDeleteFacilityModal) {
+    btnOpenDeleteFacilityModal.addEventListener('click', () => {
+      if (deleteFacilityModal) {
+        deleteFacilityModal.style.display = 'flex';
+        deleteFacilityModal.classList.add('active');
+        setTimeout(() => {
+          deleteFacilityConfirmationInput?.focus();
+        }, 50);
+      }
+    });
+  }
+
+  if (btnCloseDeleteFacilityModal) {
+    btnCloseDeleteFacilityModal.addEventListener('click', closeDeleteFacilityModal);
+  }
+
+  if (btnCancelDeleteFacilityModal) {
+    btnCancelDeleteFacilityModal.addEventListener('click', closeDeleteFacilityModal);
+  }
+
+  if (deleteFacilityModal) {
+    deleteFacilityModal.addEventListener('click', (e) => {
+      if (e.target === deleteFacilityModal) {
+        closeDeleteFacilityModal();
+      }
+    });
+  }
+
+  if (deleteFacilityConfirmationInput && btnConfirmDeleteFacility) {
+    deleteFacilityConfirmationInput.addEventListener('input', () => {
+      const val = deleteFacilityConfirmationInput.value.trim().toUpperCase();
+      if (val === 'DELETE') {
+        btnConfirmDeleteFacility.disabled = false;
+        btnConfirmDeleteFacility.style.opacity = '1';
+        btnConfirmDeleteFacility.style.cursor = 'pointer';
+      } else {
+        btnConfirmDeleteFacility.disabled = true;
+        btnConfirmDeleteFacility.style.opacity = '0.5';
+        btnConfirmDeleteFacility.style.cursor = 'not-allowed';
+      }
+    });
+
+    deleteFacilityConfirmationInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !btnConfirmDeleteFacility.disabled) {
+        btnConfirmDeleteFacility.click();
+      }
+    });
+  }
+
+  if (btnConfirmDeleteFacility) {
+    btnConfirmDeleteFacility.addEventListener('click', async () => {
+      if (btnConfirmDeleteFacility.disabled) return;
+      btnConfirmDeleteFacility.disabled = true;
+      btnConfirmDeleteFacility.textContent = 'Deleting Account...';
+
+      try {
+        const response = await fetch('/api/v1/hospital/account', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+        if (response.ok && data.status === 'success') {
+          closeDeleteFacilityModal();
+          showToast('Account deleted successfully. Redirecting to login...');
+          setTimeout(() => {
+            window.location.href = data.redirect_url || '/login?account_deleted=1&role=hospital';
+          }, 1000);
+        } else {
+          showToast(data.message || 'Failed to delete account. Please try again.', 'error');
+          btnConfirmDeleteFacility.disabled = false;
+          btnConfirmDeleteFacility.textContent = 'Permanently Delete Account';
+        }
+      } catch (err) {
+        console.error('Account deletion error:', err);
+        showToast('Error deleting account. Please try again.', 'error');
+        btnConfirmDeleteFacility.disabled = false;
+        btnConfirmDeleteFacility.textContent = 'Permanently Delete Account';
+      }
+    });
+  }
+
   // Handle initial tab from URL hash if provided
   const initialHash = window.location.hash ? window.location.hash.substring(1) : "";
   if (initialHash && document.getElementById(initialHash)) {

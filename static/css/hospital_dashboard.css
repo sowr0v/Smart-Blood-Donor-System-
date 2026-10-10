@@ -1648,3 +1648,555 @@
   }
 }
 
+/* ================= 6. PORTAL SETTINGS & FACILITY PROFILE STYLES ================= */
+.facility-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 28px;
+  align-items: start;
+  margin-top: 24px;
+}
+
+.facility-form-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.facility-settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+  margin-bottom: 24px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.facility-settings-card:hover {
+  border-color: rgba(13, 148, 136, 0.3);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  flex-shrink: 0;
+}
+
+.settings-card-icon.teal {
+  background: rgba(13, 148, 136, 0.12);
+  color: #0d9488;
+}
+
+.settings-card-icon.blue {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
+.settings-card-icon.amber {
+  background: rgba(217, 119, 6, 0.12);
+  color: #d97706;
+}
+
+.settings-card-icon.red {
+  background: rgba(225, 29, 72, 0.12);
+  color: #e11d48;
+}
+
+.settings-card-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 3px 0;
+}
+
+.settings-card-header p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* Form Fields */
+.input-with-action-btn {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-action-btn .form-control-input {
+  flex: 1;
+}
+
+.btn-input-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  background: rgba(13, 148, 136, 0.1);
+  border: 1px solid rgba(13, 148, 136, 0.3);
+  border-radius: 10px;
+  color: #0d9488;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-input-action:hover {
+  background: #0d9488;
+  color: #ffffff;
+}
+
+/* Component Chips */
+.component-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.component-chip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-page);
+  border: 1.5px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.component-chip-pill:hover {
+  border-color: #0d9488;
+}
+
+.component-chip-pill input[type="checkbox"] {
+  accent-color: #0d9488;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.component-chip-pill:has(input[type="checkbox"]:checked) {
+  background: rgba(13, 148, 136, 0.08);
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
+/* Toggle Switches */
+.settings-toggle-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-toggle-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.toggle-info-col h4 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.toggle-info-col p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hospital-switch-btn {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.hospital-switch-btn input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.hospital-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #cbd5e1;
+  transition: 0.25s;
+  border-radius: 34px;
+}
+
+.hospital-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.25s;
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.hospital-switch-btn input:checked + .hospital-switch-slider {
+  background-color: #0d9488;
+}
+
+.hospital-switch-btn input:checked + .hospital-switch-slider:before {
+  transform: translateX(22px);
+}
+
+/* Action Buttons Bar */
+.settings-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 0 32px;
+}
+
+.btn-save-settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #ffffff;
+  padding: 13px 28px;
+  border-radius: 12px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(13, 148, 136, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-save-settings:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(13, 148, 136, 0.45);
+}
+
+.btn-save-settings:active {
+  transform: translateY(0);
+}
+
+.btn-reset-settings {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-color);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-settings:hover {
+  border-color: #e11d48;
+  color: #e11d48;
+  background: rgba(225, 29, 72, 0.05);
+}
+
+.btn-export-settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(13, 148, 136, 0.08);
+  color: #0d9488;
+  border: 1px solid rgba(13, 148, 136, 0.25);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export-settings:hover {
+  background: rgba(13, 148, 136, 0.16);
+}
+
+/* Right Column Live Preview */
+.facility-preview-sticky {
+  position: sticky;
+  top: calc(var(--nav-height, 72px) + 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.facility-preview-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.preview-badge-ribbon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #0d9488;
+  background: rgba(13, 148, 136, 0.1);
+  padding: 4px 10px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+}
+
+.status-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  display: inline-block;
+}
+
+.preview-hero-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.preview-avatar-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #0d9488, #0f766e);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.25rem;
+  box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+  flex-shrink: 0;
+}
+
+.preview-avatar-circle.is-bank {
+  background: linear-gradient(135deg, #e11d48, #be123c);
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
+}
+
+.preview-title-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.preview-facility-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.preview-type-pill {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.preview-license-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(13, 148, 136, 0.06);
+  border: 1px dashed rgba(13, 148, 136, 0.3);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+  margin-bottom: 18px;
+}
+
+.preview-verified-tick {
+  margin-left: auto;
+  color: #10b981;
+  font-weight: 700;
+}
+
+.preview-meta-list {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 16px;
+}
+
+.preview-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preview-meta-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.preview-meta-val {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.preview-meta-val.green {
+  color: #0d9488;
+}
+
+.preview-components-box {
+  margin-bottom: 16px;
+}
+
+.preview-comp-title {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.preview-chips-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preview-comp-chip {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.preview-footer-telemetry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.facility-compliance-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 18px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.compliance-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.compliance-header h4 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.compliance-timestamp {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Dark Mode Overrides for Facility Settings */
+[data-theme="dark"] .facility-settings-card,
+[data-theme="dark"] .facility-preview-card,
+[data-theme="dark"] .facility-compliance-card {
+  background: #111622;
+  border-color: #1e2636;
+}
+
+[data-theme="dark"] .component-chip-pill,
+[data-theme="dark"] .preview-comp-chip {
+  background: #0a0d14;
+  border-color: #1e2636;
+}
+
+[data-theme="dark"] .hospital-switch-slider {
+  background-color: #334155;
+}
+
+[data-theme="dark"] .btn-reset-settings {
+  border-color: #1e2636;
+  color: #94a3b8;
+}
+
+/* Responsive */
+@media (max-width: 1080px) {
+  .facility-settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .facility-preview-sticky {
+    position: static;
+  }
+}
+
+

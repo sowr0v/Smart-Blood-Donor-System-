@@ -657,7 +657,465 @@
       <section class="portal-section" id="section-blood-allocation"></section>
 
       <!-- 6. Portal Settings & Facility Profile -->
-      <section class="portal-section" id="section-hospital-settings"></section>
+      <section class="portal-section" id="section-hospital-settings">
+        <div class="section-headline-box">
+          <span class="section-eyebrow">Institutional Configuration &amp; Governance</span>
+          <h2>{{ role_display_name }} Portal Settings &amp; Facility Profile</h2>
+          <p>DGHS accreditation credentials, 24/7 duty desk emergency hotline, cold-chain telemetry parameters, automated reorder triggers, and regional network visibility.</p>
+        </div>
+
+        <div class="facility-settings-layout">
+          <!-- Left Column: Settings Configuration Form -->
+          <div class="facility-form-column">
+            <form id="facilitySettingsForm" novalidate>
+              <input type="hidden" id="facilityPhone" value="{{ facility_settings.phone if facility_settings else (user.phone if user else '+8801734567890') }}">
+
+              <!-- Card 1: Facility Identity & Accreditation -->
+              <div class="facility-settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon teal">🏥</div>
+                  <div>
+                    <h3>Facility Identity &amp; Government Accreditation</h3>
+                    <p>Official DGHS registration credentials and medical administration profile</p>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityName">Facility Legal Name *</label>
+                    <input type="text" class="form-control-input" id="facilityName" required value="{{ facility_settings.facility_name if facility_settings else (user.name if user and user.name else ('Red Crescent Blood Bank' if role in ['bank', 'blood_bank'] else 'Dhaka General Hospital')) }}">
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityType">Facility Classification *</label>
+                    <select class="form-control-select" id="facilityType">
+                      <option value="Tertiary Care Teaching Hospital" {{ 'selected' if facility_settings and facility_settings.facility_type == 'Tertiary Care Teaching Hospital' else '' }}>Tertiary Care Teaching Hospital</option>
+                      <option value="Specialized Blood Center" {{ 'selected' if facility_settings and facility_settings.facility_type == 'Specialized Blood Center' else '' }}>Specialized Blood Center</option>
+                      <option value="District General Hospital" {{ 'selected' if facility_settings and facility_settings.facility_type == 'District General Hospital' else '' }}>District General Hospital</option>
+                      <option value="Autonomous Medical College Hospital" {{ 'selected' if facility_settings and facility_settings.facility_type == 'Autonomous Medical College Hospital' else '' }}>Autonomous Medical College Hospital</option>
+                      <option value="Private Multispecialty Hospital &amp; Blood Bank" {{ 'selected' if facility_settings and facility_settings.facility_type == 'Private Multispecialty Hospital &amp; Blood Bank' else '' }}>Private Multispecialty Hospital &amp; Blood Bank</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityLicense">DGHS License / Registration Number *</label>
+                    <input type="text" class="form-control-input" id="facilityLicense" placeholder="e.g. DGHS-BB-2024-8841" value="{{ facility_settings.license_no if facility_settings else ('DGHS-BB-2023-4418' if role in ['bank', 'blood_bank'] else 'DGHS-HOSP-2024-1092') }}" required>
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityEstYear">Year Established</label>
+                    <input type="text" class="form-control-input" id="facilityEstYear" placeholder="e.g. 1994" value="{{ facility_settings.est_year if facility_settings else ('1982' if role in ['bank', 'blood_bank'] else '1994') }}">
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityDirectorName">Medical Director / Facility Head *</label>
+                    <input type="text" class="form-control-input" id="facilityDirectorName" placeholder="e.g. Prof. Dr. M. A. Rashid" value="{{ facility_settings.director_name if facility_settings else (user.manager_name if user and user.manager_name else ('Farhana Ahmed' if role in ['bank', 'blood_bank'] else 'Dr. Rafiqul Islam')) }}" required>
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityDirectorTitle">Director Designation / Title</label>
+                    <input type="text" class="form-control-input" id="facilityDirectorTitle" placeholder="e.g. Chief Medical Officer &amp; Head of Transfusion" value="{{ facility_settings.director_title if facility_settings else ('Director of Blood Services &amp; Serology Lab' if role in ['bank', 'blood_bank'] else 'Chief Medical Officer &amp; Head of Transfusion Medicine') }}">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 2: 24/7 Duty Desk & Geolocation Coordinates -->
+              <div class="facility-settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon blue">📍</div>
+                  <div>
+                    <h3>24/7 Transfusion Desk &amp; Geolocation Coordinates</h3>
+                    <p>Dispatch communication channels, triage routing, and regional emergency proximity</p>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityHotline">24/7 Transfusion Emergency Hotline *</label>
+                    <input type="text" class="form-control-input" id="facilityHotline" placeholder="e.g. +880 1734-567890" value="{{ facility_settings.hotline if facility_settings else (user.phone if user else '+880 1734-567890') }}" required>
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityEmail">Institutional Blood Operations Email *</label>
+                    <input type="email" class="form-control-input" id="facilityEmail" placeholder="transfusion@hospital.gov.bd" value="{{ facility_settings.email if facility_settings else ('bloodservices@redcrescent.org.bd' if role in ['bank', 'blood_bank'] else 'transfusion@dhakahospital.gov.bd') }}" required>
+                  </div>
+                </div>
+
+                <div class="form-group-item">
+                  <label for="facilityAddress">Physical Facility Address *</label>
+                  <input type="text" class="form-control-input" id="facilityAddress" placeholder="e.g. 100 Shaheed Minar Road, Shahbagh" value="{{ facility_settings.address if facility_settings else (user.address if user and user.address else ('684-686 Bara Moghbazar' if role in ['bank', 'blood_bank'] else '100 Shaheed Minar Road, Shahbagh')) }}" required>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityDivision">Division</label>
+                    <select class="form-control-select" id="facilityDivision">
+                      <option value="Dhaka" selected>Dhaka</option>
+                      <option value="Chattogram">Chattogram</option>
+                      <option value="Rajshahi">Rajshahi</option>
+                      <option value="Khulna">Khulna</option>
+                      <option value="Barishal">Barishal</option>
+                      <option value="Sylhet">Sylhet</option>
+                      <option value="Rangpur">Rangpur</option>
+                      <option value="Mymensingh">Mymensingh</option>
+                    </select>
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityArea">District / Area</label>
+                    <input type="text" class="form-control-input" id="facilityArea" placeholder="e.g. Shahbagh" value="{{ facility_settings.area if facility_settings else ('Moghbazar' if role in ['bank', 'blood_bank'] else 'Shahbagh') }}">
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityGps">GPS Coordinates (Lat / Long)</label>
+                    <div class="input-with-action-btn">
+                      <input type="text" class="form-control-input" id="facilityGps" placeholder="23.7257° N, 90.3980° E" value="{{ facility_settings.gps_coords if facility_settings else ('23.7482° N, 90.4072° E' if role in ['bank', 'blood_bank'] else '23.7257° N, 90.3980° E') }}">
+                      <button type="button" class="btn-input-action" id="btnDetectGps" title="Detect Current GPS Coordinates">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 16 16 12 14 8 16 12 8"/></svg>
+                        <span>Detect</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityLandmark">Key Landmark / Inward Routing Note</label>
+                    <input type="text" class="form-control-input" id="facilityLandmark" placeholder="e.g. Opposite BSMMU Gate 3" value="{{ facility_settings.landmark if facility_settings else ('Near Moghbazar Wireless Railgate' if role in ['bank', 'blood_bank'] else 'Opposite BSMMU Emergency Gate 2') }}">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 3: Clinical Blood Bank Capacity & Cold Chain Standards -->
+              <div class="facility-settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon teal">❄️</div>
+                  <div>
+                    <h3>Clinical Blood Bank Capacity &amp; Cold Chain Standards</h3>
+                    <p>Phlebotomy collection units, storage temperature, and component separation licensing</p>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityChairs">Dedicated Phlebotomy Chairs (Donor Beds)</label>
+                    <input type="number" class="form-control-input" id="facilityChairs" min="1" max="60" value="{{ facility_settings.phlebotomy_chairs if facility_settings else (12 if role in ['bank', 'blood_bank'] else 8) }}">
+                  </div>
+                  <div class="form-group-item">
+                    <label for="facilityColdTemp">Cold Storage Target Safe Temperature (°C)</label>
+                    <input type="text" class="form-control-input" id="facilityColdTemp" placeholder="e.g. 3.8°C" value="{{ facility_settings.cold_storage_temp if facility_settings else ('3.5°C' if role in ['bank', 'blood_bank'] else '3.8°C') }}">
+                  </div>
+                </div>
+
+                <div class="form-group-item">
+                  <label style="display: block; margin-bottom: 8px;">Licensed Component Processing Capabilities</label>
+                  <div class="component-chips-container" id="facilityComponentChips">
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="PRBC" {{ 'checked' if not facility_settings or 'PRBC' in facility_settings.components else '' }}>
+                      <span>Packed Red Cells (PRBC)</span>
+                    </label>
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="Platelets" {{ 'checked' if not facility_settings or 'Platelets' in facility_settings.components else '' }}>
+                      <span>Platelet Concentrates (PLT)</span>
+                    </label>
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="FFP" {{ 'checked' if not facility_settings or 'FFP' in facility_settings.components else '' }}>
+                      <span>Fresh Frozen Plasma (FFP)</span>
+                    </label>
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="Cryo" {{ 'checked' if not facility_settings or 'Cryo' in facility_settings.components else '' }}>
+                      <span>Cryoprecipitate (Cryo)</span>
+                    </label>
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="Whole Blood" {{ 'checked' if not facility_settings or 'Whole Blood' in facility_settings.components else '' }}>
+                      <span>Whole Blood (WB)</span>
+                    </label>
+                    <label class="component-chip-pill">
+                      <input type="checkbox" name="components" value="Apheresis" {{ 'checked' if (facility_settings and 'Apheresis' in facility_settings.components) or role in ['bank', 'blood_bank'] else '' }}>
+                      <span>Apheresis Single-Donor Platelets (SDP)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="settings-toggle-list">
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Automated Apheresis Separation Suite</h4>
+                      <p>Licensed cell-separator apheresis machinery for high-yield platelet collection</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleApheresis" {{ 'checked' if not facility_settings or facility_settings.apheresis_active else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Ultra-Low (-40°C / -80°C) Plasma Freezers</h4>
+                      <p>Cryogenic deep freezers maintaining plasma factor VIII and fibrinogen potency</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleUltraFreezer" {{ 'checked' if not facility_settings or facility_settings.ultra_freezer_active else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Rapid NAT &amp; Serological Transfusion Screening</h4>
+                      <p>Nucleic Acid Testing (NAT) alongside 4th generation ELISA/CLIA HIV/HBV/HCV testing</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleNatScreening" {{ 'checked' if not facility_settings or facility_settings.nat_screening else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>24/7 Continuous Transfusion Duty Shift</h4>
+                      <p>Dedicated medical technologist and duty medical officer present around the clock</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleContinuousShift" {{ 'checked' if not facility_settings or facility_settings.continuous_shift else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 4: Automated Operations & Dispatch Rules -->
+              <div class="facility-settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon amber">⚡</div>
+                  <div>
+                    <h3>Automated Operations &amp; Regional Dispatch Triggers</h3>
+                    <p>Emergency low-stock replenishment automation, inter-facility network synchronization, and ward acoustic sirens</p>
+                  </div>
+                </div>
+
+                <div class="form-row-2col">
+                  <div class="form-group-item">
+                    <label for="facilityStockThreshold">Critical Low-Stock Alert Threshold (Units)</label>
+                    <input type="number" class="form-control-input" id="facilityStockThreshold" min="1" max="50" value="{{ facility_settings.low_stock_threshold if facility_settings else (8 if role in ['bank', 'blood_bank'] else 5) }}">
+                    <small style="color: var(--text-muted); font-size: 0.78rem;">Trigger priority reorder alert when any blood group stock falls below this number</small>
+                  </div>
+                </div>
+
+                <div class="settings-toggle-list">
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Auto-Dispatch SOS to Local Verified Donors</h4>
+                      <p>Automatically broadcast notification to compatible voluntary donors within 5 km when reserves breach critical threshold</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleAutoSos" {{ 'checked' if not facility_settings or facility_settings.auto_sos_dispatch else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Regional Inter-Facility Mutual Assistance Network</h4>
+                      <p>Share real-time surplus units telemetry with Dhaka Medical College, Square, and allied transfusion centers</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleInterFacility" {{ 'checked' if not facility_settings or facility_settings.inter_facility_network else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Audible Siren for STAT Emergency Requisitions</h4>
+                      <p>Play acoustic alert chime on duty desk workstation when emergency SOS OT order is logged</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleAudioSiren" {{ 'checked' if not facility_settings or facility_settings.audio_siren else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>SMS Alerts to Duty Medical Officer</h4>
+                      <p>Send instant SMS notifications for critical crossmatch clearances and incoming massive transfusion requisitions</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleSmsAlerts" {{ 'checked' if not facility_settings or facility_settings.sms_doctor_alerts else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Automated Daily Midnight Inventory Audit Ledger</h4>
+                      <p>Archive immutable snapshot of reserve units, shelf-life expiries, and daily crossmatches every midnight 00:00</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleDailyAudit" {{ 'checked' if not facility_settings or facility_settings.daily_inventory_audit else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 5: Security Governance & Calibration -->
+              <div class="facility-settings-card">
+                <div class="settings-card-header">
+                  <div class="settings-card-icon red">🛡️</div>
+                  <div>
+                    <h3>Security Governance &amp; Cold-Chain Calibration Mode</h3>
+                    <p>Requisition authorization controls and scheduled maintenance telemetry flags</p>
+                  </div>
+                </div>
+
+                <div class="settings-toggle-list">
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Two-Factor Authorization for Blood Dispatch</h4>
+                      <p>Require digital PIN authorization before releasing blood units to surgical OT orderlies</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggle2FA" {{ 'checked' if not facility_settings or facility_settings.two_factor_auth else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+
+                  <div class="settings-toggle-row">
+                    <div class="toggle-info-col">
+                      <h4>Scheduled Cold-Chain Calibration / Maintenance Mode</h4>
+                      <p>Flag facility as temporarily undergoing temperature calibration or routine quarterly decontamination</p>
+                    </div>
+                    <label class="hospital-switch-btn">
+                      <input type="checkbox" id="toggleMaintenance" {{ 'checked' if facility_settings and facility_settings.maintenance_mode else '' }}>
+                      <span class="hospital-switch-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Bar -->
+              <div class="settings-actions-bar">
+                <button type="submit" class="btn-save-settings" id="btnSaveFacilitySettings">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                  <span>Save Facility Profile &amp; Portal Settings</span>
+                </button>
+                <button type="button" class="btn-reset-settings" id="btnResetFacilitySettings">
+                  <span>Reset to Certified Baseline</span>
+                </button>
+                <button type="button" class="btn-export-settings" id="btnExportAccreditation">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Export Accreditation Summary</span>
+                </button>
+              </div>
+            </form>
+
+            <!-- Danger Zone: Account Deletion -->
+            <div class="facility-danger-card" id="facilityDangerZone">
+              <div class="danger-zone-header">
+                <div class="danger-zone-title-wrap">
+                  <span class="danger-icon">⚠️</span>
+                  <div>
+                    <h3 class="danger-zone-title">Danger Zone: Delete {{ role_display_name }} Account</h3>
+                    <p class="danger-zone-desc">
+                      Permanently decommission this institutional facility profile, revoke DGHS digital registry credentials, erase departmental requisition archives, and terminate all active login sessions. This action cannot be reversed.
+                    </p>
+                  </div>
+                </div>
+                <button type="button" class="btn-delete-facility-account" id="btnOpenDeleteFacilityModal" aria-haspopup="dialog">
+                  <span class="trash-icon">🗑️</span> Delete {{ role_display_name }} Account
+                </button>
+              </div>
+            </div>
+          </div>
+
+
+          <!-- Right Column: Live Institutional Card Preview & Network Telemetry -->
+          <div class="facility-preview-column">
+            <div class="facility-preview-sticky">
+              <div class="facility-preview-card">
+                <div class="preview-badge-ribbon">
+                  <span class="status-live-dot"></span> Live Network Profile Card
+                </div>
+
+                <div class="preview-hero-head">
+                  <div class="preview-avatar-circle {{ 'is-bank' if role in ['bank', 'blood_bank'] else '' }}" id="previewAvatar">
+                    {{ ('BB' if role in ['bank', 'blood_bank'] else 'DH') }}
+                  </div>
+                  <div class="preview-title-wrap">
+                    <h4 class="preview-facility-name" id="previewFacilityName">
+                      {{ facility_settings.facility_name if facility_settings else (user.name if user and user.name else ('Red Crescent Blood Bank' if role in ['bank', 'blood_bank'] else 'Dhaka General Hospital')) }}
+                    </h4>
+                    <div class="preview-type-pill" id="previewFacilityType">
+                      {{ facility_settings.facility_type if facility_settings else ('Specialized Blood Center' if role in ['bank', 'blood_bank'] else 'Tertiary Care Teaching Hospital') }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="preview-license-strip">
+                  <span class="preview-shield-icon">🛡️</span>
+                  <span>DGHS Reg: <strong id="previewLicenseNo">{{ facility_settings.license_no if facility_settings else ('DGHS-BB-2023-4418' if role in ['bank', 'blood_bank'] else 'DGHS-HOSP-2024-1092') }}</strong></span>
+                  <span class="preview-verified-tick">✓ Verified</span>
+                </div>
+
+                <div class="preview-meta-list">
+                  <div class="preview-meta-item">
+                    <span class="preview-meta-label">👨‍⚕️ Medical Director</span>
+                    <span class="preview-meta-val" id="previewDirector">{{ facility_settings.director_name if facility_settings else (user.manager_name if user and user.manager_name else ('Farhana Ahmed' if role in ['bank', 'blood_bank'] else 'Dr. Rafiqul Islam')) }}</span>
+                  </div>
+                  <div class="preview-meta-item">
+                    <span class="preview-meta-label">📞 Duty Hotline</span>
+                    <span class="preview-meta-val" id="previewHotline">{{ facility_settings.hotline if facility_settings else (user.phone if user else '+880 1734-567890') }}</span>
+                  </div>
+                  <div class="preview-meta-item">
+                    <span class="preview-meta-label">📍 Location</span>
+                    <span class="preview-meta-val" id="previewAddress">{{ facility_settings.address if facility_settings else (user.address if user and user.address else ('684-686 Bara Moghbazar' if role in ['bank', 'blood_bank'] else '100 Shaheed Minar Road, Shahbagh')) }}</span>
+                  </div>
+                  <div class="preview-meta-item">
+                    <span class="preview-meta-label">❄️ Cold Storage</span>
+                    <span class="preview-meta-val green" id="previewColdTemp">{{ facility_settings.cold_storage_temp if facility_settings else ('3.5°C (Optimal)' if role in ['bank', 'blood_bank'] else '3.8°C (Optimal)') }}</span>
+                  </div>
+                </div>
+
+                <div class="preview-components-box">
+                  <span class="preview-comp-title">Available Component Processing:</span>
+                  <div class="preview-chips-list" id="previewComponentChips">
+                    <span class="preview-comp-chip">PRBC</span>
+                    <span class="preview-comp-chip">Platelets</span>
+                    <span class="preview-comp-chip">FFP</span>
+                    <span class="preview-comp-chip">Cryo</span>
+                    <span class="preview-comp-chip">Whole Blood</span>
+                  </div>
+                </div>
+
+                <div class="preview-footer-telemetry">
+                  <div class="preview-telemetry-chip">
+                    <span>📡 Grid Sync:</span>
+                    <strong style="color: #0d9488;">Connected</strong>
+                  </div>
+                  <div class="preview-telemetry-chip">
+                    <span>🪑 Beds:</span>
+                    <strong id="previewChairsCount">{{ facility_settings.phlebotomy_chairs if facility_settings else (12 if role in ['bank', 'blood_bank'] else 8) }} Chairs</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Compliance Note Box -->
+              <div class="facility-compliance-card">
+                <div class="compliance-header">
+                  <span class="compliance-icon">ℹ️</span>
+                  <h4>DGHS Clinical Compliance Standard</h4>
+                </div>
+                <p>
+                  Facility licensing and blood bank registration records are synchronized with the Directorate General of Health Services (DGHS) National Transfusion Council. Modifications to institutional classification or phlebotomy license are logged for regulatory audit trails.
+                </p>
+                <div class="compliance-timestamp">
+                  Last Synced: <span id="settingsLastSynced">Just now</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -753,6 +1211,49 @@
           <button type="submit" class="btn-modal-submit" id="btnSubmitRequisition">Submit Requisition</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Delete Facility Account Confirmation Modal -->
+  <div id="deleteFacilityModal" class="hospital-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="deleteFacilityModalTitle">
+    <div class="hospital-modal-box delete-facility-modal-box">
+      <div class="modal-header-bar danger-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="delete-icon-bubble">🗑️</div>
+          <div>
+            <h3 id="deleteFacilityModalTitle" style="color: #be123c; margin: 0; font-size: 1.25rem;">Decommission &amp; Delete {{ role_display_name }} Account?</h3>
+            <span style="font-size: 0.78rem; color: var(--text-muted);">Irreversible Institutional Action</span>
+          </div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btnCloseDeleteFacilityModal" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body-form" style="padding: 24px;">
+        <div class="facility-delete-warning-box">
+          <strong style="display: block; margin-bottom: 6px;">⚠️ Critical Warning:</strong>
+          Deleting this institutional account will immediately:
+          <ul style="margin: 6px 0 0 18px; padding: 0;">
+            <li>De-list this facility from the National DGHS Blood Transfusion Grid</li>
+            <li>Permanently erase cold-chain telemetry logs and component reserve records</li>
+            <li>Cancel pending inter-facility mutual assistance transfers</li>
+            <li>Terminate active duty desk sessions across all workstations</li>
+          </ul>
+        </div>
+
+        <div style="margin: 22px 0 16px;">
+          <label for="deleteFacilityConfirmationInput" style="display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">
+            To confirm permanent de-registration, please type <strong style="color: #be123c; letter-spacing: 1px;">DELETE</strong> below:
+          </label>
+          <input type="text" class="form-control-input" id="deleteFacilityConfirmationInput" placeholder="DELETE" autocomplete="off" style="width: 100%; font-weight: 700; border-color: #fca5a5;">
+        </div>
+
+        <div class="modal-footer-actions">
+          <button type="button" class="btn-modal-cancel" id="btnCancelDeleteFacilityModal">Cancel</button>
+          <button type="button" class="btn-confirm-delete-facility" id="btnConfirmDeleteFacility" disabled>
+            Permanently Delete Account
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
