@@ -119,12 +119,15 @@ ROLE_DASHBOARDS = {
     "donor": "/donor/dashboard",
     "seeker": "/seeker/dashboard",
     "hospital": "/hospital/dashboard",
+    "bank": "/hospital/dashboard",
+    "blood_bank": "/hospital/dashboard",
     "admin": "/admin/dashboard",
 }
 USERS = {
     "+8801712345678": {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"},
     "+8801723456789": {"password": "match123", "role": "seeker", "name": "Nabil Hasan"},
-    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General"},
+    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam"},
+    "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed"},
     "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin"},
 }
 REQUESTS = [
@@ -430,6 +433,14 @@ def initialize_auth_database():
                 connection.execute("ALTER TABLE auth_users ADD COLUMN name TEXT DEFAULT ''")
             if "blood_group" not in auth_user_columns:
                 connection.execute("ALTER TABLE auth_users ADD COLUMN blood_group TEXT DEFAULT ''")
+            if "org_name" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN org_name TEXT DEFAULT ''")
+            if "govt_reg" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN govt_reg TEXT DEFAULT ''")
+            if "manager_name" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN manager_name TEXT DEFAULT ''")
+            if "address" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN address TEXT DEFAULT ''")
 
 
 def _connection():
@@ -445,7 +456,7 @@ def _get_user_by_phone(phone: str) -> dict | None:
     initialize_auth_database()
     with closing(_connection()) as connection:
         row = connection.execute(
-            "SELECT phone, password_hash, role, name, blood_group FROM auth_users WHERE phone = ?",
+            "SELECT * FROM auth_users WHERE phone = ?",
             (phone,),
         ).fetchone()
         if row:
@@ -455,7 +466,11 @@ def _get_user_by_phone(phone: str) -> dict | None:
                 "password_hash": row["password_hash"],
                 "role": role,
                 "name": row["name"] or ("Blood Seeker" if role == "seeker" else "Blood Donor"),
-                "blood_group": row["blood_group"] or "A+",
+                "blood_group": (row["blood_group"] if "blood_group" in row.keys() else "") or "A+",
+                "org_name": row["org_name"] if "org_name" in row.keys() else "",
+                "govt_reg": row["govt_reg"] if "govt_reg" in row.keys() else "",
+                "manager_name": row["manager_name"] if "manager_name" in row.keys() else "",
+                "address": row["address"] if "address" in row.keys() else "",
             }
             USERS[phone] = user_data
             return user_data
@@ -924,6 +939,7 @@ class UserRegisterRequest(BaseModel):
     address: str | None = ""
     org_name: str | None = ""
     govt_reg: str | None = ""
+    manager_name: str | None = ""
     manager_number: str | None = ""
 
 
@@ -935,6 +951,9 @@ def _register_user_record(
     blood_group: str = "A+",
     nid: str = "",
     address: str = "",
+    org_name: str = "",
+    govt_reg: str = "",
+    manager_name: str = "",
 ) -> tuple[dict, str, str]:
     try:
         phone = normalize_phone(phone_raw.strip())
@@ -942,15 +961,30 @@ def _register_user_record(
         phone = phone_raw.strip()
 
     clean_role = role.lower().strip() if role else "seeker"
-    if clean_role not in {"seeker", "donor", "hospital", "bank", "admin"}:
+    if clean_role not in {"seeker", "donor", "hospital", "bank", "blood_bank", "admin"}:
         clean_role = "seeker"
 
-    user_name = name.strip() or ("Blood Seeker" if clean_role == "seeker" else "Blood Donor")
+    if clean_role in {"bank", "blood_bank"}:
+        clean_role = "bank"
+
+    default_names = {
+        "seeker": "Blood Seeker",
+        "donor": "Blood Donor",
+        "hospital": "Dhaka General Hospital",
+        "bank": "Central Blood Bank",
+        "admin": "System Admin",
+    }
+    user_name = name.strip() or default_names.get(clean_role, "User")
     USERS[phone] = {
         "password": password,
         "role": clean_role,
         "name": user_name,
         "blood_group": blood_group or "A+",
+        "nid": nid,
+        "address": address,
+        "org_name": org_name or user_name,
+        "govt_reg": govt_reg,
+        "manager_name": manager_name,
     }
 
     # Save to auth.db
@@ -964,13 +998,13 @@ def _register_user_record(
             ).fetchone()
             if existing:
                 connection.execute(
-                    "UPDATE auth_users SET password_hash = ?, role = ?, name = ?, blood_group = ?, updated_at = ? WHERE id = ?",
-                    (pw_hash, clean_role, user_name, blood_group or "A+", now, existing["id"]),
+                    "UPDATE auth_users SET password_hash = ?, role = ?, name = ?, blood_group = ?, org_name = ?, govt_reg = ?, manager_name = ?, address = ?, updated_at = ? WHERE id = ?",
+                    (pw_hash, clean_role, user_name, blood_group or "A+", org_name, govt_reg, manager_name, address, now, existing["id"]),
                 )
             else:
                 connection.execute(
-                    "INSERT INTO auth_users (phone, password_hash, role, name, blood_group, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (phone, pw_hash, clean_role, user_name, blood_group or "A+", now, now),
+                    "INSERT INTO auth_users (phone, password_hash, role, name, blood_group, org_name, govt_reg, manager_name, address, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (phone, pw_hash, clean_role, user_name, blood_group or "A+", org_name, govt_reg, manager_name, address, now, now),
                 )
 
     if clean_role == "seeker":
@@ -1002,6 +1036,9 @@ async def api_register(payload: UserRegisterRequest, response: Response):
         blood_group=payload.blood_group or "A+",
         nid=payload.nid or "",
         address=payload.address or "",
+        org_name=payload.org_name or "",
+        govt_reg=payload.govt_reg or "",
+        manager_name=payload.manager_name or payload.manager_number or "",
     )
     # Ensure existing session/token cookies are cleared so user is not automatically logged in
     response.delete_cookie(key="access_token", path="/")
@@ -1026,6 +1063,7 @@ async def form_register(
     address: str = Form(""),
     org_name: str = Form(""),
     govt_reg: str = Form(""),
+    manager_name: str = Form(""),
     manager_number: str = Form(""),
 ):
     actual_name = name or org_name or ("Blood Seeker" if role == "seeker" else "Blood Donor")
@@ -1037,6 +1075,9 @@ async def form_register(
         blood_group=blood_group,
         nid=nid,
         address=address,
+        org_name=org_name,
+        govt_reg=govt_reg,
+        manager_name=manager_name or manager_number or "",
     )
     resp = RedirectResponse(url="/login?registered=1", status_code=303)
     resp.delete_cookie(key="access_token", path="/")
@@ -1422,6 +1463,8 @@ async def donor_dashboard(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
     if token and token.get("role") == "seeker":
         return RedirectResponse(url="/seeker/dashboard", status_code=303)
+    if token and token.get("role") in {"hospital", "bank", "blood_bank"}:
+        return RedirectResponse(url="/hospital/dashboard", status_code=303)
 
     phone = token.get("sub") if token and token.get("role") == "donor" else None
     user = USERS.get(phone) if phone else None
@@ -1465,6 +1508,8 @@ async def seeker_dashboard(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
     if token and token.get("role") == "donor":
         return RedirectResponse(url="/donor/dashboard", status_code=303)
+    if token and token.get("role") in {"hospital", "bank", "blood_bank"}:
+        return RedirectResponse(url="/hospital/dashboard", status_code=303)
 
     phone = token.get("sub") if token and token.get("role") == "seeker" else None
     user = _get_user_by_phone(phone) if phone else None
@@ -1508,11 +1553,64 @@ async def seeker_dashboard(request: Request):
 
 @app.get("/hospital/dashboard", response_class=HTMLResponse)
 async def hospital_dashboard(request: Request):
-    return templates.TemplateResponse(
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if token and token.get("role") == "donor":
+        return RedirectResponse(url="/donor/dashboard", status_code=303)
+    if token and token.get("role") == "seeker":
+        return RedirectResponse(url="/seeker/dashboard", status_code=303)
+
+    phone = token.get("sub") if token and token.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+    user = _get_user_by_phone(phone) if phone else None
+    if not user and phone:
+        user = USERS.get(phone)
+    should_set_cookie = False
+
+    role_param = request.query_params.get("role", "").lower()
+    is_demo = request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1"
+
+    if is_demo and role_param in {"bank", "blood_bank"}:
+        phone = "+8801734567891"
+        user = USERS.get(phone, {"name": "Red Crescent Blood Bank", "role": "bank", "phone": phone})
+        should_set_cookie = True
+    elif is_demo and role_param == "hospital":
+        phone = "+8801734567890"
+        user = USERS.get(phone, {"name": "Dhaka General Hospital", "role": "hospital", "phone": phone})
+        should_set_cookie = True
+    elif not user:
+        if is_demo:
+            phone = "+8801734567890"
+            user = USERS.get(phone, {"name": "Dhaka General Hospital", "role": "hospital", "phone": phone})
+            should_set_cookie = True
+        else:
+            return RedirectResponse(url="/login?next=/hospital/dashboard", status_code=303)
+
+    user_role = (user.get("role") or "hospital").lower()
+    role_display_name = "Blood Bank" if user_role in {"bank", "blood_bank"} else "Hospital"
+    portal_title = f"{role_display_name} Portal - Smart Blood Donor System"
+
+    response = templates.TemplateResponse(
         request=request,
-        name="dashboard.html",
-        context={"request": request, "role": "Hospital", "title": "Hospital Dashboard"},
+        name="hospital_dashboard.html",
+        context={
+            "request": request,
+            "user": user,
+            "role": user_role,
+            "role_display_name": role_display_name,
+            "title": portal_title,
+        },
     )
+    if should_set_cookie or not request.cookies.get("access_token"):
+        jwt_token = _generate_jwt(phone, user_role)
+        response.set_cookie(
+            key="access_token",
+            value=jwt_token,
+            httponly=True,
+            samesite="lax",
+            max_age=TOKEN_TTL_SECONDS,
+            expires=int(time.time()) + TOKEN_TTL_SECONDS,
+            path="/",
+        )
+    return response
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)

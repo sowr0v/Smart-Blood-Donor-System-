@@ -1199,7 +1199,7 @@ document.addEventListener("DOMContentLoaded", () => {
           address: formData.get("address") || "",
           org_name: formData.get("org_name") || "",
           govt_reg: formData.get("govt_reg") || "",
-          manager_number: formData.get("manager_number") || "",
+          manager_name: formData.get("manager_name") || formData.get("manager_number") || "",
         };
 
         try {
