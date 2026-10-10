@@ -319,7 +319,12 @@ async def _render_login_page(
     if not success_message and request.query_params.get("registered"):
         success_message = "Registration successful! Please log in with your phone number and password."
     if not success_message and request.query_params.get("account_deleted"):
-        success_message = "Your seeker account has been permanently deleted."
+        deleted_role = request.query_params.get("role", "").lower()
+        if deleted_role in {"hospital", "bank", "blood_bank", "facility"}:
+            success_message = "Your institutional facility account has been permanently deleted."
+        else:
+            success_message = "Your seeker account has been permanently deleted."
+
     return templates.TemplateResponse(
         request=request,
         name="login.html",
@@ -412,6 +417,38 @@ def initialize_auth_database():
                     is_available INTEGER NOT NULL DEFAULT 1,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
+                );
+                CREATE TABLE IF NOT EXISTS facility_settings (
+                    phone TEXT PRIMARY KEY,
+                    facility_name TEXT NOT NULL,
+                    facility_type TEXT NOT NULL,
+                    license_no TEXT DEFAULT '',
+                    est_year TEXT DEFAULT '',
+                    director_name TEXT DEFAULT '',
+                    director_title TEXT DEFAULT '',
+                    hotline TEXT DEFAULT '',
+                    email TEXT DEFAULT '',
+                    address TEXT DEFAULT '',
+                    division TEXT DEFAULT 'Dhaka',
+                    area TEXT DEFAULT '',
+                    gps_coords TEXT DEFAULT '',
+                    landmark TEXT DEFAULT '',
+                    phlebotomy_chairs INTEGER DEFAULT 8,
+                    components_json TEXT DEFAULT '["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"]',
+                    apheresis_active INTEGER DEFAULT 1,
+                    cold_storage_temp TEXT DEFAULT '3.8°C',
+                    ultra_freezer_active INTEGER DEFAULT 1,
+                    nat_screening INTEGER DEFAULT 1,
+                    continuous_shift INTEGER DEFAULT 1,
+                    low_stock_threshold INTEGER DEFAULT 5,
+                    auto_sos_dispatch INTEGER DEFAULT 1,
+                    inter_facility_network INTEGER DEFAULT 1,
+                    audio_siren INTEGER DEFAULT 1,
+                    sms_doctor_alerts INTEGER DEFAULT 1,
+                    daily_inventory_audit INTEGER DEFAULT 1,
+                    two_factor_auth INTEGER DEFAULT 1,
+                    maintenance_mode INTEGER DEFAULT 0,
+                    updated_at INTEGER NOT NULL
                 );
                 """
             )
@@ -1588,6 +1625,10 @@ async def hospital_dashboard(request: Request):
     role_display_name = "Blood Bank" if user_role in {"bank", "blood_bank"} else "Hospital"
     portal_title = f"{role_display_name} Portal - Smart Blood Donor System"
 
+    facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
+    if facility_settings and facility_settings.get("facility_name") and user:
+        user = {**user, "name": facility_settings["facility_name"]}
+
     response = templates.TemplateResponse(
         request=request,
         name="hospital_dashboard.html",
@@ -1597,6 +1638,7 @@ async def hospital_dashboard(request: Request):
             "role": user_role,
             "role_display_name": role_display_name,
             "title": portal_title,
+            "facility_settings": facility_settings,
         },
     )
     if should_set_cookie or not request.cookies.get("access_token"):
@@ -2167,6 +2209,38 @@ class SeekerSettingsPayload(BaseModel):
     default_radius: str = "10"
 
 
+class FacilitySettingsPayload(BaseModel):
+    phone: str = ""
+    facility_name: str = ""
+    facility_type: str = "Tertiary Care Teaching Hospital"
+    license_no: str = ""
+    est_year: str = ""
+    director_name: str = ""
+    director_title: str = ""
+    hotline: str = ""
+    email: str = ""
+    address: str = ""
+    division: str = "Dhaka"
+    area: str = ""
+    gps_coords: str = ""
+    landmark: str = ""
+    phlebotomy_chairs: int = 8
+    components: list[str] = Field(default_factory=lambda: ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"])
+    apheresis_active: bool = True
+    cold_storage_temp: str = "3.8°C"
+    ultra_freezer_active: bool = True
+    nat_screening: bool = True
+    continuous_shift: bool = True
+    low_stock_threshold: int = 5
+    auto_sos_dispatch: bool = True
+    inter_facility_network: bool = True
+    audio_siren: bool = True
+    sms_doctor_alerts: bool = True
+    daily_inventory_audit: bool = True
+    two_factor_auth: bool = True
+    maintenance_mode: bool = False
+
+
 SEEKER_CONTACT_LOGS = [
     {
         "donor_name": "Ayesha Rahman",
@@ -2197,6 +2271,296 @@ SEEKER_SETTINGS = {
         "default_radius": "10",
     }
 }
+
+FACILITY_SETTINGS = {
+    "+8801734567890": {
+        "phone": "+8801734567890",
+        "facility_name": "Dhaka General Hospital",
+        "facility_type": "Tertiary Care Teaching Hospital",
+        "license_no": "DGHS-HOSP-2024-1092",
+        "est_year": "1994",
+        "director_name": "Dr. Rafiqul Islam",
+        "director_title": "Chief Medical Officer & Head of Transfusion Medicine",
+        "hotline": "+880 1734-567890",
+        "email": "transfusion@dhakahospital.gov.bd",
+        "address": "100 Shaheed Minar Road, Shahbagh",
+        "division": "Dhaka",
+        "area": "Shahbagh",
+        "gps_coords": "23.7257° N, 90.3980° E",
+        "landmark": "Opposite BSMMU Emergency Gate 2",
+        "phlebotomy_chairs": 8,
+        "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
+        "apheresis_active": True,
+        "cold_storage_temp": "3.8°C",
+        "ultra_freezer_active": True,
+        "nat_screening": True,
+        "continuous_shift": True,
+        "low_stock_threshold": 5,
+        "auto_sos_dispatch": True,
+        "inter_facility_network": True,
+        "audio_siren": True,
+        "sms_doctor_alerts": True,
+        "daily_inventory_audit": True,
+        "two_factor_auth": True,
+        "maintenance_mode": False,
+        "updated_at": 1728564000,
+    },
+    "+8801734567891": {
+        "phone": "+8801734567891",
+        "facility_name": "Red Crescent Blood Bank",
+        "facility_type": "Specialized Blood Center",
+        "license_no": "DGHS-BB-2023-4418",
+        "est_year": "1982",
+        "director_name": "Farhana Ahmed",
+        "director_title": "Director of Blood Services & Serology Lab",
+        "hotline": "+880 1734-567891",
+        "email": "bloodservices@redcrescent.org.bd",
+        "address": "684-686 Bara Moghbazar",
+        "division": "Dhaka",
+        "area": "Moghbazar",
+        "gps_coords": "23.7482° N, 90.4072° E",
+        "landmark": "Near Moghbazar Wireless Railgate",
+        "phlebotomy_chairs": 12,
+        "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"],
+        "apheresis_active": True,
+        "cold_storage_temp": "3.5°C",
+        "ultra_freezer_active": True,
+        "nat_screening": True,
+        "continuous_shift": True,
+        "low_stock_threshold": 8,
+        "auto_sos_dispatch": True,
+        "inter_facility_network": True,
+        "audio_siren": True,
+        "sms_doctor_alerts": True,
+        "daily_inventory_audit": True,
+        "two_factor_auth": True,
+        "maintenance_mode": False,
+        "updated_at": 1728564000,
+    },
+}
+
+
+def _get_facility_settings(phone: str, role: str = "hospital", name: str = "") -> dict:
+    initialize_auth_database()
+    try:
+        with closing(_connection()) as connection:
+            row = connection.execute("SELECT * FROM facility_settings WHERE phone = ?", (phone,)).fetchone()
+            if row:
+                d = dict(row)
+                comp_raw = d.get("components_json") or "[]"
+                try:
+                    d["components"] = json.loads(comp_raw)
+                except Exception:
+                    d["components"] = ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"]
+                d["apheresis_active"] = bool(d.get("apheresis_active", 1))
+                d["ultra_freezer_active"] = bool(d.get("ultra_freezer_active", 1))
+                d["nat_screening"] = bool(d.get("nat_screening", 1))
+                d["continuous_shift"] = bool(d.get("continuous_shift", 1))
+                d["auto_sos_dispatch"] = bool(d.get("auto_sos_dispatch", 1))
+                d["inter_facility_network"] = bool(d.get("inter_facility_network", 1))
+                d["audio_siren"] = bool(d.get("audio_siren", 1))
+                d["sms_doctor_alerts"] = bool(d.get("sms_doctor_alerts", 1))
+                d["daily_inventory_audit"] = bool(d.get("daily_inventory_audit", 1))
+                d["two_factor_auth"] = bool(d.get("two_factor_auth", 1))
+                d["maintenance_mode"] = bool(d.get("maintenance_mode", 0))
+                return d
+    except Exception as exc:
+        logger.warning(f"Error reading facility_settings from db: {exc}")
+
+    if phone in FACILITY_SETTINGS:
+        return dict(FACILITY_SETTINGS[phone])
+
+    is_bank = role in {"bank", "blood_bank"}
+    def_name = name or ("Red Crescent Blood Bank" if is_bank else "Dhaka General Hospital")
+    def_type = "Specialized Blood Center" if is_bank else "Tertiary Care Teaching Hospital"
+    def_lic = "DGHS-BB-2023-4418" if is_bank else "DGHS-HOSP-2024-1092"
+    def_dir = "Farhana Ahmed" if is_bank else "Dr. Rafiqul Islam"
+    def_title = "Director of Blood Services & Serology Lab" if is_bank else "Chief Medical Officer & Head of Transfusion Medicine"
+    def_hotline = "+880 1734-567891" if is_bank else "+880 1734-567890"
+    def_email = "bloodservices@redcrescent.org.bd" if is_bank else "transfusion@dhakahospital.gov.bd"
+    def_addr = "684-686 Bara Moghbazar" if is_bank else "100 Shaheed Minar Road, Shahbagh"
+    def_area = "Moghbazar" if is_bank else "Shahbagh"
+    def_landmark = "Near Moghbazar Wireless Railgate" if is_bank else "Opposite BSMMU Emergency Gate 2"
+
+    default_settings = {
+        "phone": phone,
+        "facility_name": def_name,
+        "facility_type": def_type,
+        "license_no": def_lic,
+        "est_year": "1982" if is_bank else "1994",
+        "director_name": def_dir,
+        "director_title": def_title,
+        "hotline": def_hotline,
+        "email": def_email,
+        "address": def_addr,
+        "division": "Dhaka",
+        "area": def_area,
+        "gps_coords": "23.7482° N, 90.4072° E" if is_bank else "23.7257° N, 90.3980° E",
+        "landmark": def_landmark,
+        "phlebotomy_chairs": 12 if is_bank else 8,
+        "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"] if is_bank else ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
+        "apheresis_active": True,
+        "cold_storage_temp": "3.5°C" if is_bank else "3.8°C",
+        "ultra_freezer_active": True,
+        "nat_screening": True,
+        "continuous_shift": True,
+        "low_stock_threshold": 8 if is_bank else 5,
+        "auto_sos_dispatch": True,
+        "inter_facility_network": True,
+        "audio_siren": True,
+        "sms_doctor_alerts": True,
+        "daily_inventory_audit": True,
+        "two_factor_auth": True,
+        "maintenance_mode": False,
+        "updated_at": int(time.time()),
+    }
+    return default_settings
+
+
+def _save_facility_settings(phone: str, data: dict) -> dict:
+    initialize_auth_database()
+    components = data.get("components")
+    if not components or not isinstance(components, list):
+        components = ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"]
+    components_json = json.dumps(components)
+    updated_at = int(time.time())
+
+    clean_dict = {
+        "phone": phone,
+        "facility_name": str(data.get("facility_name", "")).strip() or "General Hospital",
+        "facility_type": str(data.get("facility_type", "Tertiary Care Teaching Hospital")),
+        "license_no": str(data.get("license_no", "")).strip(),
+        "est_year": str(data.get("est_year", "")).strip(),
+        "director_name": str(data.get("director_name", "")).strip(),
+        "director_title": str(data.get("director_title", "")).strip(),
+        "hotline": str(data.get("hotline", "")).strip(),
+        "email": str(data.get("email", "")).strip(),
+        "address": str(data.get("address", "")).strip(),
+        "division": str(data.get("division", "Dhaka")).strip(),
+        "area": str(data.get("area", "")).strip(),
+        "gps_coords": str(data.get("gps_coords", "")).strip(),
+        "landmark": str(data.get("landmark", "")).strip(),
+        "phlebotomy_chairs": int(data.get("phlebotomy_chairs", 8)),
+        "components": components,
+        "components_json": components_json,
+        "apheresis_active": bool(data.get("apheresis_active", True)),
+        "cold_storage_temp": str(data.get("cold_storage_temp", "3.8°C")).strip(),
+        "ultra_freezer_active": bool(data.get("ultra_freezer_active", True)),
+        "nat_screening": bool(data.get("nat_screening", True)),
+        "continuous_shift": bool(data.get("continuous_shift", True)),
+        "low_stock_threshold": int(data.get("low_stock_threshold", 5)),
+        "auto_sos_dispatch": bool(data.get("auto_sos_dispatch", True)),
+        "inter_facility_network": bool(data.get("inter_facility_network", True)),
+        "audio_siren": bool(data.get("audio_siren", True)),
+        "sms_doctor_alerts": bool(data.get("sms_doctor_alerts", True)),
+        "daily_inventory_audit": bool(data.get("daily_inventory_audit", True)),
+        "two_factor_auth": bool(data.get("two_factor_auth", True)),
+        "maintenance_mode": bool(data.get("maintenance_mode", False)),
+        "updated_at": updated_at,
+    }
+
+    FACILITY_SETTINGS[phone] = clean_dict
+
+    try:
+        with closing(_connection()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    INSERT INTO facility_settings (
+                        phone, facility_name, facility_type, license_no, est_year,
+                        director_name, director_title, hotline, email, address,
+                        division, area, gps_coords, landmark, phlebotomy_chairs,
+                        components_json, apheresis_active, cold_storage_temp, ultra_freezer_active,
+                        nat_screening, continuous_shift, low_stock_threshold, auto_sos_dispatch,
+                        inter_facility_network, audio_siren, sms_doctor_alerts, daily_inventory_audit,
+                        two_factor_auth, maintenance_mode, updated_at
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?, ?,
+                        ?, ?, ?
+                    )
+                    ON CONFLICT(phone) DO UPDATE SET
+                        facility_name = excluded.facility_name,
+                        facility_type = excluded.facility_type,
+                        license_no = excluded.license_no,
+                        est_year = excluded.est_year,
+                        director_name = excluded.director_name,
+                        director_title = excluded.director_title,
+                        hotline = excluded.hotline,
+                        email = excluded.email,
+                        address = excluded.address,
+                        division = excluded.division,
+                        area = excluded.area,
+                        gps_coords = excluded.gps_coords,
+                        landmark = excluded.landmark,
+                        phlebotomy_chairs = excluded.phlebotomy_chairs,
+                        components_json = excluded.components_json,
+                        apheresis_active = excluded.apheresis_active,
+                        cold_storage_temp = excluded.cold_storage_temp,
+                        ultra_freezer_active = excluded.ultra_freezer_active,
+                        nat_screening = excluded.nat_screening,
+                        continuous_shift = excluded.continuous_shift,
+                        low_stock_threshold = excluded.low_stock_threshold,
+                        auto_sos_dispatch = excluded.auto_sos_dispatch,
+                        inter_facility_network = excluded.inter_facility_network,
+                        audio_siren = excluded.audio_siren,
+                        sms_doctor_alerts = excluded.sms_doctor_alerts,
+                        daily_inventory_audit = excluded.daily_inventory_audit,
+                        two_factor_auth = excluded.two_factor_auth,
+                        maintenance_mode = excluded.maintenance_mode,
+                        updated_at = excluded.updated_at
+                    """,
+                    (
+                        phone,
+                        clean_dict["facility_name"],
+                        clean_dict["facility_type"],
+                        clean_dict["license_no"],
+                        clean_dict["est_year"],
+                        clean_dict["director_name"],
+                        clean_dict["director_title"],
+                        clean_dict["hotline"],
+                        clean_dict["email"],
+                        clean_dict["address"],
+                        clean_dict["division"],
+                        clean_dict["area"],
+                        clean_dict["gps_coords"],
+                        clean_dict["landmark"],
+                        clean_dict["phlebotomy_chairs"],
+                        clean_dict["components_json"],
+                        int(clean_dict["apheresis_active"]),
+                        clean_dict["cold_storage_temp"],
+                        int(clean_dict["ultra_freezer_active"]),
+                        int(clean_dict["nat_screening"]),
+                        int(clean_dict["continuous_shift"]),
+                        clean_dict["low_stock_threshold"],
+                        int(clean_dict["auto_sos_dispatch"]),
+                        int(clean_dict["inter_facility_network"]),
+                        int(clean_dict["audio_siren"]),
+                        int(clean_dict["sms_doctor_alerts"]),
+                        int(clean_dict["daily_inventory_audit"]),
+                        int(clean_dict["two_factor_auth"]),
+                        int(clean_dict["maintenance_mode"]),
+                        updated_at,
+                    ),
+                )
+                connection.execute(
+                    "UPDATE auth_users SET name = ?, manager_name = ?, address = ? WHERE phone = ?",
+                    (clean_dict["facility_name"], clean_dict["director_name"], clean_dict["address"], phone),
+                )
+    except Exception as exc:
+        logger.warning(f"Error persisting facility_settings: {exc}")
+
+    if phone in USERS:
+        USERS[phone]["name"] = clean_dict["facility_name"]
+        if clean_dict["director_name"]:
+            USERS[phone]["manager_name"] = clean_dict["director_name"]
+
+    return clean_dict
+
 
 SEEKER_MOCK_DONORS = [
     {
@@ -2761,5 +3125,126 @@ async def delete_seeker_account(request: Request, response: Response):
         "message": "Seeker account has been permanently deleted.",
         "redirect_url": "/login?account_deleted=1",
     }
+
+
+@app.get("/api/v1/hospital/settings")
+@app.get("/api/v1/facility/settings")
+async def get_hospital_settings(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+    role = (token.get("role") or "hospital").lower() if token else "hospital"
+
+    if not phone:
+        role_param = request.query_params.get("role", "").lower()
+        if role_param in {"bank", "blood_bank"}:
+            phone = "+8801734567891"
+            role = "bank"
+        else:
+            phone = request.query_params.get("phone", "+8801734567890")
+            role = "hospital"
+
+    user = _get_user_by_phone(phone) or USERS.get(phone)
+    name = (user.get("name") if user else None) or ("Red Crescent Blood Bank" if role in {"bank", "blood_bank"} else "Dhaka General Hospital")
+    settings = _get_facility_settings(phone, role, name)
+    return {"status": "success", "settings": settings}
+
+
+@app.post("/api/v1/hospital/settings")
+@app.post("/api/v1/facility/settings")
+async def save_hospital_settings(payload: FacilitySettingsPayload, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = payload.phone.strip()
+    if not phone and token:
+        phone = token.get("sub", "")
+    if not phone:
+        phone = "+8801734567890"
+
+    saved = _save_facility_settings(phone, payload.model_dump())
+    return {
+        "status": "success",
+        "message": "Facility profile and portal settings saved successfully",
+        "settings": saved,
+    }
+
+
+@app.post("/api/v1/hospital/settings/reset")
+@app.post("/api/v1/facility/settings/reset")
+async def reset_hospital_settings(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+    role = (token.get("role") or "hospital").lower() if token else "hospital"
+    if not phone:
+        phone = request.query_params.get("phone", "+8801734567890")
+
+    try:
+        with closing(_connection()) as connection:
+            with connection:
+                connection.execute("DELETE FROM facility_settings WHERE phone = ?", (phone,))
+    except Exception as exc:
+        logger.warning(f"Error resetting facility settings: {exc}")
+
+    if phone in FACILITY_SETTINGS:
+        del FACILITY_SETTINGS[phone]
+
+    fresh = _get_facility_settings(phone, role)
+    return {
+        "status": "success",
+        "message": "Settings reset to DGHS certified baseline",
+        "settings": fresh,
+    }
+
+
+@app.delete("/api/v1/hospital/account")
+@app.delete("/api/v1/facility/account")
+async def delete_hospital_account(request: Request, response: Response):
+    user = _get_current_user(request)
+    phone = user.get("phone") if user and user.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+
+    if not phone:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        phone = token.get("sub") if token and token.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+
+    if not phone and (request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1"):
+        phone = "+8801734567890"
+
+    if not phone:
+        phone = request.query_params.get("phone", "+8801734567890")
+
+    # 1. Remove from database auth_users, auth_sessions, and facility_settings
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+            if user_row:
+                user_id = user_row["id"]
+                connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+                connection.execute("DELETE FROM password_reset_challenges WHERE user_id = ?", (user_id,))
+                connection.execute("DELETE FROM auth_users WHERE id = ?", (user_id,))
+            connection.execute("DELETE FROM facility_settings WHERE phone = ?", (phone,))
+
+    # 2. Clean in-memory user caches
+    if phone in USERS:
+        del USERS[phone]
+    if phone in FACILITY_SETTINGS:
+        del FACILITY_SETTINGS[phone]
+
+    # 3. Clear authentication cookies
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+
+    return {
+        "status": "success",
+        "message": "Institutional facility account has been permanently deleted.",
+        "redirect_url": "/login?account_deleted=1&role=hospital",
+    }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+
 
 

@@ -6,6 +6,8 @@ from main import app, _generate_jwt
 class HospitalBloodBankPortalTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        token = _generate_jwt("+8801734567890", "hospital")
+        self.client.post("/api/v1/hospital/settings/reset", cookies={"access_token": token})
 
     def test_unauthenticated_hospital_dashboard_redirects_to_login(self):
         response = self.client.get("/hospital/dashboard", follow_redirects=False)
@@ -225,3 +227,130 @@ class HospitalBloodBankPortalTests(unittest.TestCase):
         user_record = _get_user_by_phone(unique_phone)
         self.assertIsNotNone(user_record)
         self.assertEqual(user_record["manager_name"], "Dr. Tariqul Anam")
+
+    def test_hospital_settings_section_renders_form_and_live_preview(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        response = self.client.get("/hospital/dashboard", cookies={"access_token": token})
+        self.assertEqual(response.status_code, 200)
+        html = response.text
+
+        # Verify section container and heading
+        self.assertIn('id="section-hospital-settings"', html)
+        self.assertIn("Hospital Portal Settings & Facility Profile", html)
+        self.assertIn('id="facilitySettingsForm"', html)
+
+        # Verify form inputs
+        self.assertIn('id="facilityName"', html)
+        self.assertIn('id="facilityType"', html)
+        self.assertIn('id="facilityLicense"', html)
+        self.assertIn('id="facilityDirectorName"', html)
+        self.assertIn('id="facilityHotline"', html)
+        self.assertIn('id="facilityAddress"', html)
+        self.assertIn('id="facilityColdTemp"', html)
+        self.assertIn('id="facilityChairs"', html)
+        self.assertIn('id="facilityComponentChips"', html)
+
+        # Verify toggles
+        self.assertIn('id="toggleApheresis"', html)
+        self.assertIn('id="toggleUltraFreezer"', html)
+        self.assertIn('id="toggleNatScreening"', html)
+        self.assertIn('id="toggleContinuousShift"', html)
+        self.assertIn('id="toggleAutoSos"', html)
+        self.assertIn('id="toggleInterFacility"', html)
+        self.assertIn('id="toggleAudioSiren"', html)
+        self.assertIn('id="toggleSmsAlerts"', html)
+        self.assertIn('id="toggleDailyAudit"', html)
+        self.assertIn('id="toggle2FA"', html)
+        self.assertIn('id="toggleMaintenance"', html)
+
+        # Verify Live preview card
+        self.assertIn("Live Network Profile Card", html)
+        self.assertIn('id="previewFacilityName"', html)
+        self.assertIn('id="previewLicenseNo"', html)
+        self.assertIn('id="previewDirector"', html)
+        self.assertIn('id="previewColdTemp"', html)
+        self.assertIn('id="btnSaveFacilitySettings"', html)
+        self.assertIn('id="btnResetFacilitySettings"', html)
+        self.assertIn('id="btnExportAccreditation"', html)
+
+    def test_get_hospital_settings_api(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/settings", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        settings = data["settings"]
+        self.assertIn("Dhaka General Hospital", settings["facility_name"])
+        self.assertIn("license_no", settings)
+        self.assertIn("components", settings)
+        self.assertIn("cold_storage_temp", settings)
+
+        # Blood Bank API returns blood bank defaults
+        bank_token = _generate_jwt("+8801734567891", "bank")
+        resp_bank = self.client.get("/api/v1/hospital/settings", cookies={"access_token": bank_token})
+        self.assertEqual(resp_bank.status_code, 200)
+        data_bank = resp_bank.json()
+        self.assertIn("Red Crescent Blood Bank", data_bank["settings"]["facility_name"])
+
+    def test_save_and_persist_hospital_settings_api(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        payload = {
+            "phone": "+8801734567890",
+            "facility_name": "Dhaka Central Super Specialized Hospital",
+            "facility_type": "Tertiary Care Teaching Hospital",
+            "license_no": "DGHS-SUPER-2026-99",
+            "est_year": "1999",
+            "director_name": "Prof. Dr. Shamsul Alam",
+            "director_title": "Director General of Transfusion Services",
+            "hotline": "+880 1711-002233",
+            "email": "transfusion@superhospital.gov.bd",
+            "address": "Pragati Sarani, Kuril, Dhaka",
+            "division": "Dhaka",
+            "area": "Kuril",
+            "gps_coords": "23.8103° N, 90.4125° E",
+            "landmark": "Near Kuril Flyover",
+            "phlebotomy_chairs": 16,
+            "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"],
+            "apheresis_active": True,
+            "cold_storage_temp": "3.6°C",
+            "ultra_freezer_active": True,
+            "nat_screening": True,
+            "continuous_shift": True,
+            "low_stock_threshold": 10,
+            "auto_sos_dispatch": True,
+            "inter_facility_network": True,
+            "audio_siren": True,
+            "sms_doctor_alerts": True,
+            "daily_inventory_audit": True,
+            "two_factor_auth": True,
+            "maintenance_mode": False,
+        }
+
+        # POST updated settings
+        save_resp = self.client.post("/api/v1/hospital/settings", json=payload, cookies={"access_token": token})
+        self.assertEqual(save_resp.status_code, 200)
+        save_data = save_resp.json()
+        self.assertEqual(save_data["status"], "success")
+        self.assertEqual(save_data["settings"]["facility_name"], "Dhaka Central Super Specialized Hospital")
+        self.assertEqual(save_data["settings"]["phlebotomy_chairs"], 16)
+
+        # GET confirms updated settings
+        get_resp = self.client.get("/api/v1/hospital/settings", cookies={"access_token": token})
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertEqual(get_resp.json()["settings"]["facility_name"], "Dhaka Central Super Specialized Hospital")
+        self.assertEqual(get_resp.json()["settings"]["director_name"], "Prof. Dr. Shamsul Alam")
+
+        # HTML dashboard reflects updated facility name
+        dash_resp = self.client.get("/hospital/dashboard", cookies={"access_token": token})
+        self.assertEqual(dash_resp.status_code, 200)
+        self.assertIn("Dhaka Central Super Specialized Hospital", dash_resp.text)
+
+    def test_reset_hospital_settings_api(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        reset_resp = self.client.post("/api/v1/hospital/settings/reset", cookies={"access_token": token})
+        self.assertEqual(reset_resp.status_code, 200)
+        data = reset_resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertIn("DGHS certified baseline", data["message"])
+        self.assertIn("Dhaka General Hospital", data["settings"]["facility_name"])
+
