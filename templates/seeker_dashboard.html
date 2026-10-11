@@ -346,7 +346,55 @@
       <section class="dashboard-content-section" id="section-emergency-request"></section>
 
       <!-- ================= 4. NEARBY DONORS INTERACTIVE MAP VIEW ================= -->
-      <section class="dashboard-content-section" id="section-nearby-map"></section>
+      <section class="dashboard-content-section" id="section-nearby-map" aria-labelledby="nearby-map-title">
+        <div class="seeker-card nearby-map-card">
+          <header class="nearby-map-header">
+            <div>
+              <span class="eyebrow">Available donors</span>
+              <h2 id="nearby-map-title">Nearby Donors Interactive Map View</h2>
+              <p class="card-subtitle">Explore available donors by blood group and distance.</p>
+            </div>
+            <button type="button" class="btn btn-outline nearby-map-refresh" id="nearbyMapRefresh" aria-label="Refresh nearby donors">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"/></svg>
+              Refresh
+            </button>
+          </header>
+
+          <div class="nearby-map-controls">
+            <label for="mapBloodGroupFilter">Blood group</label>
+            <select id="mapBloodGroupFilter">
+              <option value="">All groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+            <label for="mapRadiusSlider">Within <output id="mapRadiusValue" for="mapRadiusSlider">15 km</output></label>
+            <input type="range" id="mapRadiusSlider" min="1" max="30" value="15">
+            <span class="nearby-availability"><span aria-hidden="true"></span>Available now</span>
+          </div>
+
+          <div class="nearby-map-layout">
+            <div class="map-viewport-wrapper">
+              <div id="seekerDonorMap" role="application" aria-label="Map of nearby available blood donors"></div>
+              <div class="map-legend"><span class="legend-dot" aria-hidden="true"></span>Approximate donor area</div>
+            </div>
+            <aside class="nearby-donor-panel" aria-labelledby="nearby-donor-heading">
+              <div class="nearby-donor-panel-heading">
+                <h3 id="nearby-donor-heading">Matching donors</h3>
+                <span id="mapDonorCount">0</span>
+              </div>
+              <p id="mapDonorStatus" role="status" aria-live="polite">Open the map to find nearby donors.</p>
+              <div id="mapNearbyDonorsList" class="nearby-donor-list"></div>
+            </aside>
+          </div>
+          <p class="nearby-map-privacy">Donor locations are approximate unless a donor has explicitly chosen to share a more precise location.</p>
+        </div>
+      </section>
 
       <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
       <section class="dashboard-content-section" id="section-donor-directory"></section>
