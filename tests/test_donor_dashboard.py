@@ -69,45 +69,46 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn('typingIndicator', html)
 
     def test_donor_chat_threads_api(self):
-        response = self.client.get("/api/v1/donor/chat/threads")
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get(
+            "/api/v1/donor/chat/threads", cookies={"access_token": token}
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertGreaterEqual(len(data["threads"]), 4)
         thread_ids = [t["id"] for t in data["threads"]]
-        self.assertIn("thread-square", thread_ids)
-        self.assertIn("thread-dmc", thread_ids)
-
-        # Test filtering by category
-        hospital_res = self.client.get("/api/v1/donor/chat/threads?category=hospital")
-        self.assertEqual(hospital_res.status_code, 200)
-        hosp_data = hospital_res.json()
-        for t in hosp_data["threads"]:
-            self.assertEqual(t["category"], "hospital")
+        self.assertIn("thread-nabil", thread_ids)
 
     def test_donor_chat_messages_api(self):
-        response = self.client.get("/api/v1/donor/chat/thread-square/messages")
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get(
+            "/api/v1/donor/chat/thread-nabil/messages",
+            cookies={"access_token": token},
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertEqual(data["thread_id"], "thread-square")
+        self.assertEqual(data["thread_id"], "thread-nabil")
         self.assertIsInstance(data["messages"], list)
-        self.assertGreaterEqual(len(data["messages"]), 1)
 
     def test_donor_chat_send_and_read_api(self):
+        token = _generate_jwt("+8801712345678", "donor")
         # Test sending message
         send_res = self.client.post(
-            "/api/v1/donor/chat/thread-square/send",
-            json={"text": "I am on my way to Square Hospital", "sender": "you"},
+            "/api/v1/donor/chat/thread-nabil/send",
+            json={"text": "I am on my way to Square Hospital"},
+            cookies={"access_token": token},
         )
         self.assertEqual(send_res.status_code, 200)
         send_data = send_res.json()
         self.assertEqual(send_data["status"], "success")
         self.assertEqual(send_data["sent"]["text"], "I am on my way to Square Hospital")
-        self.assertIn("reply", send_data)
 
         # Test marking thread as read
-        read_res = self.client.post("/api/v1/donor/chat/thread-square/read")
+        read_res = self.client.post(
+            "/api/v1/donor/chat/thread-nabil/read",
+            cookies={"access_token": token},
+        )
         self.assertEqual(read_res.status_code, 200)
         read_data = read_res.json()
         self.assertEqual(read_data["status"], "success")

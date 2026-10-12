@@ -371,7 +371,7 @@ The platform provides multiple communication methods between blood seekers and d
 * WhatsApp
 * Emergency Notifications
 
-Communication permissions can be controlled from the user's privacy settings.
+Donor-seeker conversations are stored in `urgent_requests.db` and delivered live over authenticated WebSockets. Each conversation has one donor and one seeker participant; REST and WebSocket access is checked against that membership. The chat screens show timestamps and unread counts, and participants can report a conversation or restrict further messages from the other participant. The seeker chat sidebar loads available, active donor accounts and lets seekers start a conversation there without leaving the chat screen. Message delivery uses the chat API directly, so it remains available while live WebSocket updates reconnect.
 
 ---
 

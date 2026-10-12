@@ -521,7 +521,63 @@
       <section class="dashboard-content-section" id="section-direct-contact"></section>
 
       <!-- ================= 8. REAL-TIME IN-APP 1-ON-1 CHAT ================= -->
-      <section class="dashboard-content-section" id="section-seeker-chat"></section>
+      <section class="dashboard-content-section" id="section-seeker-chat" aria-labelledby="seeker-chat-title">
+        <div class="seeker-chat-panel">
+          <header class="seeker-chat-heading">
+            <div>
+              <h2 id="seeker-chat-title">Real-Time In-App 1-on-1 Chat</h2>
+              <p>Coordinate a donation directly with a matched donor. Keep personal and medical details private.</p>
+            </div>
+            <span id="seekerChatConnection" class="seeker-chat-connection" role="status">Connecting…</span>
+          </header>
+          <div class="seeker-chat-layout">
+            <aside class="seeker-chat-sidebar" aria-label="Your donor conversations">
+              <div class="seeker-chat-list-heading">
+                <strong>Conversations</strong>
+                <span id="seekerChatUnread" class="seeker-chat-unread" hidden></span>
+              </div>
+              <div class="seeker-chat-start">
+                <label for="seekerChatDonorSelect">Start new conversation</label>
+                <select id="seekerChatDonorSelect">
+                  <option value="">Loading available donors…</option>
+                </select>
+                <button type="button" id="seekerChatStart" disabled>Start chat</button>
+              </div>
+              <div id="seekerChatThreads" class="seeker-chat-threads" aria-live="polite">
+                <p class="seeker-chat-empty">Loading conversations…</p>
+              </div>
+            </aside>
+            <div class="seeker-chat-conversation">
+              <div class="seeker-chat-toolbar">
+                <div>
+                  <strong id="seekerChatPeer">Choose a donor conversation</strong>
+                  <span id="seekerChatRestriction" role="status"></span>
+                </div>
+                <div class="seeker-chat-safety-actions">
+                  <label class="visually-hidden" for="seekerChatReportReason">Report reason</label>
+                  <select id="seekerChatReportReason" aria-label="Report reason">
+                    <option value="harassment">Harassment</option>
+                    <option value="spam">Spam</option>
+                    <option value="safety">Safety concern</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <button type="button" id="seekerChatReport" disabled>Report</button>
+                  <button type="button" id="seekerChatBlock" disabled>Restrict</button>
+                </div>
+              </div>
+              <div id="seekerChatMessages" class="seeker-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
+                <p class="seeker-chat-empty">Select an existing conversation or open chat from a donor profile.</p>
+              </div>
+              <form id="seekerChatForm" class="seeker-chat-compose">
+                <label class="visually-hidden" for="seekerChatInput">Message</label>
+                <input id="seekerChatInput" type="text" maxlength="2000" autocomplete="off" placeholder="Write a message…" disabled>
+                <button id="seekerChatSend" type="submit" disabled>Send</button>
+              </form>
+              <p id="seekerChatFeedback" class="seeker-chat-feedback" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- ================= 9. SEEKER PORTAL SETTINGS & PREFERENCES ================= -->
       <section class="dashboard-content-section" id="section-seeker-settings">
