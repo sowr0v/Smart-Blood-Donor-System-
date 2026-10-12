@@ -1,6 +1,5 @@
 // ================= BLOOD SEEKER PORTAL SCRIPT =================
-// Implementation for Section 1: Blood Seeker Personal Dashboard
-// Sections 2 through 9 remain modular shells until requested.
+// Blood seeker dashboard interactions and emergency request submission.
 
 document.addEventListener('DOMContentLoaded', () => {
   // Navigation & Tab Switching
@@ -297,6 +296,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSeekerRequestsTable(filter = 'all') {
     const tableBody = document.getElementById('seekerRequestsTableBody');
     if (!tableBody) return;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
 
     let filtered = seekerRequests;
     if (filter === 'active') {
@@ -320,38 +326,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tableBody.innerHTML = filtered.map(req => {
       const isSos = req.is_emergency === 1 || req.status === 'Emergency';
+      const currentStatus = req.status || (isSos ? 'Emergency' : 'Active');
       const statusBadge = isSos
-        ? `<span class="nav-badge-emergency">● SOS EMERGENCY</span>`
-        : req.status === 'Fulfilled'
+        ? `<span class="nav-badge-emergency">● SOS EMERGENCY · ${escapeHtml(currentStatus)}</span>`
+        : currentStatus === 'Fulfilled'
         ? `<span class="nav-pill-badge pill-green">✓ Fulfilled</span>`
-        : `<span class="nav-pill-badge pill-blue">Active</span>`;
+        : `<span class="nav-pill-badge pill-blue">${escapeHtml(currentStatus)}</span>`;
 
       const hospitalName = req.hospital || req.hospital_name || 'Dhaka Hospital';
       const areaName = req.area || req.district || 'Dhaka';
       const patient = req.patient_name || 'Patient';
       const units = req.units || 1;
-      const responses = req.responses_count || (isSos ? 5 : 2);
+      const responses = req.responses_count ?? (isSos ? 5 : 2);
 
       return `
         <tr>
-          <td style="font-weight: 700; color: var(--text-primary);">#REQ-${req.id}</td>
-          <td><strong>${patient}</strong></td>
+          <td style="font-weight: 700; color: var(--text-primary);">#REQ-${escapeHtml(req.id)}</td>
+          <td><strong>${escapeHtml(patient)}</strong></td>
           <td>
             <span class="blood-group-badge" style="background: #FFE4E6; color: #BE123C; font-weight: 800; padding: 3px 8px; border-radius: 6px; font-size: 0.85rem; display: inline-block;">
-              ${req.blood_group}
+              ${escapeHtml(req.blood_group)}
             </span>
           </td>
           <td>
-            <div style="font-weight: 600; font-size: 0.88rem;">${hospitalName}</div>
-            <div style="font-size: 0.76rem; color: var(--text-secondary);">${areaName} • ${units} Bag(s)</div>
+            <div style="font-weight: 600; font-size: 0.88rem;">${escapeHtml(hospitalName)}</div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary);">${escapeHtml(areaName)} • ${escapeHtml(units)} Bag(s)</div>
           </td>
           <td>${statusBadge}</td>
           <td>
-            <span style="font-weight: 700; color: #0284C7;">${responses} Donors Responded</span>
+            <span style="font-weight: 700; color: #0284C7;">${escapeHtml(responses)} Donors Responded</span>
           </td>
           <td>
             <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn-card-action primary" onclick="window.viewRequestDonors('${req.blood_group}')">
+              <button type="button" class="btn-card-action primary" onclick="window.viewRequestDonors('${escapeHtml(req.blood_group)}')">
                 View Donors
               </button>
               <button type="button" class="btn-card-action" onclick="window.openChatWithDonor('dn-001')">
@@ -413,10 +420,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 area: apiReq.area || apiReq.district || 'Dhaka',
                 units: apiReq.units || 1,
                 needed_date: 'Immediate',
-                status: apiReq.is_emergency ? 'Emergency' : 'Active',
+                status: apiReq.is_emergency ? (apiReq.status || 'Emergency') : (apiReq.status || 'Active'),
                 is_emergency: apiReq.is_emergency ? 1 : 0,
-                responses_count: apiReq.is_emergency ? 4 : 2,
-                created_at: 'Recently'
+                responses_count: 0,
+                created_at: apiReq.created_at || 'Recently'
               });
             }
           });
@@ -427,6 +434,63 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Seeker requests API fetch skipped:', err);
     }
+  }
+
+  const emergencyRequestForm = document.getElementById('emergencyRequestForm');
+  if (emergencyRequestForm) {
+    emergencyRequestForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!emergencyRequestForm.reportValidity()) return;
+
+      const submitButton = document.getElementById('submitEmergencyRequest');
+      const feedback = document.getElementById('emergencyRequestFeedback');
+      const formData = new FormData(emergencyRequestForm);
+      const payload = Object.fromEntries(formData.entries());
+      payload.units = Number(payload.units);
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending emergency request...';
+      feedback.hidden = true;
+
+      try {
+        const response = await fetch('/api/v1/seeker/requests/emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(' ')
+            : data.detail;
+          throw new Error(detail || data.message || 'Could not create the emergency request.');
+        }
+
+        await loadSeekerRequestsFromApi();
+        const notification = data.notifications || {};
+        let notificationMessage = '';
+        if (notification.status === 'not_configured') {
+          notificationMessage = ' SMS alerts were not sent because the SMS gateway is not configured.';
+        } else if (notification.status === 'failed' || notification.status === 'partial') {
+          notificationMessage = ` SMS delivery: ${notification.sent} sent, ${notification.failed} failed.`;
+        } else if (notification.status === 'no_matches') {
+          notificationMessage = ' No available matching donors were found to notify.';
+        } else if (notification.status === 'sent') {
+          notificationMessage = ` SMS alerts sent to ${notification.sent} matching donor(s).`;
+        }
+
+        feedback.textContent = `Emergency request #${data.request.id} is active and can be tracked in My Posted Blood Requests.${notificationMessage}`;
+        feedback.hidden = false;
+        emergencyRequestForm.reset();
+        showToast(`Emergency request #${data.request.id} created.`);
+      } catch (error) {
+        feedback.textContent = error.message || 'The emergency request could not be submitted. Please try again.';
+        feedback.hidden = false;
+        showToast(feedback.textContent, 'error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<span aria-hidden="true">🚨</span> Broadcast Emergency Request';
+      }
+    });
   }
 
   // Update user name in sidebar, avatar circle, and banner greeting

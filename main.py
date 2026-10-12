@@ -56,7 +56,14 @@ def initialize_urgent_database():
                     distance_km REAL,
                     expires_at TEXT NOT NULL,
                     contact_phone TEXT,
-                    is_emergency INTEGER DEFAULT 0
+                    is_emergency INTEGER DEFAULT 0,
+                    owner_phone TEXT,
+                    patient_name TEXT NOT NULL DEFAULT '',
+                    units INTEGER NOT NULL DEFAULT 1,
+                    urgency_level TEXT NOT NULL DEFAULT 'Standard',
+                    reason TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'Active',
+                    created_at TEXT
                 );
                 CREATE TABLE IF NOT EXISTS donor_request_responses (
                     id INTEGER PRIMARY KEY,
@@ -89,6 +96,23 @@ def initialize_urgent_database():
                     ON donor_donation_history(donor_phone, donated_at DESC);
                 """
             )
+            blood_request_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(blood_requests)").fetchall()
+            }
+            request_migrations = {
+                "owner_phone": "TEXT",
+                "patient_name": "TEXT NOT NULL DEFAULT ''",
+                "units": "INTEGER NOT NULL DEFAULT 1",
+                "urgency_level": "TEXT NOT NULL DEFAULT 'Standard'",
+                "reason": "TEXT NOT NULL DEFAULT ''",
+                "status": "TEXT NOT NULL DEFAULT 'Active'",
+                "created_at": "TEXT",
+            }
+            for column, definition in request_migrations.items():
+                if column not in blood_request_columns:
+                    connection.execute(
+                        f"ALTER TABLE blood_requests ADD COLUMN {column} {definition}"
+                    )
             count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
             if count == 0:
                 now = datetime.now(timezone.utc)
@@ -570,6 +594,13 @@ def sms_is_configured() -> bool:
 
 
 def send_recovery_sms(phone: str, code: str):
+    send_sms_message(
+        phone,
+        f"Your Smart Blood Donor System reset code is {code}. It expires in 10 minutes.",
+    )
+
+
+def send_sms_message(phone: str, message: str):
     account_sid = os.environ["TWILIO_ACCOUNT_SID"]
     auth_token = os.environ["TWILIO_AUTH_TOKEN"]
     from_number = os.environ["TWILIO_FROM_NUMBER"]
@@ -578,7 +609,7 @@ def send_recovery_sms(phone: str, code: str):
         {
             "To": phone,
             "From": from_number,
-            "Body": f"Your Smart Blood Donor System reset code is {code}. It expires in 10 minutes.",
+            "Body": message,
         }
     ).encode("ascii")
     credentials = base64.b64encode(f"{account_sid}:{auth_token}".encode("ascii")).decode("ascii")
@@ -2183,12 +2214,15 @@ class SeekerBloodRequestCreate(BaseModel):
 
 
 class SeekerEmergencyBroadcastCreate(BaseModel):
-    patient_name: str
-    blood_group: str
-    hospital_name: str
-    area: str = "Dhaka"
-    urgency_level: str = "Code Red (Within 1 Hour)"
-    contact_phone: str
+    patient_name: str = Field(min_length=1, max_length=120)
+    blood_group: str = Field(min_length=2, max_length=3)
+    hospital_name: str = Field(min_length=2, max_length=160)
+    area: str = Field(default="Dhaka", min_length=2, max_length=120)
+    district: str = Field(default="Dhaka", min_length=2, max_length=120)
+    units: int = Field(default=1, ge=1, le=20)
+    urgency_level: str = Field(default="Code Red (Within 1 Hour)", min_length=1, max_length=80)
+    contact_phone: str = Field(min_length=7, max_length=24)
+    reason: str = Field(default="", max_length=500)
 
 
 class SeekerContactLogPayload(BaseModel):
@@ -2730,13 +2764,28 @@ SEEKER_CHAT_MESSAGES = {
 
 
 @app.get("/api/v1/seeker/requests")
-async def get_seeker_requests():
+async def get_seeker_requests(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to view your requests.")
+
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-        rows = connection.execute(
-            """SELECT id, blood_group, hospital_name, district, area, distance_km,
-                      expires_at, contact_phone, is_emergency
-               FROM blood_requests ORDER BY id DESC LIMIT 20"""
-        ).fetchall()
+        with connection:
+            connection.execute(
+                """UPDATE blood_requests SET status = 'Expired'
+                   WHERE status = 'Active' AND expires_at <= ?
+                     AND (owner_phone = ? OR owner_phone IS NULL)""",
+                (datetime.now(timezone.utc).isoformat(), token["sub"]),
+            )
+            rows = connection.execute(
+                """SELECT id, blood_group, hospital_name, district, area, distance_km,
+                          expires_at, contact_phone, is_emergency, patient_name, units,
+                          urgency_level, reason, status, created_at
+                   FROM blood_requests
+                   WHERE owner_phone = ? OR owner_phone IS NULL
+                   ORDER BY id DESC LIMIT 50""",
+                (token["sub"],),
+            ).fetchall()
         requests_list = [
             {
                 "id": r[0],
@@ -2748,6 +2797,12 @@ async def get_seeker_requests():
                 "expires_at": r[6],
                 "contact_phone": r[7],
                 "is_emergency": bool(r[8]),
+                "patient_name": r[9],
+                "units": r[10],
+                "urgency_level": r[11],
+                "reason": r[12],
+                "status": r[13],
+                "created_at": r[14],
             }
             for r in rows
         ]
@@ -2755,20 +2810,23 @@ async def get_seeker_requests():
 
 
 @app.post("/api/v1/seeker/requests")
-async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
+async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request: Request):
     group = payload.blood_group.strip().upper()
     if group not in VALID_BLOOD_GROUPS:
         raise HTTPException(status_code=422, detail="Invalid blood group")
 
     now = datetime.now(timezone.utc)
     expires_at = (now + timedelta(hours=24)).isoformat()
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    owner_phone = token.get("sub") if token and token.get("role") == "seeker" else None
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             cursor = connection.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
-                       expires_at, contact_phone, is_emergency
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       expires_at, contact_phone, is_emergency, owner_phone,
+                       patient_name, units, urgency_level, reason, status, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     group,
                     payload.hospital_name.strip(),
@@ -2778,6 +2836,13 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
                     expires_at,
                     payload.contact_phone.strip(),
                     1 if payload.is_emergency else 0,
+                    owner_phone,
+                    payload.patient_name.strip(),
+                    payload.units,
+                    "Standard",
+                    payload.reason.strip(),
+                    "Active",
+                    now.isoformat(),
                 ),
             )
             new_id = cursor.lastrowid
@@ -2793,50 +2858,140 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
             "area": payload.area,
             "units": payload.units,
             "is_emergency": payload.is_emergency,
+            "status": "Active",
+            "created_at": now.isoformat(),
             "expires_at": expires_at,
         },
     }
 
 
 @app.post("/api/v1/seeker/requests/emergency")
-async def create_seeker_emergency_broadcast(payload: SeekerEmergencyBroadcastCreate):
+async def create_seeker_emergency_broadcast(
+    payload: SeekerEmergencyBroadcastCreate,
+    request: Request,
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to create an emergency request.")
+
+    required_values = {
+        "patient name": payload.patient_name,
+        "hospital": payload.hospital_name,
+        "area": payload.area,
+        "district": payload.district,
+        "contact phone": payload.contact_phone,
+    }
+    for label, value in required_values.items():
+        if not value.strip():
+            raise HTTPException(status_code=422, detail=f"{label.title()} is required.")
+
     group = payload.blood_group.strip().upper()
     if group not in VALID_BLOOD_GROUPS:
         raise HTTPException(status_code=422, detail="Invalid blood group")
 
+    expiration_hours = {
+        "Code Red (Within 1 Hour)": 1,
+        "Critical (Within 3 Hours)": 3,
+        "Urgent (Within 6 Hours)": 6,
+    }
+    if payload.urgency_level not in expiration_hours:
+        raise HTTPException(status_code=422, detail="Select a valid emergency urgency level.")
+
     now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(hours=3)).isoformat()
+    created_at = now.isoformat()
+    expires_at = (now + timedelta(hours=expiration_hours[payload.urgency_level])).isoformat()
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             cursor = connection.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
-                       expires_at, contact_phone, is_emergency
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       expires_at, contact_phone, is_emergency, owner_phone,
+                       patient_name, units, urgency_level, reason, status, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     group,
                     payload.hospital_name.strip(),
-                    "Dhaka",
+                    payload.district.strip(),
                     payload.area.strip() or "Dhaka",
                     1.5,
                     expires_at,
                     payload.contact_phone.strip(),
                     1,
+                    token["sub"],
+                    payload.patient_name.strip(),
+                    payload.units,
+                    payload.urgency_level,
+                    payload.reason.strip(),
+                    "Active",
+                    created_at,
                 ),
             )
             new_id = cursor.lastrowid
 
+    matching_donor_groups = {
+        donor_group
+        for donor_group, compatible_recipients in DONOR_MATCH_COMPATIBILITY.items()
+        if group in compatible_recipients
+    }
+    with closing(_connection()) as connection:
+        donors = connection.execute(
+            """SELECT donor_profiles.phone, donor_profiles.blood_group
+               FROM donor_profiles
+               JOIN auth_users ON auth_users.phone = donor_profiles.phone
+               WHERE auth_users.role = 'donor'
+                 AND COALESCE(donor_profiles.is_available, 1) = 1"""
+        ).fetchall()
+    matching_donors = [
+        donor[0]
+        for donor in donors
+        if donor[1] in matching_donor_groups and donor[0] != token["sub"]
+    ]
+
+    notification = {
+        "channel": "sms",
+        "status": "not_configured",
+        "matched_donors": len(matching_donors),
+        "sent": 0,
+        "failed": 0,
+    }
+    if sms_is_configured():
+        for donor_phone in matching_donors:
+            try:
+                send_sms_message(
+                    donor_phone,
+                    (
+                        f"Emergency blood request: {group}, {payload.units} unit(s) needed at "
+                        f"{payload.hospital_name.strip()}, {payload.area.strip()}, "
+                        f"{payload.district.strip()}. Please sign in to respond."
+                    ),
+                )
+                notification["sent"] += 1
+            except (OSError, urllib.error.URLError, TimeoutError):
+                notification["failed"] += 1
+                logger.exception("Emergency blood request SMS delivery failed for request %s", new_id)
+        if notification["failed"]:
+            notification["status"] = "partial" if notification["sent"] else "failed"
+        else:
+            notification["status"] = "sent" if notification["sent"] else "no_matches"
+
     return {
         "status": "success",
-        "message": "Emergency SOS broadcast alert dispatched to nearby donors",
-        "broadcast_count": 18,
+        "message": "Emergency blood request created and matching donors were notified according to system settings.",
+        "broadcast_count": notification["matched_donors"],
+        "notifications": notification,
         "request": {
             "id": new_id,
             "patient_name": payload.patient_name,
             "blood_group": group,
-            "hospital_name": payload.hospital_name,
+            "hospital_name": payload.hospital_name.strip(),
+            "district": payload.district.strip(),
+            "area": payload.area.strip(),
+            "units": payload.units,
             "urgency_level": payload.urgency_level,
             "is_emergency": True,
+            "status": "Active",
+            "reason": payload.reason.strip(),
+            "created_at": created_at,
             "expires_at": expires_at,
         },
     }
@@ -3284,8 +3439,5 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
-
-
 
 

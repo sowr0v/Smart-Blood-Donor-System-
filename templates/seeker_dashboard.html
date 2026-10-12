@@ -343,7 +343,81 @@
       <section class="dashboard-content-section" id="section-standard-request"></section>
 
       <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-emergency-request"></section>
+      <section class="dashboard-content-section" id="section-emergency-request">
+        <div class="seeker-card emergency-form-panel">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🚨</span>
+            <div>
+              <h2>Create Emergency Blood Request</h2>
+              <div class="card-subtitle">Alert suitable donors for an immediate blood requirement.</div>
+            </div>
+          </div>
+
+          <div class="sos-alert-banner" role="note">
+            <span class="sos-alert-banner-icon" aria-hidden="true">⚠️</span>
+            <div class="sos-alert-banner-text">
+              <strong>Emergency request — priority donor matching</strong>
+              <span>Submit only for an urgent medical need. Matching donor alerts follow your system's notification settings.</span>
+            </div>
+          </div>
+
+          <form id="emergencyRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="emergencyPatientName">Patient name</label>
+                <input id="emergencyPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyBloodGroup">Blood group</label>
+                <select id="emergencyBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyHospital">Hospital or care facility</label>
+                <input id="emergencyHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyUnits">Units needed</label>
+                <input id="emergencyUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyDistrict">District</label>
+                <input id="emergencyDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyArea">Area / neighborhood</label>
+                <input id="emergencyArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyUrgency">How soon is blood needed?</label>
+                <select id="emergencyUrgency" name="urgency_level" required>
+                  <option value="Code Red (Within 1 Hour)">Code Red — within 1 hour</option>
+                  <option value="Critical (Within 3 Hours)">Critical — within 3 hours</option>
+                  <option value="Urgent (Within 6 Hours)">Urgent — within 6 hours</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyContactPhone">Contact phone</label>
+                <input id="emergencyContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="emergencyReason">Additional details (optional)</label>
+              <textarea id="emergencyReason" name="reason" rows="3" maxlength="500" placeholder="Share relevant details for responding donors"></textarea>
+            </div>
+            <p id="emergencyRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitEmergencyRequest" type="submit" class="btn-broadcast-emergency" style="margin-top: 18px;">
+              <span aria-hidden="true">🚨</span> Broadcast Emergency Request
+            </button>
+            <p class="card-subtitle" style="margin: 12px 0 0;">
+              Your request will appear in My Posted Blood Requests so you can track its active status.
+            </p>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 4. NEARBY DONORS INTERACTIVE MAP VIEW ================= -->
       <section class="dashboard-content-section" id="section-nearby-map" aria-labelledby="nearby-map-title">

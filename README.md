@@ -86,6 +86,12 @@ Password recovery uses the SQLite database at `auth.db` by default; set `SBDS_AU
 
 Passwords are stored as PBKDF2 hashes. New passwords must have at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. A successful reset updates `auth_users` and deletes every persisted session for that account. The existing registration page is still a UI-only stub; an account-registration/authentication provider must provision `auth_users` with an E.164 Bangladesh phone number and a password hash before login or recovery is available.
 
+### Emergency Blood Requests
+
+Seekers can create emergency requests from the seeker dashboard. Required blood group, patient, facility, location, unit count, urgency, and contact details are validated and saved in `urgent_requests.db`; new fields are migrated in place for existing databases. Requests remain active and visible in the seeker's request list for status tracking. The emergency endpoint requires a seeker session.
+
+Matching available donor profiles are selected using the system's blood-group compatibility rules. If `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` are configured, the platform sends those donors an SMS; the API reports delivery counts and failures. Without gateway credentials it records the request but reports SMS as not configured, rather than claiming alerts were delivered. Push delivery is not currently integrated.
+
 ### Authentication Flow
 
 ```text

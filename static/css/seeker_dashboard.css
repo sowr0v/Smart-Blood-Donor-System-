@@ -682,6 +682,22 @@
   font-size: 0.84rem;
 }
 
+#emergencyRequestFeedback {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+#submitEmergencyRequest:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
 .btn-broadcast-emergency {
   background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
   color: #FFFFFF;
@@ -2070,7 +2086,6 @@ input:checked + .switch-slider:before {
   border-color: rgba(225, 29, 72, 0.35);
   color: #FDA4AF;
 }
-
 
 
 
