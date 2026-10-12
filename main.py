@@ -2848,6 +2848,7 @@ async def get_seeker_donors(
     radius_km: float = 30.0,
     available_only: bool = False,
     query: str | None = None,
+    location: str | None = None,
 ):
     donors = list(SEEKER_MOCK_DONORS)
     if blood_group:
@@ -2857,10 +2858,32 @@ async def get_seeker_donors(
         donors = [d for d in donors if d["is_available"]]
     if query:
         q = query.strip().lower()
-        donors = [d for d in donors if q in d["name"].lower() or q in d["area"].lower() or q in d["district"].lower()]
+        donors = [
+            d for d in donors
+            if q in d.get("area", "").lower() or q in d.get("district", "").lower()
+        ]
+    if location:
+        selected_location = location.strip().lower()
+        donors = [
+            d for d in donors
+            if selected_location in d.get("area", "").lower()
+            or selected_location in d.get("district", "").lower()
+        ]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
-    return {"status": "success", "count": len(donors), "donors": donors}
+    directory_donors = [
+        {
+            "blood_group": donor["blood_group"],
+            "district": donor.get("district", "Dhaka"),
+            "area": donor.get("area", "Dhaka"),
+            "distance_km": donor["distance_km"],
+            "is_available": bool(donor["is_available"]),
+            "is_verified": bool(donor.get("nid_verified", False)),
+            "location_precision": "approximate",
+        }
+        for donor in donors
+    ]
+    return {"status": "success", "count": len(directory_donors), "donors": directory_donors}
 
 
 @app.get("/api/v1/seeker/donors/{donor_id}")

@@ -46,6 +46,10 @@ document.addEventListener('DOMContentLoaded', () => {
       mobileSidebar.classList.remove('mobile-open');
     }
 
+    if (cleanId === 'section-donor-directory') {
+      window.requestAnimationFrame(() => window.filterDonorDirectory?.());
+    }
+
     if (history.pushState) {
       history.pushState(null, null, `#${cleanId}`);
     } else {
@@ -87,6 +91,121 @@ document.addEventListener('DOMContentLoaded', () => {
       const target = btn.getAttribute('data-goto');
       activateSection(target);
     });
+  });
+
+  // =========================================================================
+  // 4. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING
+  // =========================================================================
+  const dirLocationFilter = document.getElementById('dirLocationFilter');
+  const dirBloodFilter = document.getElementById('dirBloodFilter');
+  const dirRadiusSlider = document.getElementById('dirRadiusSlider');
+  const dirRadiusValue = document.getElementById('dirRadiusValue');
+  const dirAvailFilter = document.getElementById('dirAvailFilter');
+  const dirGrid = document.getElementById('donorDirectoryGrid');
+  const dirStatus = document.getElementById('donorDirectoryStatus');
+  const dirResultsCount = document.getElementById('dirResultsCount');
+  let dirRefreshTimer;
+  let dirRequestSequence = 0;
+
+  function renderDonorDirectory(donors) {
+    if (!dirGrid || !dirStatus || !dirResultsCount) return;
+    dirGrid.replaceChildren();
+    dirResultsCount.textContent = String(donors.length);
+
+    if (donors.length === 0) {
+      dirStatus.textContent = 'No donors match these filters. Try a wider distance or another area.';
+      return;
+    }
+
+    dirStatus.textContent = `${donors.length} donor${donors.length === 1 ? '' : 's'} found.`;
+    donors.forEach(donor => {
+      const card = document.createElement('article');
+      card.className = 'directory-donor-card';
+
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'directory-donor-header';
+      const bloodGroup = document.createElement('span');
+      bloodGroup.className = 'directory-blood-group';
+      bloodGroup.textContent = donor.blood_group;
+      const availability = document.createElement('span');
+      availability.className = donor.is_available ? 'directory-status available' : 'directory-status unavailable';
+      availability.textContent = donor.is_available ? 'Available now' : 'Unavailable';
+      cardHeader.append(bloodGroup, availability);
+
+      const location = document.createElement('h3');
+      location.className = 'directory-donor-location';
+      location.textContent = `${donor.area}, ${donor.district}`;
+
+      const details = document.createElement('div');
+      details.className = 'directory-donor-details';
+      const distance = document.createElement('span');
+      distance.textContent = `${Number(donor.distance_km).toFixed(1)} km away`;
+      const precision = document.createElement('span');
+      precision.textContent = 'Approximate area';
+      details.append(distance, precision);
+
+      if (donor.is_verified) {
+        const verified = document.createElement('p');
+        verified.className = 'directory-verification';
+        verified.textContent = 'Verified donor';
+        card.append(cardHeader, location, details, verified);
+      } else {
+        card.append(cardHeader, location, details);
+      }
+      dirGrid.append(card);
+    });
+  }
+
+  async function loadDonorDirectory() {
+    if (!dirGrid || !dirStatus || !dirResultsCount) return;
+    const requestSequence = ++dirRequestSequence;
+    dirStatus.textContent = 'Searching nearby donors...';
+    dirStatus.setAttribute('aria-busy', 'true');
+    const params = new URLSearchParams({
+      radius_km: dirRadiusSlider?.value || '15',
+      available_only: String(dirAvailFilter?.checked ?? true)
+    });
+    if (dirBloodFilter?.value) params.set('blood_group', dirBloodFilter.value);
+    if (dirLocationFilter?.value.trim()) params.set('location', dirLocationFilter.value.trim());
+
+    try {
+      const response = await fetch(`/api/v1/seeker/donors?${params.toString()}`);
+      if (!response.ok) throw new Error('Donor directory request failed');
+      const data = await response.json();
+      if (requestSequence === dirRequestSequence) {
+        renderDonorDirectory(Array.isArray(data.donors) ? data.donors : []);
+      }
+    } catch (error) {
+      if (requestSequence === dirRequestSequence) {
+        dirGrid.replaceChildren();
+        dirResultsCount.textContent = '0';
+        dirStatus.textContent = 'Donors could not be loaded. Please try again.';
+      }
+    } finally {
+      if (requestSequence === dirRequestSequence) dirStatus.removeAttribute('aria-busy');
+    }
+  }
+
+  function queueDonorDirectoryRefresh() {
+    clearTimeout(dirRefreshTimer);
+    dirRefreshTimer = setTimeout(loadDonorDirectory, 160);
+  }
+
+  window.filterDonorDirectory = loadDonorDirectory;
+  dirLocationFilter?.addEventListener('input', queueDonorDirectoryRefresh);
+  dirBloodFilter?.addEventListener('change', loadDonorDirectory);
+  dirRadiusSlider?.addEventListener('input', () => {
+    if (dirRadiusValue) dirRadiusValue.textContent = `${dirRadiusSlider.value} km`;
+    queueDonorDirectoryRefresh();
+  });
+  dirAvailFilter?.addEventListener('change', loadDonorDirectory);
+  document.getElementById('dirClearFilters')?.addEventListener('click', () => {
+    if (dirLocationFilter) dirLocationFilter.value = '';
+    if (dirBloodFilter) dirBloodFilter.value = '';
+    if (dirRadiusSlider) dirRadiusSlider.value = '15';
+    if (dirRadiusValue) dirRadiusValue.textContent = '15 km';
+    if (dirAvailFilter) dirAvailFilter.checked = true;
+    loadDonorDirectory();
   });
 
   // Modal controls

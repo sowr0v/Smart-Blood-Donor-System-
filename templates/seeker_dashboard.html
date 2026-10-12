@@ -349,7 +349,55 @@
       <section class="dashboard-content-section" id="section-nearby-map"></section>
 
       <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
-      <section class="dashboard-content-section" id="section-donor-directory"></section>
+      <section class="dashboard-content-section" id="section-donor-directory" aria-labelledby="donor-directory-title">
+        <div class="seeker-card directory-card">
+          <header class="directory-heading">
+            <div>
+              <span class="eyebrow">Donor discovery</span>
+              <h2 id="donor-directory-title">Donor Directory Search &amp; Proximity Filtering</h2>
+              <p class="card-subtitle">Find available donors by blood group and nearby area.</p>
+            </div>
+            <span class="directory-privacy-badge">Approximate locations</span>
+          </header>
+
+          <div class="directory-filters-bar" aria-label="Filter donors">
+            <label class="directory-location-filter" for="dirLocationFilter">
+              Area or district
+              <input type="search" id="dirLocationFilter" placeholder="e.g. Dhanmondi or Dhaka" autocomplete="off">
+            </label>
+            <label for="dirBloodFilter">
+              Blood group
+              <select id="dirBloodFilter">
+                <option value="">All groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </label>
+            <label class="directory-radius-filter" for="dirRadiusSlider">
+              <span>Distance <output id="dirRadiusValue" for="dirRadiusSlider">15 km</output></span>
+              <input type="range" id="dirRadiusSlider" min="1" max="30" value="15">
+            </label>
+            <label class="directory-availability-filter" for="dirAvailFilter">
+              <input type="checkbox" id="dirAvailFilter" checked>
+              <span>Available now</span>
+            </label>
+            <button type="button" class="directory-clear-button" id="dirClearFilters">Clear filters</button>
+          </div>
+
+          <div class="directory-results-heading">
+            <p id="donorDirectoryStatus" role="status" aria-live="polite">Choose filters to search nearby donors.</p>
+            <span id="dirResultsCount" aria-label="Matching donors">0</span>
+          </div>
+          <div class="donor-directory-grid" id="donorDirectoryGrid" aria-live="polite"></div>
+          <p class="directory-privacy-note">Donor names, contact details, medical records, and exact locations are not shown in this directory.</p>
+        </div>
+      </section>
 
       <!-- ================= 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW ================= -->
       <section class="dashboard-content-section" id="section-donor-credentials"></section>
