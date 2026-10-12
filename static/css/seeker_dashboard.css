@@ -706,19 +706,220 @@
 }
 
 /* Map Section Styles */
+.nearby-map-card {
+  padding: 24px;
+}
+
+.nearby-map-header,
+.nearby-donor-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.nearby-map-header h2 {
+  margin: 4px 0 6px;
+}
+
+.nearby-map-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nearby-map-refresh svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nearby-map-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 22px 0 14px;
+  padding: 12px 14px;
+  border-block: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.nearby-map-controls select {
+  min-height: 38px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.nearby-map-controls input[type="range"] {
+  width: min(180px, 35vw);
+  accent-color: #0f766e;
+}
+
+#mapRadiusValue {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.nearby-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: #166534;
+  font-weight: 700;
+}
+
+.nearby-availability span,
+.map-legend .legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.nearby-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 290px);
+  gap: 16px;
+}
+
 .map-viewport-wrapper {
   position: relative;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: #F1F5F9;
-  min-height: 520px;
+  min-height: 460px;
 }
 
 #seekerDonorMap {
-  height: 520px;
+  height: 460px;
   width: 100%;
   z-index: 10;
+}
+
+.nearby-donor-panel {
+  min-width: 0;
+  border-left: 1px solid var(--border-color);
+  padding-left: 16px;
+}
+
+.nearby-donor-panel-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.nearby-donor-panel-heading > span {
+  min-width: 28px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #e8f3ef;
+  color: #166534;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+#mapDonorStatus {
+  min-height: 38px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.nearby-donor-list {
+  display: grid;
+  gap: 7px;
+  max-height: 370px;
+  overflow-y: auto;
+}
+
+.nearby-donor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nearby-donor-row:hover,
+.nearby-donor-row:focus-visible {
+  border-color: #0f766e;
+  outline: 2px solid #0f766e;
+  outline-offset: 1px;
+}
+
+.nearby-donor-group {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.nearby-donor-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nearby-donor-details strong,
+.nearby-donor-details small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nearby-donor-details small {
+  color: var(--text-secondary);
+}
+
+.nearby-map-privacy {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.map-donor-marker {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #0f766e;
+  box-shadow: 0 2px 10px rgba(15, 118, 110, 0.32);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.nearby-donor-icon {
+  background: transparent;
+  border: 0;
+}
+
+.nearby-map-privacy + * {
+  margin-top: 0;
 }
 
 .map-floating-filter-panel {
@@ -783,6 +984,57 @@
 .custom-donor-pin.available {
   background: #10B981;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+@media (max-width: 900px) {
+  .nearby-map-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nearby-donor-panel {
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+    padding: 14px 0 0;
+  }
+
+  .nearby-donor-list {
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 560px) {
+  .nearby-map-card {
+    padding: 16px;
+  }
+
+  .nearby-map-header {
+    align-items: flex-start;
+  }
+
+  .nearby-map-refresh {
+    padding: 8px;
+    font-size: 0;
+  }
+
+  .nearby-map-refresh svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .nearby-map-controls {
+    gap: 10px;
+  }
+
+  .nearby-availability {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .map-viewport-wrapper,
+  #seekerDonorMap {
+    min-height: 380px;
+    height: 380px;
+  }
 }
 
 /* Donor Directory Grid */

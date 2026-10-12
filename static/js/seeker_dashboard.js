@@ -46,6 +46,14 @@ document.addEventListener('DOMContentLoaded', () => {
       mobileSidebar.classList.remove('mobile-open');
     }
 
+    if (cleanId === 'section-nearby-map') {
+      window.requestAnimationFrame(() => {
+        if (!nearbyMap) initializeNearbyMap();
+        else nearbyMap.invalidateSize();
+        if (!nearbyMapLoaded) loadNearbyDonors();
+      });
+    }
+
     if (history.pushState) {
       history.pushState(null, null, `#${cleanId}`);
     } else {
@@ -88,6 +96,124 @@ document.addEventListener('DOMContentLoaded', () => {
       activateSection(target);
     });
   });
+
+  // =========================================================================
+  // 4. NEARBY DONORS INTERACTIVE MAP VIEW
+  // =========================================================================
+  const mapElement = document.getElementById('seekerDonorMap');
+  const mapBloodFilter = document.getElementById('mapBloodGroupFilter');
+  const mapRadiusSlider = document.getElementById('mapRadiusSlider');
+  const mapRadiusValue = document.getElementById('mapRadiusValue');
+  const mapStatus = document.getElementById('mapDonorStatus');
+  const mapDonorCount = document.getElementById('mapDonorCount');
+  const mapDonorList = document.getElementById('mapNearbyDonorsList');
+  let nearbyMap = null;
+  let nearbyMapLoaded = false;
+  let nearbyMapMarkers = [];
+
+  function initializeNearbyMap() {
+    if (!mapElement || typeof window.L === 'undefined') {
+      if (mapStatus) mapStatus.textContent = 'The map could not be loaded. Check your connection and try again.';
+      return;
+    }
+    if (nearbyMap) {
+      nearbyMap.invalidateSize();
+      return;
+    }
+
+    nearbyMap = window.L.map(mapElement, { scrollWheelZoom: false }).setView([23.75, 90.38], 12);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(nearbyMap);
+  }
+
+  function renderNearbyDonors(donors) {
+    if (!nearbyMap || !mapDonorList || !mapDonorCount) return;
+    nearbyMapMarkers.forEach(marker => nearbyMap.removeLayer(marker));
+    nearbyMapMarkers = [];
+    mapDonorList.replaceChildren();
+    mapDonorCount.textContent = String(donors.length);
+
+    if (donors.length === 0) {
+      mapStatus.textContent = 'No available donors match these filters.';
+      return;
+    }
+
+    mapStatus.textContent = `${donors.length} available donor${donors.length === 1 ? '' : 's'} found.`;
+    const bounds = [];
+    donors.forEach((donor, index) => {
+      const markerIcon = window.L.divIcon({
+        className: 'nearby-donor-icon',
+        html: `<span class="map-donor-marker">${donor.blood_group}</span>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
+      });
+      const marker = window.L.marker([donor.lat, donor.lng], { icon: markerIcon }).addTo(nearbyMap);
+      const popup = document.createElement('div');
+      const bloodGroup = document.createElement('strong');
+      bloodGroup.textContent = `${donor.blood_group} donor`;
+      const area = document.createElement('p');
+      area.textContent = `${donor.area}, ${donor.district}`;
+      const distance = document.createElement('p');
+      distance.textContent = `${Number(donor.distance_km).toFixed(1)} km away · ${donor.location_precision === 'exact' ? 'Shared location' : 'Approximate area'}`;
+      popup.append(bloodGroup, area, distance);
+      marker.bindPopup(popup);
+      nearbyMapMarkers.push(marker);
+      bounds.push([donor.lat, donor.lng]);
+
+      const listButton = document.createElement('button');
+      listButton.type = 'button';
+      listButton.className = 'nearby-donor-row';
+      const group = document.createElement('span');
+      group.className = 'nearby-donor-group';
+      group.textContent = donor.blood_group;
+      const details = document.createElement('span');
+      details.className = 'nearby-donor-details';
+      const location = document.createElement('strong');
+      location.textContent = donor.area;
+      const distanceText = document.createElement('small');
+      distanceText.textContent = `${Number(donor.distance_km).toFixed(1)} km away`;
+      details.append(location, distanceText);
+      listButton.append(group, details);
+      listButton.addEventListener('click', () => {
+        nearbyMap.setView([donor.lat, donor.lng], Math.max(nearbyMap.getZoom(), 14));
+        nearbyMapMarkers[index].openPopup();
+      });
+      mapDonorList.append(listButton);
+    });
+
+    if (bounds.length > 1) nearbyMap.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
+    else nearbyMap.setView(bounds[0], 14);
+  }
+
+  async function loadNearbyDonors() {
+    if (!mapStatus) return;
+    initializeNearbyMap();
+    if (!nearbyMap) return;
+    mapStatus.textContent = 'Loading available donors...';
+    mapStatus.setAttribute('aria-busy', 'true');
+    const params = new URLSearchParams({ radius_km: mapRadiusSlider?.value || '15' });
+    if (mapBloodFilter?.value) params.set('blood_group', mapBloodFilter.value);
+    try {
+      const response = await fetch(`/api/v1/seeker/donors/map?${params.toString()}`);
+      if (!response.ok) throw new Error('Donor map request failed');
+      const data = await response.json();
+      nearbyMapLoaded = true;
+      renderNearbyDonors(Array.isArray(data.donors) ? data.donors : []);
+    } catch (error) {
+      mapStatus.textContent = 'Nearby donors could not be loaded. Please try again.';
+    } finally {
+      mapStatus.removeAttribute('aria-busy');
+    }
+  }
+
+  mapBloodFilter?.addEventListener('change', loadNearbyDonors);
+  mapRadiusSlider?.addEventListener('input', () => {
+    if (mapRadiusValue) mapRadiusValue.textContent = `${mapRadiusSlider.value} km`;
+    loadNearbyDonors();
+  });
+  document.getElementById('nearbyMapRefresh')?.addEventListener('click', loadNearbyDonors);
 
   // Modal controls
   window.closeSosModal = function() {

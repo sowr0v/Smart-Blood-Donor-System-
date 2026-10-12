@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from main import app, _generate_jwt
@@ -112,6 +113,78 @@ class SeekerDashboardTests(unittest.TestCase):
         for donor in data["donors"]:
             self.assertEqual(donor["blood_group"], "A+")
             self.assertLessEqual(donor["distance_km"], 10)
+
+    def test_seeker_donor_list_and_detail_obscure_restricted_coordinates(self):
+        list_response = self.client.get("/api/v1/seeker/donors?blood_group=A%2B")
+        detail_response = self.client.get("/api/v1/seeker/donors/dn-001")
+
+        self.assertEqual((list_response.json()["donors"][0]["lat"], list_response.json()["donors"][0]["lng"]), (23.75, 90.37))
+        self.assertEqual((detail_response.json()["donor"]["lat"], detail_response.json()["donor"]["lng"]), (23.75, 90.37))
+
+    def test_seeker_donor_map_filters_and_hides_restricted_location_details(self):
+        donor_records = [
+            {
+                "id": "private-donor",
+                "name": "Private Donor",
+                "phone": "+8801700000000",
+                "blood_group": "A+",
+                "district": "Dhaka",
+                "area": "Dhanmondi",
+                "lat": 23.7461,
+                "lng": 90.3742,
+                "distance_km": 1.2,
+                "is_available": True,
+            },
+            {
+                "blood_group": "A+",
+                "area": "Mirpur",
+                "district": "Dhaka",
+                "lat": 23.8,
+                "lng": 90.36,
+                "distance_km": 2,
+                "is_available": False,
+            },
+            {
+                "blood_group": "O+",
+                "area": "Gulshan",
+                "district": "Dhaka",
+                "lat": 23.79,
+                "lng": 90.42,
+                "distance_km": 1,
+                "is_available": True,
+            },
+        ]
+        with patch("main.SEEKER_MOCK_DONORS", donor_records):
+            response = self.client.get("/api/v1/seeker/donors/map?blood_group=A%2B&radius_km=5")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        donor = data["donors"][0]
+        self.assertEqual(donor["blood_group"], "A+")
+        self.assertEqual(donor["location_precision"], "approximate")
+        self.assertEqual((donor["lat"], donor["lng"]), (23.75, 90.37))
+        self.assertNotIn("name", donor)
+        self.assertNotIn("phone", donor)
+        self.assertNotIn("id", donor)
+
+    def test_seeker_donor_map_returns_exact_location_only_with_explicit_sharing(self):
+        donor_records = [{
+            "blood_group": "O-",
+            "area": "Dhanmondi",
+            "district": "Dhaka",
+            "lat": 23.7461,
+            "lng": 90.3742,
+            "distance_km": 1.2,
+            "is_available": True,
+            "share_exact_location": True,
+        }]
+        with patch("main.SEEKER_MOCK_DONORS", donor_records):
+            response = self.client.get("/api/v1/seeker/donors/map")
+
+        donor = response.json()["donors"][0]
+        self.assertEqual(donor["location_precision"], "exact")
+        self.assertEqual((donor["lat"], donor["lng"]), (23.7461, 90.3742))
 
     def test_seeker_donor_credentials_detail(self):
         response = self.client.get("/api/v1/seeker/donors/dn-001")

@@ -2842,6 +2842,15 @@ async def create_seeker_emergency_broadcast(payload: SeekerEmergencyBroadcastCre
     }
 
 
+def _seeker_donor_with_safe_location(donor: dict) -> dict:
+    safe_donor = dict(donor)
+    if "lat" in donor and "lng" in donor:
+        exact_location_shared = donor.get("share_exact_location") is True
+        safe_donor["lat"] = float(donor["lat"]) if exact_location_shared else round(float(donor["lat"]), 2)
+        safe_donor["lng"] = float(donor["lng"]) if exact_location_shared else round(float(donor["lng"]), 2)
+    return safe_donor
+
+
 @app.get("/api/v1/seeker/donors")
 async def get_seeker_donors(
     blood_group: str | None = None,
@@ -2860,7 +2869,39 @@ async def get_seeker_donors(
         donors = [d for d in donors if q in d["name"].lower() or q in d["area"].lower() or q in d["district"].lower()]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
+    donors = [_seeker_donor_with_safe_location(donor) for donor in donors]
     return {"status": "success", "count": len(donors), "donors": donors}
+
+
+@app.get("/api/v1/seeker/donors/map")
+async def get_seeker_donor_map(
+    blood_group: str | None = None,
+    radius_km: float = Query(default=15.0, ge=1.0, le=30.0),
+):
+    selected_group = blood_group.strip().replace(" ", "+").upper() if blood_group else ""
+    donors = [
+        donor for donor in SEEKER_MOCK_DONORS
+        if donor.get("is_available") and donor.get("distance_km", float("inf")) <= radius_km
+    ]
+    if selected_group:
+        donors = [donor for donor in donors if donor.get("blood_group", "").upper() == selected_group]
+
+    map_donors = []
+    for donor in donors:
+        exact_location_shared = donor.get("share_exact_location") is True
+        latitude = float(donor["lat"])
+        longitude = float(donor["lng"])
+        map_donors.append({
+            "blood_group": donor["blood_group"],
+            "district": donor.get("district", "Dhaka"),
+            "area": donor.get("area", "Dhaka"),
+            "distance_km": donor["distance_km"],
+            "lat": latitude if exact_location_shared else round(latitude, 2),
+            "lng": longitude if exact_location_shared else round(longitude, 2),
+            "location_precision": "exact" if exact_location_shared else "approximate",
+        })
+
+    return {"status": "success", "count": len(map_donors), "donors": map_donors}
 
 
 @app.get("/api/v1/seeker/donors/{donor_id}")
@@ -2868,7 +2909,7 @@ async def get_seeker_donor_detail(donor_id: str):
     donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
     if not donor:
         donor = SEEKER_MOCK_DONORS[0]
-    return {"status": "success", "donor": donor}
+    return {"status": "success", "donor": _seeker_donor_with_safe_location(donor)}
 
 
 @app.post("/api/v1/seeker/contact/log")
