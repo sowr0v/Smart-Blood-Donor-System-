@@ -54,11 +54,16 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Donor Directory Search &amp; Proximity Filtering", html)
         self.assertIn('id="section-donor-directory"', html)
         self.assertIn('id="nav-item-donor-directory"', html)
+        self.assertIn('id="donorDirectoryGrid"', html)
+        self.assertIn('id="dirBloodFilter"', html)
 
         # 6. Donor Public Profile & Credentials View
         self.assertIn("Donor Public Profile &amp; Credentials View", html)
         self.assertIn('id="section-donor-credentials"', html)
         self.assertIn('id="nav-item-donor-credentials"', html)
+        self.assertIn('id="donorPublicProfile"', html)
+        self.assertIn('class="donor-directory-grid" aria-live="polite"', html)
+        self.assertNotIn('id="donorProfileBack"', html)
 
         # 7. Direct Contact Action (Call / WhatsApp CTA)
         self.assertIn("Direct Contact Action (Call / WhatsApp CTA)", html)
@@ -245,8 +250,71 @@ class SeekerDashboardTests(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["donor"]["id"], "dn-001")
         self.assertEqual(data["donor"]["name"], "Ayesha Rahman")
-        self.assertTrue(data["donor"]["nid_verified"])
-        self.assertIn("Hepatitis", data["donor"]["screening"])
+        self.assertTrue(data["donor"]["is_verified"])
+        self.assertEqual(data["donor"]["verification_status"], "verified")
+        self.assertEqual(data["donor"]["blood_group"], "A+")
+        self.assertTrue(data["donor"]["is_available"])
+        self.assertEqual(data["donor"]["donation_count"], 8)
+        for private_field in (
+            "phone",
+            "formatted_phone",
+            "email",
+            "address",
+            "hemoglobin",
+            "weight_bp",
+            "screening",
+            "medical_conditions",
+            "reviews",
+        ):
+            self.assertNotIn(private_field, data["donor"])
+        self.assertEqual((data["donor"]["lat"], data["donor"]["lng"]), (23.75, 90.37))
+
+    def test_public_donor_profile_respects_name_and_history_privacy(self):
+        donor = {
+            "id": "private-donor",
+            "name": "Private Name",
+            "share_name": False,
+            "public_identifier": "Donor 24",
+            "blood_group": "O-",
+            "area": "Mirpur",
+            "district": "Dhaka",
+            "is_available": False,
+            "nid_verified": False,
+            "total_donations": 4,
+            "phone": "+8801700000000",
+            "screening": "Private screening information",
+        }
+        with patch("main.SEEKER_MOCK_DONORS", [donor]):
+            response = self.client.get("/api/v1/seeker/donors/private-donor")
+            hidden_name_search = self.client.get(
+                "/api/v1/seeker/donors",
+                params={"query": "Private Name"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(hidden_name_search.json()["count"], 0)
+        public_donor = response.json()["donor"]
+        self.assertEqual(public_donor["name"], "Donor 24")
+        self.assertFalse(public_donor["is_available"])
+        self.assertEqual(public_donor["verification_status"], "not_verified")
+        self.assertNotIn("donation_count", public_donor)
+        self.assertNotIn("phone", public_donor)
+        self.assertNotIn("screening", public_donor)
+
+    def test_unknown_public_donor_profile_returns_not_found(self):
+        response = self.client.get("/api/v1/seeker/donors/not-a-donor")
+        self.assertEqual(response.status_code, 404)
+
+    def test_public_donor_directory_does_not_expose_private_profile_fields(self):
+        response = self.client.get("/api/v1/seeker/donors")
+        self.assertEqual(response.status_code, 200)
+        donor = response.json()["donors"][0]
+        self.assertIn("name", donor)
+        self.assertIn("blood_group", donor)
+        self.assertIn("is_available", donor)
+        self.assertIn("verification_status", donor)
+        self.assertNotIn("phone", donor)
+        self.assertNotIn("screening", donor)
 
     def test_seeker_contact_log_flow(self):
         post_resp = self.client.post(

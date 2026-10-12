@@ -52,6 +52,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!nearbyMapLoaded) loadNearbyDonors();
       });
     }
+    if (cleanId === 'section-donor-directory') loadDonorDirectory();
+    if (cleanId === 'section-donor-credentials') loadPublicDonorProfiles();
 
     if (history.pushState) {
       history.pushState(null, null, `#${cleanId}`);
@@ -214,6 +216,166 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('nearbyMapRefresh')?.addEventListener('click', loadNearbyDonors);
 
+  const donorDirectoryGrid = document.getElementById('donorDirectoryGrid');
+  const donorDirectoryStatus = document.getElementById('donorDirectoryStatus');
+  const donorProfileStatus = document.getElementById('donorProfileStatus');
+  const publicDonorProfile = document.getElementById('donorPublicProfile');
+
+  async function loadDonorDirectory() {
+    if (!donorDirectoryGrid || !donorDirectoryStatus) return;
+    donorDirectoryStatus.textContent = 'Loading donors...';
+    donorDirectoryStatus.setAttribute('aria-busy', 'true');
+    const params = new URLSearchParams({ radius_km: '30' });
+    const bloodGroup = document.getElementById('dirBloodFilter')?.value;
+    const query = document.getElementById('dirSearch')?.value.trim();
+    const availableOnly = document.getElementById('dirAvailableOnly')?.checked;
+    if (bloodGroup) params.set('blood_group', bloodGroup);
+    if (query) params.set('query', query);
+    if (availableOnly) params.set('available_only', 'true');
+    try {
+      const response = await fetch(`/api/v1/seeker/donors?${params.toString()}`);
+      if (!response.ok) throw new Error('Donor directory request failed');
+      const data = await response.json();
+      const donors = Array.isArray(data.donors) ? data.donors : [];
+      donorDirectoryGrid.replaceChildren();
+      if (!donors.length) {
+        donorDirectoryStatus.textContent = 'No donors match these filters.';
+        return;
+      }
+      donorDirectoryStatus.textContent = `${donors.length} donor${donors.length === 1 ? '' : 's'} found.`;
+      donors.forEach(donor => {
+        const card = document.createElement('article');
+        card.className = 'donor-card';
+        const top = document.createElement('div');
+        top.className = 'donor-card-top';
+        const identity = document.createElement('div');
+        identity.className = 'donor-card-avatar-combo';
+        const avatar = document.createElement('span');
+        avatar.className = 'donor-card-avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = String(donor.name || 'D').trim().charAt(0).toUpperCase();
+        const identityText = document.createElement('div');
+        const name = document.createElement('h3');
+        name.className = 'donor-card-name';
+        name.textContent = donor.name || 'Donor';
+        const location = document.createElement('p');
+        location.className = 'donor-card-loc';
+        location.textContent = [donor.area, donor.district].filter(Boolean).join(', ') || 'Location not shared';
+        identityText.append(name, location);
+        identity.append(avatar, identityText);
+        const group = document.createElement('span');
+        group.className = 'donor-badge-group';
+        group.textContent = donor.blood_group || 'Unknown';
+        top.append(identity, group);
+
+        const stats = document.createElement('div');
+        stats.className = 'donor-card-stats';
+        const availability = document.createElement('div');
+        availability.className = 'stat-item';
+        const availabilityValue = document.createElement('div');
+        availabilityValue.className = 'stat-item-val';
+        availabilityValue.textContent = donor.is_available ? 'Available' : 'Unavailable';
+        const availabilityLabel = document.createElement('div');
+        availabilityLabel.className = 'stat-item-lbl';
+        availabilityLabel.textContent = 'Status';
+        availability.append(availabilityValue, availabilityLabel);
+        const verification = document.createElement('div');
+        verification.className = 'stat-item';
+        const verificationValue = document.createElement('div');
+        verificationValue.className = 'stat-item-val';
+        verificationValue.textContent = donor.is_verified ? 'Verified' : 'Not verified';
+        const verificationLabel = document.createElement('div');
+        verificationLabel.className = 'stat-item-lbl';
+        verificationLabel.textContent = 'Credentials';
+        verification.append(verificationValue, verificationLabel);
+        stats.append(availability, verification);
+
+        const viewButton = document.createElement('button');
+        viewButton.type = 'button';
+        viewButton.className = 'btn-card-action primary';
+        viewButton.textContent = 'View all public profiles';
+        viewButton.addEventListener('click', () => {
+          activateSection('section-donor-credentials');
+        });
+        card.append(top, stats, viewButton);
+        donorDirectoryGrid.append(card);
+      });
+    } catch (error) {
+      console.error('Donor directory error:', error);
+      donorDirectoryStatus.textContent = 'Donors could not be loaded. Please try again.';
+    } finally {
+      donorDirectoryStatus.removeAttribute('aria-busy');
+    }
+  }
+
+  async function loadPublicDonorProfiles() {
+    if (!donorProfileStatus || !publicDonorProfile) return;
+    donorProfileStatus.textContent = 'Loading public donor profiles...';
+    donorProfileStatus.setAttribute('aria-busy', 'true');
+    publicDonorProfile.replaceChildren();
+    try {
+      const response = await fetch('/api/v1/seeker/donors?radius_km=30');
+      if (!response.ok) throw new Error('Public donor profiles request failed');
+      const data = await response.json();
+      const donors = Array.isArray(data.donors) ? data.donors : [];
+      if (!donors.length) {
+        donorProfileStatus.textContent = 'No public donor profiles are available right now.';
+        return;
+      }
+      donors.forEach(donor => {
+        const card = document.createElement('article');
+        card.className = 'donor-card public-donor-profile';
+        const hero = document.createElement('header');
+        hero.className = 'credentials-hero-panel';
+        const heroLeft = document.createElement('div');
+        heroLeft.className = 'credentials-hero-left';
+        const avatar = document.createElement('span');
+        avatar.className = 'credentials-large-avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = String(donor.name || 'D').trim().charAt(0).toUpperCase();
+        const identity = document.createElement('div');
+        const title = document.createElement('h3');
+        title.className = 'donor-card-name';
+        title.textContent = donor.name || 'Donor';
+        const subheading = document.createElement('p');
+        subheading.className = 'card-subtitle';
+        subheading.textContent = [donor.area, donor.district].filter(Boolean).join(', ') || 'Location not shared';
+        identity.append(title, subheading);
+        heroLeft.append(avatar, identity);
+        const bloodGroup = document.createElement('span');
+        bloodGroup.className = 'donor-badge-group donor-profile-blood-group';
+        bloodGroup.textContent = donor.blood_group || 'Blood group not shared';
+        hero.append(heroLeft, bloodGroup);
+
+        const credentials = document.createElement('div');
+        credentials.className = 'public-profile-credentials';
+        const availability = document.createElement('p');
+        availability.textContent = donor.is_available ? 'Availability: Available now' : 'Availability: Not currently available';
+        const verification = document.createElement('p');
+        verification.textContent = donor.is_verified ? 'Verification: Verified donor' : 'Verification: Not verified';
+        const history = document.createElement('p');
+        history.textContent = Number.isInteger(donor.donation_count)
+          ? `Donation history: ${donor.donation_count} donation${donor.donation_count === 1 ? '' : 's'} shared`
+          : 'Donation history: Not shared';
+        credentials.append(availability, verification, history);
+        card.append(hero, credentials);
+        publicDonorProfile.append(card);
+      });
+      donorProfileStatus.textContent = `${donors.length} public donor profile${donors.length === 1 ? '' : 's'}.`;
+    } catch (error) {
+      console.error('Public donor profiles error:', error);
+      donorProfileStatus.textContent = 'Donor profiles could not be loaded. Please try again.';
+    } finally {
+      donorProfileStatus.removeAttribute('aria-busy');
+    }
+  }
+
+  document.getElementById('dirBloodFilter')?.addEventListener('change', loadDonorDirectory);
+  document.getElementById('dirAvailableOnly')?.addEventListener('change', loadDonorDirectory);
+  document.getElementById('dirSearch')?.addEventListener('input', () => {
+    window.clearTimeout(window._donorDirectorySearchTimeout);
+    window._donorDirectorySearchTimeout = window.setTimeout(loadDonorDirectory, 250);
+  });
   // Modal controls
   window.closeSosModal = function() {
     const modal = document.getElementById('sosBroadcastModal');
