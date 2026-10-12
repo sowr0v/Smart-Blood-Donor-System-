@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from main import app, _generate_jwt
@@ -38,6 +39,11 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Create Emergency Blood Request", html)
         self.assertIn('id="section-emergency-request"', html)
         self.assertIn('id="nav-item-emergency-request"', html)
+        self.assertIn('id="emergencyRequestForm"', html)
+        self.assertIn('name="blood_group"', html)
+        self.assertIn('name="district"', html)
+        self.assertIn('name="urgency_level"', html)
+        self.assertIn('id="emergencyRequestFeedback"', html)
 
         # 4. Nearby Donors Interactive Map View
         self.assertIn("Nearby Donors Interactive Map View", html)
@@ -94,15 +100,63 @@ class SeekerDashboardTests(unittest.TestCase):
             "blood_group": "O-",
             "hospital_name": "DMCH ICU",
             "area": "Shahbagh",
+            "district": "Dhaka",
+            "units": 2,
             "urgency_level": "Code Red (Within 1 Hour)",
             "contact_phone": "+8801723456789",
         }
-        response = self.client.post("/api/v1/seeker/requests/emergency", json=payload)
+        token = _generate_jwt("+8801723456789", "seeker")
+        cookies = {"access_token": token}
+        with patch("main.sms_is_configured", return_value=False):
+            response = self.client.post(
+                "/api/v1/seeker/requests/emergency",
+                json=payload,
+                cookies=cookies,
+            )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertEqual(data["broadcast_count"], 18)
+        self.assertEqual(data["broadcast_count"], data["notifications"]["matched_donors"])
+        self.assertEqual(data["notifications"]["status"], "not_configured")
         self.assertTrue(data["request"]["is_emergency"])
+        self.assertEqual(data["request"]["status"], "Active")
+        self.assertEqual(data["request"]["units"], 2)
+
+        tracked = self.client.get("/api/v1/seeker/requests", cookies=cookies)
+        self.assertEqual(tracked.status_code, 200)
+        saved_request = next(
+            item for item in tracked.json()["requests"] if item["id"] == data["request"]["id"]
+        )
+        self.assertEqual(saved_request["urgency_level"], payload["urgency_level"])
+        self.assertEqual(saved_request["status"], "Active")
+
+    def test_emergency_blood_request_requires_seeker_session(self):
+        response = self.client.post(
+            "/api/v1/seeker/requests/emergency",
+            json={
+                "patient_name": "Emergency Patient",
+                "blood_group": "O-",
+                "hospital_name": "DMCH ICU",
+                "area": "Shahbagh",
+                "contact_phone": "+8801723456789",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_emergency_blood_request_validates_required_blood_group(self):
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.post(
+            "/api/v1/seeker/requests/emergency",
+            cookies={"access_token": token},
+            json={
+                "patient_name": "Emergency Patient",
+                "blood_group": "X+",
+                "hospital_name": "DMCH ICU",
+                "area": "Shahbagh",
+                "contact_phone": "+8801723456789",
+            },
+        )
+        self.assertEqual(response.status_code, 422)
 
     def test_seeker_donors_search_and_filter(self):
         response = self.client.get("/api/v1/seeker/donors?blood_group=A+&radius_km=10")
@@ -309,4 +363,3 @@ class SeekerDashboardTests(unittest.TestCase):
         login_view = self.client.get("/login?account_deleted=1")
         self.assertEqual(login_view.status_code, 200)
         self.assertIn("Your seeker account has been permanently deleted.", login_view.text)
-
