@@ -471,10 +471,51 @@
       </section>
 
       <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
-      <section class="dashboard-content-section" id="section-donor-directory"></section>
+      <section class="dashboard-content-section" id="section-donor-directory" aria-labelledby="donor-directory-title">
+        <div class="seeker-card">
+          <header class="donor-directory-header">
+            <div>
+              <span class="eyebrow">Donor discovery</span>
+              <h2 id="donor-directory-title">Donor Directory</h2>
+              <p class="card-subtitle">Find donors by blood group and review the information they have chosen to share.</p>
+            </div>
+          </header>
+          <div class="donor-directory-filters">
+            <label for="dirBloodFilter">Blood group</label>
+            <select id="dirBloodFilter">
+              <option value="">All groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+            <label class="donor-directory-search" for="dirSearch">
+              Search name or area
+              <input id="dirSearch" type="search" autocomplete="off" placeholder="Search donors">
+            </label>
+            <label class="donor-directory-available">
+              <input id="dirAvailableOnly" type="checkbox">
+              Available now
+            </label>
+          </div>
+          <p id="donorDirectoryStatus" role="status" aria-live="polite">Loading donors...</p>
+          <div id="donorDirectoryGrid" class="donor-directory-grid"></div>
+        </div>
+      </section>
 
       <!-- ================= 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW ================= -->
-      <section class="dashboard-content-section" id="section-donor-credentials"></section>
+      <section class="dashboard-content-section" id="section-donor-credentials" aria-labelledby="donor-profile-title">
+        <div class="seeker-card donor-public-profile-card">
+          <h2 id="donor-profile-title">Donor public profile &amp; credentials</h2>
+          <p id="donorProfileStatus" role="status" aria-live="polite">Loading public donor profiles...</p>
+          <div id="donorPublicProfile" class="donor-directory-grid" aria-live="polite"></div>
+          <p class="donor-profile-privacy">Only information permitted for public viewing is shown here. Private contact, medical, and identity details are not displayed.</p>
+        </div>
+      </section>
 
       <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
       <section class="dashboard-content-section" id="section-direct-contact"></section>

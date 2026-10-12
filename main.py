@@ -2611,6 +2611,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Gold Life Saver",
         "total_donations": 8,
+        "share_donation_summary": True,
         "rating": 4.9,
         "reviews_count": 18,
         "last_donation": "110 days ago",
@@ -2640,6 +2641,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Platinum Donor",
         "total_donations": 12,
+        "share_donation_summary": True,
         "rating": 5.0,
         "reviews_count": 26,
         "last_donation": "95 days ago",
@@ -2668,6 +2670,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Silver Donor",
         "total_donations": 5,
+        "share_donation_summary": True,
         "rating": 4.8,
         "reviews_count": 12,
         "last_donation": "130 days ago",
@@ -2696,6 +2699,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Rare Hero Tier",
         "total_donations": 15,
+        "share_donation_summary": True,
         "rating": 5.0,
         "reviews_count": 32,
         "last_donation": "105 days ago",
@@ -3006,6 +3010,32 @@ def _seeker_donor_with_safe_location(donor: dict) -> dict:
     return safe_donor
 
 
+def _public_seeker_donor(donor: dict) -> dict:
+    verified = bool(donor.get("nid_verified") or donor.get("is_verified"))
+    name = donor.get("public_name") or donor.get("name")
+    if donor.get("share_name") is False:
+        name = donor.get("public_identifier") or "Private donor"
+    safe_location = _seeker_donor_with_safe_location(donor)
+
+    public_donor = {
+        "id": donor["id"],
+        "name": name or donor.get("public_identifier") or "Donor",
+        "blood_group": donor["blood_group"],
+        "district": donor.get("district", ""),
+        "area": donor.get("area", ""),
+        "distance_km": donor.get("distance_km"),
+        "is_available": bool(donor.get("is_available", False)),
+        "is_verified": verified,
+        "verification_status": "verified" if verified else "not_verified",
+    }
+    if "lat" in safe_location and "lng" in safe_location:
+        public_donor["lat"] = safe_location["lat"]
+        public_donor["lng"] = safe_location["lng"]
+    if donor.get("share_donation_summary") is True and donor.get("total_donations") is not None:
+        public_donor["donation_count"] = int(donor["total_donations"])
+    return public_donor
+
+
 @app.get("/api/v1/seeker/donors")
 async def get_seeker_donors(
     blood_group: str | None = None,
@@ -3021,10 +3051,23 @@ async def get_seeker_donors(
         donors = [d for d in donors if d["is_available"]]
     if query:
         q = query.strip().lower()
-        donors = [d for d in donors if q in d["name"].lower() or q in d["area"].lower() or q in d["district"].lower()]
+        donors = [
+            donor
+            for donor in donors
+            if any(
+                q in str(value or "").lower()
+                for value in (
+                    donor.get("public_name"),
+                    donor.get("name") if donor.get("share_name") is not False else None,
+                    donor.get("public_identifier"),
+                    donor.get("area"),
+                    donor.get("district"),
+                )
+            )
+        ]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
-    donors = [_seeker_donor_with_safe_location(donor) for donor in donors]
+    donors = [_public_seeker_donor(donor) for donor in donors]
     return {"status": "success", "count": len(donors), "donors": donors}
 
 
@@ -3063,8 +3106,8 @@ async def get_seeker_donor_map(
 async def get_seeker_donor_detail(donor_id: str):
     donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
     if not donor:
-        donor = SEEKER_MOCK_DONORS[0]
-    return {"status": "success", "donor": _seeker_donor_with_safe_location(donor)}
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    return {"status": "success", "donor": _public_seeker_donor(donor)}
 
 
 @app.post("/api/v1/seeker/contact/log")
@@ -3439,5 +3482,3 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
-
