@@ -59,6 +59,9 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Donor Public Profile &amp; Credentials View", html)
         self.assertIn('id="section-donor-credentials"', html)
         self.assertIn('id="nav-item-donor-credentials"', html)
+        self.assertIn('id="publicDonorSelect"', html)
+        self.assertIn('id="publicDonorProfile"', html)
+        self.assertIn('id="publicDonorIdentityVerification"', html)
 
         # 7. Direct Contact Action (Call / WhatsApp CTA)
         self.assertIn("Direct Contact Action (Call / WhatsApp CTA)", html)
@@ -166,6 +169,13 @@ class SeekerDashboardTests(unittest.TestCase):
         for donor in data["donors"]:
             self.assertEqual(donor["blood_group"], "A+")
             self.assertLessEqual(donor["distance_km"], 10)
+            self.assertNotIn("phone", donor)
+            self.assertNotIn("lat", donor)
+            self.assertNotIn("lng", donor)
+            self.assertNotIn("hemoglobin", donor)
+            self.assertNotIn("weight_bp", donor)
+            self.assertNotIn("screening", donor)
+            self.assertNotIn("reviews", donor)
 
     def test_seeker_donor_credentials_detail(self):
         response = self.client.get("/api/v1/seeker/donors/dn-001")
@@ -173,8 +183,22 @@ class SeekerDashboardTests(unittest.TestCase):
         data = response.json()
         self.assertEqual(data["donor"]["id"], "dn-001")
         self.assertEqual(data["donor"]["name"], "Ayesha Rahman")
-        self.assertTrue(data["donor"]["nid_verified"])
-        self.assertIn("Hepatitis", data["donor"]["screening"])
+        self.assertTrue(data["donor"]["identity_verified"])
+        self.assertTrue(data["donor"]["screening_verified"])
+        self.assertEqual(data["donor"]["blood_group"], "A+")
+        self.assertTrue(data["donor"]["is_available"])
+        self.assertEqual(data["donor"]["total_donations"], 8)
+        self.assertNotIn("phone", data["donor"])
+        self.assertNotIn("lat", data["donor"])
+        self.assertNotIn("lng", data["donor"])
+        self.assertNotIn("hemoglobin", data["donor"])
+        self.assertNotIn("weight_bp", data["donor"])
+        self.assertNotIn("screening", data["donor"])
+        self.assertNotIn("reviews", data["donor"])
+
+    def test_seeker_donor_credentials_detail_returns_not_found_for_unknown_donor(self):
+        response = self.client.get("/api/v1/seeker/donors/not-a-donor")
+        self.assertEqual(response.status_code, 404)
 
     def test_seeker_contact_log_flow(self):
         post_resp = self.client.post(

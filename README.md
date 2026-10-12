@@ -92,6 +92,10 @@ Seekers can create emergency requests from the seeker dashboard. Required blood 
 
 Matching available donor profiles are selected using the system's blood-group compatibility rules. If `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` are configured, the platform sends those donors an SMS; the API reports delivery counts and failures. Without gateway credentials it records the request but reports SMS as not configured, rather than claiming alerts were delivered. Push delivery is not currently integrated.
 
+### Public Donor Profiles
+
+The seeker dashboard's donor credentials view displays only public profile fields: donor identifier/name when identity is verified, blood group, area/district, approximate distance, availability, verification flags, and donation count. Donor phone numbers, exact coordinates, medical measurements, screening details, and review text are excluded from the public donor APIs. Unknown donor IDs return `404`.
+
 ### Authentication Flow
 
 ```text

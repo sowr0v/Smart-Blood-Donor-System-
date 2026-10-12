@@ -426,7 +426,58 @@
       <section class="dashboard-content-section" id="section-donor-directory"></section>
 
       <!-- ================= 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW ================= -->
-      <section class="dashboard-content-section" id="section-donor-credentials"></section>
+      <section class="dashboard-content-section" id="section-donor-credentials">
+        <div class="seeker-card">
+          <div class="card-header-flex">
+            <div class="card-title-combo">
+              <span style="font-size: 1.5rem;" aria-hidden="true">🛡️</span>
+              <div>
+                <h2>Donor Public Profile &amp; Credentials</h2>
+                <div class="card-subtitle">Review the donor's public blood group, availability, verification, and donation summary.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="public-profile-controls">
+            <label for="publicDonorSelect">Select a donor</label>
+            <select id="publicDonorSelect" aria-describedby="publicDonorPrivacyNote">
+              <option value="">Loading donors...</option>
+            </select>
+          </div>
+          <p id="publicDonorPrivacyNote" class="card-subtitle public-profile-privacy-note">
+            Private contact details, precise location, and personal health measurements are not shown on public profiles.
+          </p>
+          <p id="publicDonorProfileStatus" role="status" aria-live="polite">Loading public donor profiles...</p>
+          <article id="publicDonorProfile" class="public-donor-profile" aria-live="polite" hidden>
+            <div class="public-donor-profile-heading">
+              <div class="public-donor-avatar" id="publicDonorAvatar" aria-hidden="true"></div>
+              <div>
+                <h3 id="publicDonorName"></h3>
+                <p id="publicDonorLocation"></p>
+              </div>
+              <span id="publicDonorBloodGroup" class="donor-badge-group"></span>
+            </div>
+            <div class="public-donor-status-grid">
+              <div class="public-donor-status-item">
+                <span>Availability</span>
+                <strong id="publicDonorAvailability"></strong>
+              </div>
+              <div class="public-donor-status-item">
+                <span>Identity</span>
+                <strong id="publicDonorIdentityVerification"></strong>
+              </div>
+              <div class="public-donor-status-item">
+                <span>Health screening</span>
+                <strong id="publicDonorScreeningVerification"></strong>
+              </div>
+              <div class="public-donor-status-item">
+                <span>Donation history</span>
+                <strong id="publicDonorDonationSummary"></strong>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
 
       <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
       <section class="dashboard-content-section" id="section-direct-contact"></section>

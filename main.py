@@ -3015,15 +3015,32 @@ async def get_seeker_donors(
         donors = [d for d in donors if q in d["name"].lower() or q in d["area"].lower() or q in d["district"].lower()]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
-    return {"status": "success", "count": len(donors), "donors": donors}
+    public_donors = [_public_donor_profile(donor) for donor in donors]
+    return {"status": "success", "count": len(public_donors), "donors": public_donors}
+
+
+def _public_donor_profile(donor: dict) -> dict:
+    identity_verified = bool(donor.get("nid_verified"))
+    return {
+        "id": donor["id"],
+        "name": donor["name"] if identity_verified else "Blood donor",
+        "blood_group": donor["blood_group"],
+        "district": donor.get("district"),
+        "area": donor.get("area"),
+        "distance_km": donor.get("distance_km"),
+        "is_available": bool(donor.get("is_available")),
+        "identity_verified": identity_verified,
+        "screening_verified": bool(donor.get("screening")),
+        "total_donations": donor.get("total_donations", 0),
+    }
 
 
 @app.get("/api/v1/seeker/donors/{donor_id}")
 async def get_seeker_donor_detail(donor_id: str):
     donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
     if not donor:
-        donor = SEEKER_MOCK_DONORS[0]
-    return {"status": "success", "donor": donor}
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    return {"status": "success", "donor": _public_donor_profile(donor)}
 
 
 @app.post("/api/v1/seeker/contact/log")
@@ -3398,5 +3415,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
 

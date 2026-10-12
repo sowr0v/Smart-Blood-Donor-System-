@@ -434,6 +434,102 @@
   margin-top: 2px;
 }
 
+.public-profile-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: 460px;
+}
+
+.public-profile-controls label {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.public-profile-controls select {
+  padding: 10px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.public-profile-privacy-note {
+  margin: 12px 0;
+}
+
+.public-donor-profile {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-page);
+}
+
+.public-donor-profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.public-donor-profile-heading h3 {
+  margin: 0;
+  color: var(--heading-color);
+  font-size: 1.12rem;
+}
+
+.public-donor-profile-heading p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.public-donor-avatar {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(225, 29, 72, 0.12);
+  color: var(--primary-red);
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.public-donor-profile-heading .donor-badge-group {
+  margin-left: auto;
+}
+
+.public-donor-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.public-donor-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+
+.public-donor-status-item span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.public-donor-status-item strong {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
 /* Requests Table & Action Badges */
 #seekerRequestsTableBody tr {
   border-bottom: 1px solid var(--border-color);
@@ -1573,6 +1669,14 @@ input:checked + .switch-slider:before {
     grid-template-columns: 1fr;
   }
 
+  .public-donor-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .public-donor-profile-heading {
+    flex-wrap: wrap;
+  }
+
   .seeker-banner-header {
     flex-direction: column;
     align-items: flex-start;
@@ -1834,7 +1938,6 @@ input:checked + .switch-slider:before {
   border-color: rgba(225, 29, 72, 0.35);
   color: #FDA4AF;
 }
-
 
 
 

@@ -104,6 +104,94 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modal) modal.style.display = 'flex';
   };
 
+  const publicDonorSelect = document.getElementById('publicDonorSelect');
+  const publicDonorProfile = document.getElementById('publicDonorProfile');
+  const publicDonorProfileStatus = document.getElementById('publicDonorProfileStatus');
+
+  function setPublicDonorProfileStatus(message) {
+    if (publicDonorProfileStatus) publicDonorProfileStatus.textContent = message;
+    if (publicDonorProfile) publicDonorProfile.hidden = true;
+  }
+
+  function renderPublicDonorProfile(donor) {
+    document.getElementById('publicDonorAvatar').textContent = donor.name.charAt(0).toUpperCase();
+    document.getElementById('publicDonorName').textContent = donor.name;
+    const location = [donor.area, donor.district].filter(Boolean).join(', ');
+    const distance = Number.isFinite(Number(donor.distance_km))
+      ? ` · Approximately ${donor.distance_km} km away`
+      : '';
+    document.getElementById('publicDonorLocation').textContent = `${location}${distance}`;
+    document.getElementById('publicDonorBloodGroup').textContent = donor.blood_group;
+    document.getElementById('publicDonorAvailability').textContent = donor.is_available
+      ? 'Available'
+      : 'Currently unavailable';
+    document.getElementById('publicDonorIdentityVerification').textContent = donor.identity_verified
+      ? 'Verified'
+      : 'Not verified';
+    document.getElementById('publicDonorScreeningVerification').textContent = donor.screening_verified
+      ? 'Screening on file'
+      : 'No screening verification';
+    document.getElementById('publicDonorDonationSummary').textContent =
+      `${donor.total_donations} recorded donation${donor.total_donations === 1 ? '' : 's'}`;
+    if (publicDonorProfileStatus) publicDonorProfileStatus.textContent = '';
+    if (publicDonorProfile) publicDonorProfile.hidden = false;
+  }
+
+  async function loadPublicDonorProfile(donorId) {
+    if (!donorId) {
+      setPublicDonorProfileStatus('Select a donor to view their public profile.');
+      return;
+    }
+    setPublicDonorProfileStatus('Loading donor profile...');
+
+    try {
+      const response = await fetch(`/api/v1/seeker/donors/${encodeURIComponent(donorId)}`);
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success' || !data.donor) {
+        throw new Error(data.detail || 'Could not load this donor profile.');
+      }
+      renderPublicDonorProfile(data.donor);
+    } catch (error) {
+      setPublicDonorProfileStatus(error.message || 'Could not load this donor profile. Please try again.');
+    }
+  }
+
+  if (publicDonorSelect) {
+    publicDonorSelect.addEventListener('change', () => {
+      loadPublicDonorProfile(publicDonorSelect.value);
+    });
+
+    fetch('/api/v1/seeker/donors')
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success' || !Array.isArray(data.donors)) {
+          throw new Error(data.detail || 'Could not load public donor profiles.');
+        }
+        return data.donors;
+      })
+      .then(donors => {
+        publicDonorSelect.replaceChildren();
+        if (!donors.length) {
+          publicDonorSelect.add(new Option('No donors available', ''));
+          setPublicDonorProfileStatus('No public donor profiles are available right now.');
+          return;
+        }
+
+        publicDonorSelect.add(new Option('Choose a donor', ''));
+        donors.forEach(donor => {
+          publicDonorSelect.add(
+            new Option(`${donor.name} · ${donor.blood_group}`, donor.id)
+          );
+        });
+        publicDonorSelect.value = donors[0].id;
+        loadPublicDonorProfile(donors[0].id);
+      })
+      .catch(error => {
+        publicDonorSelect.replaceChildren(new Option('Profiles unavailable', ''));
+        setPublicDonorProfileStatus(error.message || 'Could not load public donor profiles.');
+      });
+  }
+
   // =========================================================================
   // 1. BLOOD SEEKER PERSONAL DASHBOARD: RECENT REQUESTS & METRICS
   // =========================================================================
