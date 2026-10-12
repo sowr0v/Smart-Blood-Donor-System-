@@ -74,6 +74,12 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Real-Time In-App 1-on-1 Chat", html)
         self.assertIn('id="section-seeker-chat"', html)
         self.assertIn('id="nav-item-seeker-chat"', html)
+        self.assertIn('id="seekerChatMessages"', html)
+        self.assertIn('id="seekerChatForm"', html)
+        self.assertIn('id="seekerChatDonorSelect"', html)
+        self.assertIn('id="seekerChatStart"', html)
+        self.assertIn('id="seekerChatReport"', html)
+        self.assertIn('id="seekerChatBlock"', html)
 
         # 9. Seeker Portal Settings & Preferences
         self.assertIn("Seeker Portal Settings &amp; Preferences", html)
@@ -334,19 +340,30 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertGreaterEqual(data["count"], 1)
 
     def test_seeker_chat_thread_and_send(self):
-        threads_resp = self.client.get("/api/v1/seeker/chat/threads")
+        token = _generate_jwt("+8801723456789", "seeker")
+        cookies = {"access_token": token}
+        start_resp = self.client.post(
+            "/api/v1/seeker/chat/conversations",
+            json={"donor_id": "dn-001"},
+            cookies=cookies,
+        )
+        self.assertEqual(start_resp.status_code, 200)
+        self.assertEqual(start_resp.json()["thread"]["id"], "thread-ayesha")
+
+        threads_resp = self.client.get("/api/v1/seeker/chat/threads", cookies=cookies)
         self.assertEqual(threads_resp.status_code, 200)
         threads = threads_resp.json()["threads"]
-        self.assertGreaterEqual(len(threads), 2)
+        self.assertGreaterEqual(len(threads), 1)
 
         send_resp = self.client.post(
             "/api/v1/seeker/chat/thread-ayesha/send",
             json={"text": "Hello Ayesha, please confirm your arrival time."},
+            cookies=cookies,
         )
         self.assertEqual(send_resp.status_code, 200)
         data = send_resp.json()
         self.assertEqual(data["sent"]["text"], "Hello Ayesha, please confirm your arrival time.")
-        self.assertIn("reply", data)
+        self.assertTrue(data["sent"]["sent_at"])
 
     def test_seeker_settings_save_and_fetch(self):
         save_resp = self.client.post(

@@ -556,13 +556,344 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  const seekerChatThreads = document.getElementById('seekerChatThreads');
+  const seekerChatMessages = document.getElementById('seekerChatMessages');
+  const seekerChatPeer = document.getElementById('seekerChatPeer');
+  const seekerChatForm = document.getElementById('seekerChatForm');
+  const seekerChatInput = document.getElementById('seekerChatInput');
+  const seekerChatSend = document.getElementById('seekerChatSend');
+  const seekerChatReport = document.getElementById('seekerChatReport');
+  const seekerChatBlock = document.getElementById('seekerChatBlock');
+  const seekerChatFeedback = document.getElementById('seekerChatFeedback');
+  const seekerChatRestriction = document.getElementById('seekerChatRestriction');
+  const seekerChatConnection = document.getElementById('seekerChatConnection');
+  const seekerChatDonorSelect = document.getElementById('seekerChatDonorSelect');
+  const seekerChatStart = document.getElementById('seekerChatStart');
+  let activeSeekerThreadId = '';
+  let seekerThreadData = [];
+  let seekerChatSocket = null;
+  let seekerChatReconnectTimer = null;
+  let seekerChatPingTimer = null;
+
+  function chatErrorMessage(data, fallback) {
+    return data?.detail || data?.message || fallback;
+  }
+
+  function setSeekerChatFeedback(message, isError = false) {
+    if (!seekerChatFeedback) return;
+    seekerChatFeedback.textContent = message;
+    seekerChatFeedback.dataset.state = isError ? 'error' : 'success';
+  }
+
+  function renderSeekerChatThreads() {
+    if (!seekerChatThreads) return;
+    seekerChatThreads.replaceChildren();
+    if (!seekerThreadData.length) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = 'No conversations yet. Start a conversation from an available donor profile.';
+      seekerChatThreads.append(empty);
+      return;
+    }
+    seekerThreadData.forEach(thread => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'seeker-chat-thread';
+      button.dataset.threadId = thread.id;
+      button.setAttribute('aria-current', String(thread.id === activeSeekerThreadId));
+      const title = document.createElement('span');
+      title.className = 'seeker-chat-thread-title';
+      title.textContent = thread.name || 'Donor';
+      if (thread.unread_count) {
+        const count = document.createElement('span');
+        count.className = 'seeker-chat-thread-count';
+        count.textContent = String(thread.unread_count);
+        title.append(' ', count);
+      }
+      const preview = document.createElement('span');
+      preview.className = 'seeker-chat-thread-preview';
+      preview.textContent = thread.last_message || 'Conversation started';
+      button.append(title, preview);
+      button.addEventListener('click', () => openSeekerChatThread(thread.id));
+      seekerChatThreads.append(button);
+    });
+    const unread = seekerThreadData.reduce((total, thread) => total + thread.unread_count, 0);
+    const unreadBadge = document.getElementById('seekerChatUnread');
+    if (unreadBadge) {
+      unreadBadge.textContent = `${unread} unread`;
+      unreadBadge.hidden = unread === 0;
+    }
+  }
+
+  async function loadSeekerChatThreads() {
+    if (!seekerChatThreads) return;
+    try {
+      const response = await fetch('/api/v1/seeker/chat/threads');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load conversations.'));
+      }
+      seekerThreadData = data.threads || [];
+      renderSeekerChatThreads();
+      if (activeSeekerThreadId && !seekerThreadData.some(item => item.id === activeSeekerThreadId)) {
+        activeSeekerThreadId = '';
+      }
+      if (!activeSeekerThreadId && seekerThreadData.length) {
+        await openSeekerChatThread(seekerThreadData[0].id);
+      }
+    } catch (error) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = error.message || 'Could not load conversations.';
+      seekerChatThreads.replaceChildren(empty);
+      setSeekerChatFeedback(empty.textContent, true);
+    }
+  }
+
+  async function loadAvailableChatDonors() {
+    if (!seekerChatDonorSelect) return;
+    try {
+      const response = await fetch('/api/v1/seeker/chat/available-donors');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load available donors.'));
+      }
+      seekerChatDonorSelect.replaceChildren();
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = data.donors.length
+        ? 'Select an available donor…'
+        : 'No available donor accounts';
+      seekerChatDonorSelect.append(placeholder);
+      data.donors.forEach(donor => {
+        const option = document.createElement('option');
+        option.value = donor.id;
+        option.textContent = `${donor.name} · ${donor.blood_group || 'Blood group not listed'}${donor.area ? ` · ${donor.area}` : ''}`;
+        seekerChatDonorSelect.append(option);
+      });
+      if (seekerChatStart) seekerChatStart.disabled = data.donors.length === 0;
+    } catch (error) {
+      seekerChatDonorSelect.replaceChildren();
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = error.message || 'Donor list unavailable';
+      seekerChatDonorSelect.append(option);
+      if (seekerChatStart) seekerChatStart.disabled = true;
+      setSeekerChatFeedback(error.message || 'Could not load available donors.', true);
+    }
+  }
+
+  function renderSeekerMessages(messages) {
+    if (!seekerChatMessages) return;
+    seekerChatMessages.replaceChildren();
+    if (!messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = 'No messages yet. Send a message to begin the conversation.';
+      seekerChatMessages.append(empty);
+      return;
+    }
+    messages.forEach(message => {
+      const bubble = document.createElement('article');
+      bubble.className = `seeker-chat-bubble${message.sender === 'you' ? ' is-own' : ''}`;
+      bubble.dataset.messageId = message.id;
+      const text = document.createElement('div');
+      text.textContent = message.text;
+      const timestamp = document.createElement('time');
+      timestamp.dateTime = message.sent_at || message.time;
+      const parsedDate = new Date(timestamp.dateTime);
+      timestamp.textContent = Number.isNaN(parsedDate.getTime())
+        ? message.time
+        : parsedDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+      bubble.append(text, timestamp);
+      seekerChatMessages.append(bubble);
+    });
+    seekerChatMessages.scrollTop = seekerChatMessages.scrollHeight;
+  }
+
+  async function openSeekerChatThread(threadId) {
+    activeSeekerThreadId = threadId;
+    renderSeekerChatThreads();
+    const thread = seekerThreadData.find(item => item.id === threadId);
+    if (!thread || !seekerChatMessages) return;
+    if (seekerChatPeer) seekerChatPeer.textContent = thread.name || 'Donor';
+    if (seekerChatInput) seekerChatInput.disabled = Boolean(thread.restricted);
+    if (seekerChatSend) seekerChatSend.disabled = Boolean(thread.restricted);
+    if (seekerChatReport) seekerChatReport.disabled = false;
+    if (seekerChatBlock) seekerChatBlock.disabled = Boolean(thread.restricted);
+    if (seekerChatRestriction) {
+      seekerChatRestriction.textContent = thread.restricted ? 'Messaging is restricted.' : '';
+    }
+    try {
+      const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(threadId)}/messages`);
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load this conversation.'));
+      }
+      renderSeekerMessages(data.messages || []);
+      await fetch(`/api/v1/seeker/chat/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
+      const currentThread = seekerThreadData.find(item => item.id === threadId);
+      if (currentThread) currentThread.unread_count = 0;
+      renderSeekerChatThreads();
+      setSeekerChatFeedback('');
+    } catch (error) {
+      setSeekerChatFeedback(error.message || 'Could not load this conversation.', true);
+    }
+  }
+
+  async function startSeekerChat(donorId) {
+    if (!donorId) {
+      setSeekerChatFeedback('Choose a donor from the directory to start a conversation.', true);
+      return;
+    }
+    try {
+      const response = await fetch('/api/v1/seeker/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donor_id: donorId })
+      });
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not start this conversation.'));
+      }
+      activeSeekerThreadId = data.thread.id;
+      await loadSeekerChatThreads();
+      await openSeekerChatThread(data.thread.id);
+      setSeekerChatFeedback(`Conversation with ${data.thread.name} is ready.`);
+    } catch (error) {
+      setSeekerChatFeedback(error.message || 'Could not start this conversation.', true);
+      showToast(error.message || 'Could not start this conversation.', 'error');
+    }
+  }
+
+  if (seekerChatStart && seekerChatDonorSelect) {
+    seekerChatStart.addEventListener('click', () => {
+      startSeekerChat(seekerChatDonorSelect.value);
+    });
+  }
+
+  if (seekerChatForm) {
+    seekerChatForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const text = seekerChatInput?.value.trim();
+      if (!text || !activeSeekerThreadId) return;
+      if (seekerChatSend) seekerChatSend.disabled = true;
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'Message could not be sent.'));
+        }
+        if (seekerChatInput) seekerChatInput.value = '';
+        await openSeekerChatThread(activeSeekerThreadId);
+        await loadSeekerChatThreads();
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'Message could not be sent.', true);
+      } finally {
+        if (seekerChatSend) seekerChatSend.disabled = false;
+      }
+    });
+  }
+
+  if (seekerChatReport) {
+    seekerChatReport.addEventListener('click', async () => {
+      if (!activeSeekerThreadId) return;
+      const reason = document.getElementById('seekerChatReportReason')?.value || 'other';
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'The report could not be submitted.'));
+        }
+        setSeekerChatFeedback(data.message);
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'The report could not be submitted.', true);
+      }
+    });
+  }
+
+  if (seekerChatBlock) {
+    seekerChatBlock.addEventListener('click', async () => {
+      if (!activeSeekerThreadId || !window.confirm('Restrict this participant? You will no longer be able to send messages in this conversation.')) return;
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/block`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'This conversation could not be restricted.'));
+        }
+        await loadSeekerChatThreads();
+        await openSeekerChatThread(activeSeekerThreadId);
+        setSeekerChatFeedback('Conversation restricted. You can still review its messages.');
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'This conversation could not be restricted.', true);
+      }
+    });
+  }
+
+  function connectSeekerChatSocket() {
+    if (!seekerChatConnection || !window.WebSocket) return;
+    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    try {
+      seekerChatSocket = new WebSocket(`${scheme}//${window.location.host}/ws/chat/seeker`);
+    } catch (error) {
+      seekerChatConnection.textContent = 'Live updates unavailable · Sending remains available';
+      seekerChatConnection.dataset.state = 'offline';
+      seekerChatReconnectTimer = setTimeout(connectSeekerChatSocket, 3000);
+      return;
+    }
+    seekerChatSocket.onopen = () => {
+      seekerChatConnection.textContent = 'Live';
+      seekerChatConnection.dataset.state = 'online';
+      clearTimeout(seekerChatReconnectTimer);
+      clearInterval(seekerChatPingTimer);
+      seekerChatPingTimer = setInterval(() => {
+        if (seekerChatSocket?.readyState === WebSocket.OPEN) {
+          seekerChatSocket.send(JSON.stringify({ action: 'ping' }));
+        }
+      }, 25000);
+    };
+    seekerChatSocket.onmessage = event => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'chat_message') {
+        loadSeekerChatThreads();
+        if (data.thread_id === activeSeekerThreadId) {
+          openSeekerChatThread(activeSeekerThreadId);
+        }
+      } else if (data.type === 'presence') {
+        const current = seekerThreadData.find(thread => thread.id === activeSeekerThreadId);
+        if (current) seekerChatConnection.textContent = data.status === 'online' ? `${current.name} is online` : 'Live';
+      }
+    };
+    seekerChatSocket.onclose = event => {
+      clearInterval(seekerChatPingTimer);
+      seekerChatConnection.textContent = 'Live updates unavailable · Sending remains available';
+      seekerChatConnection.dataset.state = 'offline';
+      if (event.code === 4401 || event.code === 4404) {
+        seekerChatConnection.textContent = 'Sign in to use chat';
+        return;
+      }
+      seekerChatReconnectTimer = setTimeout(connectSeekerChatSocket, 3000);
+    };
+    seekerChatSocket.onerror = () => {
+      seekerChatSocket?.close();
+    };
+  }
+  connectSeekerChatSocket();
+  loadSeekerChatThreads();
+  loadAvailableChatDonors();
+
+  window.selectSeekerChatThread = openSeekerChatThread;
   window.openChatWithDonor = function(donorId) {
     activateSection('section-seeker-chat');
-    if (typeof window.selectSeekerChatThread === 'function') {
-      window.selectSeekerChatThread('thread-ayesha');
-    } else {
-      showToast('Opening live chat coordinator with donor...');
-    }
+    startSeekerChat(donorId);
   };
 
   // Sync with API to load any dynamic requests from server
