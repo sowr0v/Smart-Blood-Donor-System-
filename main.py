@@ -39,6 +39,7 @@ OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
+BLOOD_GROUPS = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 
 
 def initialize_urgent_database():
@@ -131,6 +132,24 @@ def initialize_urgent_database():
                 );
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reports_once_per_message
                     ON chat_reports(thread_id, reporter_phone, COALESCE(message_id, ''));
+                CREATE TABLE IF NOT EXISTS facility_blood_inventory (
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+                    updated_at TEXT,
+                    PRIMARY KEY (facility_phone, blood_group)
+                );
+                CREATE TABLE IF NOT EXISTS facility_inventory_audit (
+                    id INTEGER PRIMARY KEY,
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    previous_quantity INTEGER NOT NULL CHECK (previous_quantity >= 0),
+                    new_quantity INTEGER NOT NULL CHECK (new_quantity >= 0),
+                    actor_phone TEXT NOT NULL,
+                    changed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_facility_inventory_audit_recent
+                    ON facility_inventory_audit(facility_phone, changed_at DESC, id DESC);
                 """
             )
             connection.execute(
@@ -168,6 +187,91 @@ def initialize_urgent_database():
                     ('A+', 'Dhaka Medical College', 'Dhaka', 'Shahbagh', 2.5, '{(now + timedelta(hours=2)).isoformat()}', '+8801700000000', 1),
                     ('O-', 'Square Hospital', 'Dhaka', 'Panthapath', 4.1, '{(now + timedelta(hours=1)).isoformat()}', '+8801700000001', 1);
                 """)
+
+
+def _get_facility_inventory(facility_phone: str) -> list[dict]:
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.executemany(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                [(facility_phone, group) for group in BLOOD_GROUPS],
+            )
+        rows = connection.execute(
+            """SELECT blood_group, quantity, updated_at
+               FROM facility_blood_inventory
+               WHERE facility_phone = ?
+               ORDER BY CASE blood_group
+                   WHEN 'A+' THEN 1 WHEN 'A-' THEN 2
+                   WHEN 'B+' THEN 3 WHEN 'B-' THEN 4
+                   WHEN 'AB+' THEN 5 WHEN 'AB-' THEN 6
+                   WHEN 'O+' THEN 7 WHEN 'O-' THEN 8 END""",
+            (facility_phone,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _update_facility_inventory(
+    facility_phone: str, actor_phone: str, blood_group: str, quantity: int
+) -> dict:
+    initialize_urgent_database()
+    changed_at = datetime.now(timezone.utc).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                (facility_phone, blood_group),
+            )
+            current = connection.execute(
+                """SELECT quantity, updated_at FROM facility_blood_inventory
+                   WHERE facility_phone = ? AND blood_group = ?""",
+                (facility_phone, blood_group),
+            ).fetchone()
+            previous_quantity = current["quantity"]
+            if previous_quantity != quantity:
+                connection.execute(
+                    """UPDATE facility_blood_inventory
+                       SET quantity = ?, updated_at = ?
+                       WHERE facility_phone = ? AND blood_group = ?""",
+                    (quantity, changed_at, facility_phone, blood_group),
+                )
+                connection.execute(
+                    """INSERT INTO facility_inventory_audit
+                       (facility_phone, blood_group, previous_quantity, new_quantity,
+                        actor_phone, changed_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        facility_phone,
+                        blood_group,
+                        previous_quantity,
+                        quantity,
+                        actor_phone,
+                        changed_at,
+                    ),
+                )
+    return {
+        "blood_group": blood_group,
+        "quantity": quantity,
+        "updated_at": changed_at if previous_quantity != quantity else current["updated_at"],
+        "changed": previous_quantity != quantity,
+    }
+
+
+def _require_facility_inventory_user(request: Request) -> dict:
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to access facility inventory.")
+    if user.get("role") not in {"hospital", "bank", "blood_bank"}:
+        raise HTTPException(status_code=403, detail="Only hospital and blood bank users can manage inventory.")
+    return user
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -1450,7 +1554,7 @@ class DonorProfileUpdate(BaseModel):
     preferred_donation_types: str = "Whole Blood"
 
 
-VALID_BLOOD_GROUPS = {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}
+VALID_BLOOD_GROUPS = set(BLOOD_GROUPS)
 
 
 @app.get("/api/v1/donor/profile")
@@ -1706,6 +1810,14 @@ async def hospital_dashboard(request: Request):
     user_role = (user.get("role") or "hospital").lower()
     role_display_name = "Blood Bank" if user_role in {"bank", "blood_bank"} else "Hospital"
     portal_title = f"{role_display_name} Portal - Smart Blood Donor System"
+    can_manage_inventory = user_role in {"hospital", "bank", "blood_bank"}
+    inventory = _get_facility_inventory(phone) if can_manage_inventory and phone else []
+    inventory_total_units = sum(item["quantity"] for item in inventory)
+    inventory_low_stock_groups = sum(item["quantity"] < 2 for item in inventory)
+    inventory_last_sync = max(
+        (item["updated_at"] for item in inventory if item["updated_at"]),
+        default="",
+    )
 
     facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
     if facility_settings and facility_settings.get("facility_name") and user:
@@ -1721,6 +1833,11 @@ async def hospital_dashboard(request: Request):
             "role_display_name": role_display_name,
             "title": portal_title,
             "facility_settings": facility_settings,
+            "inventory": inventory,
+            "inventory_total_units": inventory_total_units,
+            "inventory_low_stock_groups": inventory_low_stock_groups,
+            "inventory_last_sync": inventory_last_sync,
+            "can_manage_inventory": can_manage_inventory,
         },
     )
     if should_set_cookie or not request.cookies.get("access_token"):
@@ -2878,6 +2995,10 @@ class FacilitySettingsPayload(BaseModel):
     maintenance_mode: bool = False
 
 
+class FacilityInventoryUpdatePayload(BaseModel):
+    quantity: int = Field(strict=True, ge=0, le=9223372036854775807)
+
+
 SEEKER_CONTACT_LOGS = [
     {
         "donor_name": "Ayesha Rahman",
@@ -3963,6 +4084,28 @@ async def delete_seeker_account(request: Request, response: Response):
         "message": "Seeker account has been permanently deleted.",
         "redirect_url": "/login?account_deleted=1",
     }
+
+
+@app.get("/api/v1/facility/inventory")
+async def get_facility_inventory(request: Request):
+    user = _require_facility_inventory_user(request)
+    inventory = _get_facility_inventory(user["phone"])
+    return {"status": "success", "inventory": inventory}
+
+
+@app.put("/api/v1/facility/inventory/{blood_group}")
+async def update_facility_inventory(
+    blood_group: str,
+    payload: FacilityInventoryUpdatePayload,
+    request: Request,
+):
+    user = _require_facility_inventory_user(request)
+    if blood_group not in BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Choose a valid blood group.")
+    result = _update_facility_inventory(
+        user["phone"], user["phone"], blood_group, payload.quantity
+    )
+    return {"status": "success", "item": result}
 
 
 @app.get("/api/v1/hospital/settings")
