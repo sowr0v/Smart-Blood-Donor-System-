@@ -92,6 +92,10 @@ Seekers can create emergency requests from the seeker dashboard. Required blood 
 
 Matching available donor profiles are selected using the system's blood-group compatibility rules. If `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` are configured, the platform sends those donors an SMS; the API reports delivery counts and failures. Without gateway credentials it records the request but reports SMS as not configured, rather than claiming alerts were delivered. Push delivery is not currently integrated.
 
+### Facility Blood Inventory
+
+Hospital and blood bank dashboards display facility-specific quantities for all eight ABO/Rh blood groups. Authenticated hospital and blood bank users can update a quantity with `PUT /api/v1/facility/inventory/{blood_group}` using `{"quantity": 0}` or another non-negative whole number; `GET /api/v1/facility/inventory` returns the current matrix. Other roles cannot read or modify facility inventory. Stock and its change audit trail are stored in `urgent_requests.db` (or the configured `SBDS_DATABASE_PATH`); unchanged quantities do not create duplicate audit records.
+
 ### Authentication Flow
 
 ```text
