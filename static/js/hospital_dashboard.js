@@ -38,7 +38,109 @@ window.handleInterFacilityTransfer = function (facility, group) {
   showMasterToast(`Inter-facility support dispatched for ${group} to ${facility}.`, "🚑");
 };
 
+function formatInventoryTimestamp(timestamp) {
+  if (!timestamp) return "Not updated yet";
+  const parsedTimestamp = new Date(timestamp);
+  if (Number.isNaN(parsedTimestamp.getTime())) return "Not updated yet";
+  return parsedTimestamp.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+window.saveFacilityInventory = async function (bloodGroup, inputId, saveButton) {
+  if (saveButton.disabled) return;
+  const quantityInput = document.getElementById(inputId);
+  const form = saveButton.closest(".inventory-update-form");
+  const feedback = form.querySelector(".inventory-row-feedback");
+  const rawQuantity = quantityInput.value.trim();
+  const quantity = rawQuantity === "" ? Number.NaN : Number(rawQuantity);
+
+  if (!Number.isSafeInteger(quantity) || quantity < 0) {
+    const message = "Enter a whole number of zero or more.";
+    feedback.textContent = message;
+    showMasterToast(message, "⚠️");
+    quantityInput.focus();
+    return;
+  }
+
+  feedback.textContent = "Saving…";
+  saveButton.disabled = true;
+  try {
+    const response = await fetch(
+      `/api/v1/facility/inventory/${encodeURIComponent(bloodGroup)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ quantity }),
+      }
+    );
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = Array.isArray(result.detail)
+        ? result.detail.map((item) => item.msg).join(" ")
+        : result.detail;
+      throw new Error(detail || "Could not update inventory.");
+    }
+
+    const savedQuantity = result.item.quantity;
+    const quantityDisplay = document.querySelector(
+      `[data-inventory-quantity="${bloodGroup}"]`
+    );
+    if (quantityDisplay) {
+      quantityDisplay.textContent = savedQuantity;
+      quantityDisplay.dataset.stock = savedQuantity > 0 ? "available" : "empty";
+    }
+    quantityInput.value = savedQuantity;
+
+    const countId = `count-${bloodGroup.replace("+", "-pos").replace(/-$/, "-neg")}`;
+    const dashboardCount = document.getElementById(countId);
+    if (dashboardCount) dashboardCount.textContent = savedQuantity;
+    const total = [...document.querySelectorAll("[data-inventory-quantity]")]
+      .reduce((sum, item) => sum + Number(item.textContent), 0);
+    const totalDisplay = document.getElementById("kpiTotalUnits");
+    if (totalDisplay) totalDisplay.textContent = total;
+    const inventoryTotalDisplay = document.getElementById("inventoryTotalUnits");
+    if (inventoryTotalDisplay) inventoryTotalDisplay.textContent = total;
+    const lowStockCount = [...document.querySelectorAll("[data-inventory-quantity]")]
+      .filter((item) => Number(item.textContent) < 2).length;
+    const lowStockDisplay = document.getElementById("inventoryLowStockGroups");
+    if (lowStockDisplay) lowStockDisplay.textContent = lowStockCount;
+
+    const updatedAt = form.closest("tr").querySelector(".inventory-updated-at");
+    if (updatedAt) {
+      updatedAt.dataset.timestamp = result.item.updated_at || "";
+      updatedAt.textContent = formatInventoryTimestamp(result.item.updated_at);
+    }
+    const matrixSync = document.getElementById("inventoryLastMatrixSync");
+    if (matrixSync && result.item.updated_at) {
+      matrixSync.dataset.timestamp = result.item.updated_at;
+      matrixSync.textContent = formatInventoryTimestamp(result.item.updated_at);
+    }
+    const message = result.item.changed ? `${bloodGroup} stock updated.` : "Stock is unchanged.";
+    feedback.textContent = message;
+    showMasterToast(message, result.item.changed ? "✅" : "ℹ️");
+  } catch (error) {
+    const message = error.message || "Could not update inventory. Please try again.";
+    feedback.textContent = message;
+    showMasterToast(message, "⚠️");
+  } finally {
+    saveButton.disabled = false;
+  }
+};
+
 document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".inventory-updated-at").forEach((element) => {
+    element.textContent = formatInventoryTimestamp(element.dataset.timestamp);
+  });
+  const matrixSync = document.getElementById("inventoryLastMatrixSync");
+  if (matrixSync) {
+    matrixSync.textContent = formatInventoryTimestamp(matrixSync.dataset.timestamp);
+  }
+
   const sidebar = document.getElementById("hospitalSidebar");
   const navItems = document.querySelectorAll(".hospital-nav-item");
   const sections = document.querySelectorAll(".portal-section");
@@ -199,39 +301,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ================= 3. MATRIX COMPONENT FILTER =================
-  const filterGroup = document.getElementById("matrixComponentFilter");
-  if (filterGroup) {
-    const filterButtons = filterGroup.querySelectorAll(".filter-pill-btn");
-    const stockMatrixData = {
-      all: { "A+": 32, "A-": 12, "B+": 38, "B-": 8, "AB+": 18, "AB-": 2, "O+": 36, "O-": 2, total: 148 },
-      prbc: { "A+": 16, "A-": 6, "B+": 20, "B-": 4, "AB+": 8, "AB-": 1, "O+": 18, "O-": 1, total: 74 },
-      wb: { "A+": 8, "A-": 3, "B+": 10, "B-": 2, "AB+": 5, "AB-": 1, "O+": 10, "O-": 1, total: 40 },
-      plt: { "A+": 5, "A-": 2, "B+": 5, "B-": 1, "AB+": 3, "AB-": 0, "O+": 5, "O-": 0, total: 21 },
-      ffp: { "A+": 3, "A-": 1, "B+": 3, "B-": 1, "AB+": 2, "AB-": 0, "O+": 3, "O-": 0, total: 13 }
-    };
-
-    filterButtons.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        filterButtons.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        const comp = btn.getAttribute("data-component") || "all";
-        const dataset = stockMatrixData[comp] || stockMatrixData.all;
-
-        document.getElementById("count-A-pos") && (document.getElementById("count-A-pos").textContent = dataset["A+"]);
-        document.getElementById("count-A-neg") && (document.getElementById("count-A-neg").textContent = dataset["A-"]);
-        document.getElementById("count-B-pos") && (document.getElementById("count-B-pos").textContent = dataset["B+"]);
-        document.getElementById("count-B-neg") && (document.getElementById("count-B-neg").textContent = dataset["B-"]);
-        document.getElementById("count-AB-pos") && (document.getElementById("count-AB-pos").textContent = dataset["AB+"]);
-        document.getElementById("count-AB-neg") && (document.getElementById("count-AB-neg").textContent = dataset["AB-"]);
-        document.getElementById("count-O-pos") && (document.getElementById("count-O-pos").textContent = dataset["O+"]);
-        document.getElementById("count-O-neg") && (document.getElementById("count-O-neg").textContent = dataset["O-"]);
-
-        const kpiUnits = document.getElementById("kpiTotalUnits");
-        if (kpiUnits) kpiUnits.textContent = dataset.total;
-      });
+  // ================= 3. FACILITY BLOOD INVENTORY =================
+  document.querySelectorAll(".inventory-update-form").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const saveButton = form.querySelector("[data-inventory-save]");
+      window.saveFacilityInventory(
+        saveButton.dataset.bloodGroup,
+        saveButton.dataset.quantityInput,
+        saveButton
+      );
     });
-  }
+  });
 
   // ================= 4. LIVE EMERGENCY NETWORK FEED SYNC =================
   async function loadRegionalEmergencyFeed() {

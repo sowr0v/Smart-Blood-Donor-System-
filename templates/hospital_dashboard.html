@@ -246,7 +246,7 @@
               </div>
             </div>
             <div class="kpi-value-row">
-              <span class="kpi-main-number" id="kpiTotalUnits">148</span>
+              <span class="kpi-main-number" id="kpiTotalUnits">{{ inventory|sum(attribute="quantity") }}</span>
               <span class="kpi-unit">Units</span>
             </div>
             <div class="kpi-footer-metric positive">
@@ -315,145 +315,24 @@
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                 ABO &amp; Rh Blood Group Reserve Matrix
               </h3>
-              <p>Current reserve units across all 8 blood groups with safety margin status.</p>
-            </div>
-            <div class="filter-pill-group" id="matrixComponentFilter">
-              <button type="button" class="filter-pill-btn active" data-component="all">All Components</button>
-              <button type="button" class="filter-pill-btn" data-component="prbc">PRBC</button>
-              <button type="button" class="filter-pill-btn" data-component="wb">Whole Blood</button>
-              <button type="button" class="filter-pill-btn" data-component="plt">Platelets</button>
-              <button type="button" class="filter-pill-btn" data-component="ffp">FFP</button>
+              <p>Available units across all 8 blood groups. Open the inventory matrix to update stock.</p>
             </div>
           </div>
 
           <div class="matrix-grid-8" id="bloodMatrixGrid">
-            <!-- A+ -->
-            <div class="matrix-group-card" data-group="A+">
+            {% for item in inventory %}
+            <div class="matrix-group-card" data-group="{{ item.blood_group }}">
               <div class="group-badge-top">
-                <span class="blood-type-tag">A+</span>
-                <span class="status-micro-pill optimal">Optimal</span>
+                <span class="blood-type-tag">{{ item.blood_group }}</span>
+                <span class="status-micro-pill sufficient">Units</span>
               </div>
-              <div class="group-unit-count" id="count-A-pos">32</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill teal" style="width: 85%;"></div>
-              </div>
+              <div class="group-unit-count" id="count-{{ item.blood_group|replace('+', '-pos')|replace('-', '-neg') }}">{{ item.quantity }}</div>
               <div class="group-unit-meta">
-                <span>Buffer: 10</span>
-                <span>Max: 40</span>
+                <span>Available</span>
+                <span>units</span>
               </div>
             </div>
-
-            <!-- A- -->
-            <div class="matrix-group-card" data-group="A-">
-              <div class="group-badge-top">
-                <span class="blood-type-tag">A-</span>
-                <span class="status-micro-pill sufficient">Sufficient</span>
-              </div>
-              <div class="group-unit-count" id="count-A-neg">12</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill green" style="width: 60%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span>Buffer: 6</span>
-                <span>Max: 20</span>
-              </div>
-            </div>
-
-            <!-- B+ -->
-            <div class="matrix-group-card" data-group="B+">
-              <div class="group-badge-top">
-                <span class="blood-type-tag">B+</span>
-                <span class="status-micro-pill optimal">Optimal</span>
-              </div>
-              <div class="group-unit-count" id="count-B-pos">38</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill teal" style="width: 95%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span>Buffer: 10</span>
-                <span>Max: 40</span>
-              </div>
-            </div>
-
-            <!-- B- -->
-            <div class="matrix-group-card" data-group="B-">
-              <div class="group-badge-top">
-                <span class="blood-type-tag">B-</span>
-                <span class="status-micro-pill sufficient">Sufficient</span>
-              </div>
-              <div class="group-unit-count" id="count-B-neg">8</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill green" style="width: 40%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span>Buffer: 6</span>
-                <span>Max: 20</span>
-              </div>
-            </div>
-
-            <!-- AB+ -->
-            <div class="matrix-group-card" data-group="AB+">
-              <div class="group-badge-top">
-                <span class="blood-type-tag">AB+</span>
-                <span class="status-micro-pill optimal">Optimal</span>
-              </div>
-              <div class="group-unit-count" id="count-AB-pos">18</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill teal" style="width: 72%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span>Buffer: 6</span>
-                <span>Max: 25</span>
-              </div>
-            </div>
-
-            <!-- AB- (Critical Low) -->
-            <div class="matrix-group-card is-critical" data-group="AB-">
-              <div class="group-badge-top">
-                <span class="blood-type-tag text-rose">AB-</span>
-                <span class="status-micro-pill critical">Low Stock</span>
-              </div>
-              <div class="group-unit-count text-rose" id="count-AB-neg">2</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill rose" style="width: 15%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span style="color: #e11d48; font-weight: 700;">Buffer: 5</span>
-                <span>Max: 15</span>
-              </div>
-            </div>
-
-            <!-- O+ -->
-            <div class="matrix-group-card" data-group="O+">
-              <div class="group-badge-top">
-                <span class="blood-type-tag">O+</span>
-                <span class="status-micro-pill optimal">Optimal</span>
-              </div>
-              <div class="group-unit-count" id="count-O-pos">36</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill teal" style="width: 90%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span>Buffer: 12</span>
-                <span>Max: 40</span>
-              </div>
-            </div>
-
-            <!-- O- (Critical Low Universal) -->
-            <div class="matrix-group-card is-critical" data-group="O-">
-              <div class="group-badge-top">
-                <span class="blood-type-tag text-rose">O-</span>
-                <span class="status-micro-pill critical">Critical</span>
-              </div>
-              <div class="group-unit-count text-rose" id="count-O-neg">2</div>
-              <div class="group-progress-track">
-                <div class="group-progress-fill rose" style="width: 15%;"></div>
-              </div>
-              <div class="group-unit-meta">
-                <span style="color: #e11d48; font-weight: 700;">Buffer: 8</span>
-                <span>Max: 20</span>
-              </div>
-            </div>
+            {% endfor %}
           </div>
         </div>
 
@@ -648,7 +527,52 @@
       <section class="portal-section" id="section-donor-search"></section>
 
       <!-- 3. Blood Stock Inventory Matrix Management -->
-      <section class="portal-section" id="section-stock-matrix"></section>
+      <section class="portal-section" id="section-stock-matrix">
+        <div class="inventory-page-header">
+          <div class="inventory-page-overline">FACILITY BLOOD RESERVE</div>
+          <h1>Blood Stock Inventory Matrix Management</h1>
+          <p>Review available units by blood group and manage real-time inventory updates for this facility.</p>
+        </div>
+
+        <div class="inventory-matrix-panel" style="background: #0b1329; border: 1px solid #1e293b; border-radius: 16px; padding: 24px; margin-top: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);">
+          <div hidden aria-hidden="true">
+            <strong id="inventoryTotalUnits">{{ inventory_total_units }}</strong>
+            <strong id="inventoryLowStockGroups">{{ inventory_low_stock_groups }}</strong>
+            <strong id="inventoryLastMatrixSync" data-timestamp="{{ inventory_last_sync }}">{{ inventory_last_sync or "Not synced yet" }}</strong>
+          </div>
+          <div class="inventory-table-scroll">
+            <table class="inventory-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+              <thead>
+                <tr style="border-bottom: 1px solid #1e293b;">
+                  <th scope="col" style="padding: 12px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Blood Group</th>
+                  <th scope="col" style="padding: 12px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Available Stock</th>
+                  {% if can_manage_inventory %}<th scope="col" style="padding: 12px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Update Quantity</th>{% endif %}
+                  <th scope="col" style="padding: 12px 16px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase;">Last Updated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in inventory %}
+                <tr data-inventory-row="{{ item.blood_group }}" style="border-bottom: 1px solid rgba(30, 41, 59, 0.7);">
+                  <th scope="row" style="padding: 16px;"><span class="inventory-blood-group" style="display: inline-block; background: rgba(225, 29, 72, 0.15); color: #fb7185; border: 1px solid rgba(225, 29, 72, 0.35); border-radius: 8px; padding: 4px 12px; font-weight: 700; font-size: 14px;">{{ item.blood_group }}</span></th>
+                  <td class="inventory-stock-cell" style="padding: 16px;"><span style="font-size: 16px; font-weight: 700; color: #ffffff;"><strong class="inventory-quantity" data-stock="{{ 'available' if item.quantity > 0 else 'empty' }}" data-inventory-quantity="{{ item.blood_group }}">{{ item.quantity }}</strong> <span class="inventory-units" style="color: #64748b; font-size: 13px; font-weight: normal;">units</span></span></td>
+                  {% if can_manage_inventory %}
+                  <td style="padding: 16px;">
+                    <form class="inventory-update-form" data-blood-group="{{ item.blood_group }}" novalidate>
+                      <label class="visually-hidden" for="inventory-input-{{ loop.index }}">New quantity for {{ item.blood_group }}</label>
+                      <input id="inventory-input-{{ loop.index }}" name="quantity" type="number" min="0" step="1" required inputmode="numeric" value="{{ item.quantity }}" style="background: #1e293b; border: 1px solid #334155; color: #ffffff; border-radius: 8px; padding: 8px 12px; width: 80px; text-align: center; font-size: 14px; font-weight: 600; outline: none; margin-right: 8px;">
+                      <button type="button" data-inventory-save data-blood-group="{{ item.blood_group }}" data-quantity-input="inventory-input-{{ loop.index }}" onclick="window.saveFacilityInventory('{{ item.blood_group }}', 'inventory-input-{{ loop.index }}', this)" style="background: #e11d48; color: #ffffff; border: none; border-radius: 8px; padding: 8px 18px; font-weight: 700; font-size: 13px; cursor: pointer; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.4);">Save</button>
+                      <span class="inventory-row-feedback" role="status" aria-live="polite"></span>
+                    </form>
+                  </td>
+                  {% endif %}
+                  <td class="inventory-updated-at" data-timestamp="{{ item.updated_at or '' }}" style="padding: 16px; color: #94a3b8; font-size: 13px;">{{ item.updated_at or "Not updated yet" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <!-- 4. Low Blood Stock Alerts & Reorder Triggers -->
       <section class="portal-section" id="section-stock-alerts"></section>
@@ -1263,6 +1187,6 @@
     <span id="masterToastMessage">Action completed successfully.</span>
   </div>
 
-  <script src="/static/js/hospital_dashboard.js"></script>
+  <script src="/static/js/hospital_dashboard.js?v=inventory-save-3"></script>
 </body>
 </html>

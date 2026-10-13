@@ -1,6 +1,5 @@
 // ================= BLOOD SEEKER PORTAL SCRIPT =================
-// Implementation for Section 1: Blood Seeker Personal Dashboard
-// Sections 2 through 9 remain modular shells until requested.
+// Blood seeker dashboard interactions and emergency request submission.
 
 document.addEventListener('DOMContentLoaded', () => {
   // Navigation & Tab Switching
@@ -44,10 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (mobileSidebar && mobileSidebar.classList.contains('mobile-open')) {
       mobileSidebar.classList.remove('mobile-open');
-    }
-
-    if (cleanId === 'section-donor-directory') {
-      window.requestAnimationFrame(() => window.filterDonorDirectory?.());
     }
 
     if (history.pushState) {
@@ -94,7 +89,125 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // =========================================================================
-  // 4. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING
+  // 4. NEARBY DONORS INTERACTIVE MAP VIEW
+  // =========================================================================
+  const mapElement = document.getElementById('seekerDonorMap');
+  const mapBloodFilter = document.getElementById('mapBloodGroupFilter');
+  const mapRadiusSlider = document.getElementById('mapRadiusSlider');
+  const mapRadiusValue = document.getElementById('mapRadiusValue');
+  const mapStatus = document.getElementById('mapDonorStatus');
+  const mapDonorCount = document.getElementById('mapDonorCount');
+  const mapDonorList = document.getElementById('mapNearbyDonorsList');
+  let nearbyMap = null;
+  let nearbyMapLoaded = false;
+  let nearbyMapMarkers = [];
+
+  function initializeNearbyMap() {
+    if (!mapElement || typeof window.L === 'undefined') {
+      if (mapStatus) mapStatus.textContent = 'The map could not be loaded. Check your connection and try again.';
+      return;
+    }
+    if (nearbyMap) {
+      nearbyMap.invalidateSize();
+      return;
+    }
+
+    nearbyMap = window.L.map(mapElement, { scrollWheelZoom: false }).setView([23.75, 90.38], 12);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(nearbyMap);
+  }
+
+  function renderNearbyDonors(donors) {
+    if (!nearbyMap || !mapDonorList || !mapDonorCount) return;
+    nearbyMapMarkers.forEach(marker => nearbyMap.removeLayer(marker));
+    nearbyMapMarkers = [];
+    mapDonorList.replaceChildren();
+    mapDonorCount.textContent = String(donors.length);
+
+    if (donors.length === 0) {
+      mapStatus.textContent = 'No available donors match these filters.';
+      return;
+    }
+
+    mapStatus.textContent = `${donors.length} available donor${donors.length === 1 ? '' : 's'} found.`;
+    const bounds = [];
+    donors.forEach((donor, index) => {
+      const markerIcon = window.L.divIcon({
+        className: 'nearby-donor-icon',
+        html: `<span class="map-donor-marker">${donor.blood_group}</span>`,
+        iconSize: [42, 42],
+        iconAnchor: [21, 21]
+      });
+      const marker = window.L.marker([donor.lat, donor.lng], { icon: markerIcon }).addTo(nearbyMap);
+      const popup = document.createElement('div');
+      const bloodGroup = document.createElement('strong');
+      bloodGroup.textContent = `${donor.blood_group} donor`;
+      const area = document.createElement('p');
+      area.textContent = `${donor.area}, ${donor.district}`;
+      const distance = document.createElement('p');
+      distance.textContent = `${Number(donor.distance_km).toFixed(1)} km away · ${donor.location_precision === 'exact' ? 'Shared location' : 'Approximate area'}`;
+      popup.append(bloodGroup, area, distance);
+      marker.bindPopup(popup);
+      nearbyMapMarkers.push(marker);
+      bounds.push([donor.lat, donor.lng]);
+
+      const listButton = document.createElement('button');
+      listButton.type = 'button';
+      listButton.className = 'nearby-donor-row';
+      const group = document.createElement('span');
+      group.className = 'nearby-donor-group';
+      group.textContent = donor.blood_group;
+      const details = document.createElement('span');
+      details.className = 'nearby-donor-details';
+      const location = document.createElement('strong');
+      location.textContent = donor.area;
+      const distanceText = document.createElement('small');
+      distanceText.textContent = `${Number(donor.distance_km).toFixed(1)} km away`;
+      details.append(location, distanceText);
+      listButton.append(group, details);
+      listButton.addEventListener('click', () => {
+        nearbyMap.setView([donor.lat, donor.lng], Math.max(nearbyMap.getZoom(), 14));
+        nearbyMapMarkers[index].openPopup();
+      });
+      mapDonorList.append(listButton);
+    });
+
+    if (bounds.length > 1) nearbyMap.fitBounds(bounds, { padding: [48, 48], maxZoom: 14 });
+    else nearbyMap.setView(bounds[0], 14);
+  }
+
+  async function loadNearbyDonors() {
+    if (!mapStatus) return;
+    initializeNearbyMap();
+    if (!nearbyMap) return;
+    mapStatus.textContent = 'Loading available donors...';
+    mapStatus.setAttribute('aria-busy', 'true');
+    const params = new URLSearchParams({ radius_km: mapRadiusSlider?.value || '15' });
+    if (mapBloodFilter?.value) params.set('blood_group', mapBloodFilter.value);
+    try {
+      const response = await fetch(`/api/v1/seeker/donors/map?${params.toString()}`);
+      if (!response.ok) throw new Error('Donor map request failed');
+      const data = await response.json();
+      nearbyMapLoaded = true;
+      renderNearbyDonors(Array.isArray(data.donors) ? data.donors : []);
+    } catch (error) {
+      mapStatus.textContent = 'Nearby donors could not be loaded. Please try again.';
+    } finally {
+      mapStatus.removeAttribute('aria-busy');
+    }
+  }
+
+  mapBloodFilter?.addEventListener('change', loadNearbyDonors);
+  mapRadiusSlider?.addEventListener('input', () => {
+    if (mapRadiusValue) mapRadiusValue.textContent = `${mapRadiusSlider.value} km`;
+    loadNearbyDonors();
+  });
+  document.getElementById('nearbyMapRefresh')?.addEventListener('click', loadNearbyDonors);
+
+  // =========================================================================
+  // 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING
   // =========================================================================
   const dirLocationFilter = document.getElementById('dirLocationFilter');
   const dirBloodFilter = document.getElementById('dirBloodFilter');
@@ -208,14 +321,82 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDonorDirectory();
   });
 
+  // =========================================================================
+  // 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW
+  // =========================================================================
+  const donorProfileStatus = document.getElementById('donorProfileStatus');
+  const publicDonorProfile = document.getElementById('donorPublicProfile');
+
+  async function loadPublicDonorProfiles() {
+    if (!donorProfileStatus || !publicDonorProfile) return;
+    donorProfileStatus.textContent = 'Loading public donor profiles...';
+    donorProfileStatus.setAttribute('aria-busy', 'true');
+    publicDonorProfile.replaceChildren();
+    try {
+      const response = await fetch('/api/v1/seeker/donors?radius_km=30');
+      if (!response.ok) throw new Error('Public donor profiles request failed');
+      const data = await response.json();
+      const donors = Array.isArray(data.donors) ? data.donors : [];
+      if (!donors.length) {
+        donorProfileStatus.textContent = 'No public donor profiles are available right now.';
+        return;
+      }
+      donors.forEach(donor => {
+        const card = document.createElement('article');
+        card.className = 'donor-card public-donor-profile';
+        const hero = document.createElement('header');
+        hero.className = 'credentials-hero-panel';
+        const heroLeft = document.createElement('div');
+        heroLeft.className = 'credentials-hero-left';
+        const avatar = document.createElement('span');
+        avatar.className = 'credentials-large-avatar';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.textContent = String(donor.name || 'D').trim().charAt(0).toUpperCase();
+        const identity = document.createElement('div');
+        const title = document.createElement('h3');
+        title.className = 'donor-card-name';
+        title.textContent = donor.name || 'Donor';
+        const subheading = document.createElement('p');
+        subheading.className = 'card-subtitle';
+        subheading.textContent = [donor.area, donor.district].filter(Boolean).join(', ') || 'Location not shared';
+        identity.append(title, subheading);
+        heroLeft.append(avatar, identity);
+        const bloodGroup = document.createElement('span');
+        bloodGroup.className = 'donor-badge-group donor-profile-blood-group';
+        bloodGroup.textContent = donor.blood_group || 'Blood group not shared';
+        hero.append(heroLeft, bloodGroup);
+
+        const credentials = document.createElement('div');
+        credentials.className = 'public-profile-credentials';
+        const availability = document.createElement('p');
+        availability.textContent = donor.is_available ? 'Availability: Available now' : 'Availability: Not currently available';
+        const verification = document.createElement('p');
+        verification.textContent = donor.is_verified ? 'Verification: Verified donor' : 'Verification: Not verified';
+        const history = document.createElement('p');
+        history.textContent = Number.isInteger(donor.donation_count)
+          ? `Donation history: ${donor.donation_count} donation${donor.donation_count === 1 ? '' : 's'} shared`
+          : 'Donation history: Not shared';
+        credentials.append(availability, verification, history);
+        card.append(hero, credentials);
+        publicDonorProfile.append(card);
+      });
+      donorProfileStatus.textContent = `${donors.length} public donor profile${donors.length === 1 ? '' : 's'}.`;
+    } catch (error) {
+      console.error('Public donor profiles error:', error);
+      donorProfileStatus.textContent = 'Donor profiles could not be loaded. Please try again.';
+    } finally {
+      donorProfileStatus.removeAttribute('aria-busy');
+    }
+  }
+
   // Modal controls
-  window.closeSosModal = function() {
+  window.closeSosModal = function () {
     const modal = document.getElementById('sosBroadcastModal');
     if (modal) modal.style.display = 'none';
     activateSection('section-seeker-dashboard');
   };
 
-  window.showSosModal = function(group = 'O+', hospital = 'Square Hospital') {
+  window.showSosModal = function (group = 'O+', hospital = 'Square Hospital') {
     const modal = document.getElementById('sosBroadcastModal');
     const groupEl = document.getElementById('sosBroadcastGroup');
     const hospEl = document.getElementById('sosBroadcastHospital');
@@ -290,6 +471,13 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderSeekerRequestsTable(filter = 'all') {
     const tableBody = document.getElementById('seekerRequestsTableBody');
     if (!tableBody) return;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
 
     let filtered = seekerRequests;
     if (filter === 'active') {
@@ -313,38 +501,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     tableBody.innerHTML = filtered.map(req => {
       const isSos = req.is_emergency === 1 || req.status === 'Emergency';
+      const currentStatus = req.status || (isSos ? 'Emergency' : 'Active');
       const statusBadge = isSos
-        ? `<span class="nav-badge-emergency">● SOS EMERGENCY</span>`
-        : req.status === 'Fulfilled'
-        ? `<span class="nav-pill-badge pill-green">✓ Fulfilled</span>`
-        : `<span class="nav-pill-badge pill-blue">Active</span>`;
+        ? `<span class="nav-badge-emergency">● SOS EMERGENCY · ${escapeHtml(currentStatus)}</span>`
+        : currentStatus === 'Fulfilled'
+          ? `<span class="nav-pill-badge pill-green">✓ Fulfilled</span>`
+          : `<span class="nav-pill-badge pill-blue">${escapeHtml(currentStatus)}</span>`;
 
       const hospitalName = req.hospital || req.hospital_name || 'Dhaka Hospital';
       const areaName = req.area || req.district || 'Dhaka';
       const patient = req.patient_name || 'Patient';
       const units = req.units || 1;
-      const responses = req.responses_count || (isSos ? 5 : 2);
+      const responses = req.responses_count ?? (isSos ? 5 : 2);
 
       return `
         <tr>
-          <td style="font-weight: 700; color: var(--text-primary);">#REQ-${req.id}</td>
-          <td><strong>${patient}</strong></td>
+          <td style="font-weight: 700; color: var(--text-primary);">#REQ-${escapeHtml(req.id)}</td>
+          <td><strong>${escapeHtml(patient)}</strong></td>
           <td>
             <span class="blood-group-badge" style="background: #FFE4E6; color: #BE123C; font-weight: 800; padding: 3px 8px; border-radius: 6px; font-size: 0.85rem; display: inline-block;">
-              ${req.blood_group}
+              ${escapeHtml(req.blood_group)}
             </span>
           </td>
           <td>
-            <div style="font-weight: 600; font-size: 0.88rem;">${hospitalName}</div>
-            <div style="font-size: 0.76rem; color: var(--text-secondary);">${areaName} • ${units} Bag(s)</div>
+            <div style="font-weight: 600; font-size: 0.88rem;">${escapeHtml(hospitalName)}</div>
+            <div style="font-size: 0.76rem; color: var(--text-secondary);">${escapeHtml(areaName)} • ${escapeHtml(units)} Bag(s)</div>
           </td>
           <td>${statusBadge}</td>
           <td>
-            <span style="font-weight: 700; color: #0284C7;">${responses} Donors Responded</span>
+            <span style="font-weight: 700; color: #0284C7;">${escapeHtml(responses)} Donors Responded</span>
           </td>
           <td>
             <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn-card-action primary" onclick="window.viewRequestDonors('${req.blood_group}')">
+              <button type="button" class="btn-card-action primary" onclick="window.viewRequestDonors('${escapeHtml(req.blood_group)}')">
                 View Donors
               </button>
               <button type="button" class="btn-card-action" onclick="window.openChatWithDonor('dn-001')">
@@ -367,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Action handlers
-  window.viewRequestDonors = function(bloodGroup) {
+  window.viewRequestDonors = function (bloodGroup) {
     activateSection('section-donor-directory');
     const bloodSelect = document.getElementById('dirBloodFilter');
     if (bloodSelect) {
@@ -380,13 +569,344 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.openChatWithDonor = function(donorId) {
-    activateSection('section-seeker-chat');
-    if (typeof window.selectSeekerChatThread === 'function') {
-      window.selectSeekerChatThread('thread-ayesha');
-    } else {
-      showToast('Opening live chat coordinator with donor...');
+  const seekerChatThreads = document.getElementById('seekerChatThreads');
+  const seekerChatMessages = document.getElementById('seekerChatMessages');
+  const seekerChatPeer = document.getElementById('seekerChatPeer');
+  const seekerChatForm = document.getElementById('seekerChatForm');
+  const seekerChatInput = document.getElementById('seekerChatInput');
+  const seekerChatSend = document.getElementById('seekerChatSend');
+  const seekerChatReport = document.getElementById('seekerChatReport');
+  const seekerChatBlock = document.getElementById('seekerChatBlock');
+  const seekerChatFeedback = document.getElementById('seekerChatFeedback');
+  const seekerChatRestriction = document.getElementById('seekerChatRestriction');
+  const seekerChatConnection = document.getElementById('seekerChatConnection');
+  const seekerChatDonorSelect = document.getElementById('seekerChatDonorSelect');
+  const seekerChatStart = document.getElementById('seekerChatStart');
+  let activeSeekerThreadId = '';
+  let seekerThreadData = [];
+  let seekerChatSocket = null;
+  let seekerChatReconnectTimer = null;
+  let seekerChatPingTimer = null;
+
+  function chatErrorMessage(data, fallback) {
+    return data?.detail || data?.message || fallback;
+  }
+
+  function setSeekerChatFeedback(message, isError = false) {
+    if (!seekerChatFeedback) return;
+    seekerChatFeedback.textContent = message;
+    seekerChatFeedback.dataset.state = isError ? 'error' : 'success';
+  }
+
+  function renderSeekerChatThreads() {
+    if (!seekerChatThreads) return;
+    seekerChatThreads.replaceChildren();
+    if (!seekerThreadData.length) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = 'No conversations yet. Start a conversation from an available donor profile.';
+      seekerChatThreads.append(empty);
+      return;
     }
+    seekerThreadData.forEach(thread => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'seeker-chat-thread';
+      button.dataset.threadId = thread.id;
+      button.setAttribute('aria-current', String(thread.id === activeSeekerThreadId));
+      const title = document.createElement('span');
+      title.className = 'seeker-chat-thread-title';
+      title.textContent = thread.name || 'Donor';
+      if (thread.unread_count) {
+        const count = document.createElement('span');
+        count.className = 'seeker-chat-thread-count';
+        count.textContent = String(thread.unread_count);
+        title.append(' ', count);
+      }
+      const preview = document.createElement('span');
+      preview.className = 'seeker-chat-thread-preview';
+      preview.textContent = thread.last_message || 'Conversation started';
+      button.append(title, preview);
+      button.addEventListener('click', () => openSeekerChatThread(thread.id));
+      seekerChatThreads.append(button);
+    });
+    const unread = seekerThreadData.reduce((total, thread) => total + thread.unread_count, 0);
+    const unreadBadge = document.getElementById('seekerChatUnread');
+    if (unreadBadge) {
+      unreadBadge.textContent = `${unread} unread`;
+      unreadBadge.hidden = unread === 0;
+    }
+  }
+
+  async function loadSeekerChatThreads() {
+    if (!seekerChatThreads) return;
+    try {
+      const response = await fetch('/api/v1/seeker/chat/threads');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load conversations.'));
+      }
+      seekerThreadData = data.threads || [];
+      renderSeekerChatThreads();
+      if (activeSeekerThreadId && !seekerThreadData.some(item => item.id === activeSeekerThreadId)) {
+        activeSeekerThreadId = '';
+      }
+      if (!activeSeekerThreadId && seekerThreadData.length) {
+        await openSeekerChatThread(seekerThreadData[0].id);
+      }
+    } catch (error) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = error.message || 'Could not load conversations.';
+      seekerChatThreads.replaceChildren(empty);
+      setSeekerChatFeedback(empty.textContent, true);
+    }
+  }
+
+  async function loadAvailableChatDonors() {
+    if (!seekerChatDonorSelect) return;
+    try {
+      const response = await fetch('/api/v1/seeker/chat/available-donors');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load available donors.'));
+      }
+      seekerChatDonorSelect.replaceChildren();
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = data.donors.length
+        ? 'Select an available donor…'
+        : 'No available donor accounts';
+      seekerChatDonorSelect.append(placeholder);
+      data.donors.forEach(donor => {
+        const option = document.createElement('option');
+        option.value = donor.id;
+        option.textContent = `${donor.name} · ${donor.blood_group || 'Blood group not listed'}${donor.area ? ` · ${donor.area}` : ''}`;
+        seekerChatDonorSelect.append(option);
+      });
+      if (seekerChatStart) seekerChatStart.disabled = data.donors.length === 0;
+    } catch (error) {
+      seekerChatDonorSelect.replaceChildren();
+      const option = document.createElement('option');
+      option.value = '';
+      option.textContent = error.message || 'Donor list unavailable';
+      seekerChatDonorSelect.append(option);
+      if (seekerChatStart) seekerChatStart.disabled = true;
+      setSeekerChatFeedback(error.message || 'Could not load available donors.', true);
+    }
+  }
+
+  function renderSeekerMessages(messages) {
+    if (!seekerChatMessages) return;
+    seekerChatMessages.replaceChildren();
+    if (!messages.length) {
+      const empty = document.createElement('p');
+      empty.className = 'seeker-chat-empty';
+      empty.textContent = 'No messages yet. Send a message to begin the conversation.';
+      seekerChatMessages.append(empty);
+      return;
+    }
+    messages.forEach(message => {
+      const bubble = document.createElement('article');
+      bubble.className = `seeker-chat-bubble${message.sender === 'you' ? ' is-own' : ''}`;
+      bubble.dataset.messageId = message.id;
+      const text = document.createElement('div');
+      text.textContent = message.text;
+      const timestamp = document.createElement('time');
+      timestamp.dateTime = message.sent_at || message.time;
+      const parsedDate = new Date(timestamp.dateTime);
+      timestamp.textContent = Number.isNaN(parsedDate.getTime())
+        ? message.time
+        : parsedDate.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+      bubble.append(text, timestamp);
+      seekerChatMessages.append(bubble);
+    });
+    seekerChatMessages.scrollTop = seekerChatMessages.scrollHeight;
+  }
+
+  async function openSeekerChatThread(threadId) {
+    activeSeekerThreadId = threadId;
+    renderSeekerChatThreads();
+    const thread = seekerThreadData.find(item => item.id === threadId);
+    if (!thread || !seekerChatMessages) return;
+    if (seekerChatPeer) seekerChatPeer.textContent = thread.name || 'Donor';
+    if (seekerChatInput) seekerChatInput.disabled = Boolean(thread.restricted);
+    if (seekerChatSend) seekerChatSend.disabled = Boolean(thread.restricted);
+    if (seekerChatReport) seekerChatReport.disabled = false;
+    if (seekerChatBlock) seekerChatBlock.disabled = Boolean(thread.restricted);
+    if (seekerChatRestriction) {
+      seekerChatRestriction.textContent = thread.restricted ? 'Messaging is restricted.' : '';
+    }
+    try {
+      const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(threadId)}/messages`);
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not load this conversation.'));
+      }
+      renderSeekerMessages(data.messages || []);
+      await fetch(`/api/v1/seeker/chat/${encodeURIComponent(threadId)}/read`, { method: 'POST' });
+      const currentThread = seekerThreadData.find(item => item.id === threadId);
+      if (currentThread) currentThread.unread_count = 0;
+      renderSeekerChatThreads();
+      setSeekerChatFeedback('');
+    } catch (error) {
+      setSeekerChatFeedback(error.message || 'Could not load this conversation.', true);
+    }
+  }
+
+  async function startSeekerChat(donorId) {
+    if (!donorId) {
+      setSeekerChatFeedback('Choose a donor from the directory to start a conversation.', true);
+      return;
+    }
+    try {
+      const response = await fetch('/api/v1/seeker/chat/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donor_id: donorId })
+      });
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(chatErrorMessage(data, 'Could not start this conversation.'));
+      }
+      activeSeekerThreadId = data.thread.id;
+      await loadSeekerChatThreads();
+      await openSeekerChatThread(data.thread.id);
+      setSeekerChatFeedback(`Conversation with ${data.thread.name} is ready.`);
+    } catch (error) {
+      setSeekerChatFeedback(error.message || 'Could not start this conversation.', true);
+      showToast(error.message || 'Could not start this conversation.', 'error');
+    }
+  }
+
+  if (seekerChatStart && seekerChatDonorSelect) {
+    seekerChatStart.addEventListener('click', () => {
+      startSeekerChat(seekerChatDonorSelect.value);
+    });
+  }
+
+  if (seekerChatForm) {
+    seekerChatForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const text = seekerChatInput?.value.trim();
+      if (!text || !activeSeekerThreadId) return;
+      if (seekerChatSend) seekerChatSend.disabled = true;
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'Message could not be sent.'));
+        }
+        if (seekerChatInput) seekerChatInput.value = '';
+        await openSeekerChatThread(activeSeekerThreadId);
+        await loadSeekerChatThreads();
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'Message could not be sent.', true);
+      } finally {
+        if (seekerChatSend) seekerChatSend.disabled = false;
+      }
+    });
+  }
+
+  if (seekerChatReport) {
+    seekerChatReport.addEventListener('click', async () => {
+      if (!activeSeekerThreadId) return;
+      const reason = document.getElementById('seekerChatReportReason')?.value || 'other';
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'The report could not be submitted.'));
+        }
+        setSeekerChatFeedback(data.message);
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'The report could not be submitted.', true);
+      }
+    });
+  }
+
+  if (seekerChatBlock) {
+    seekerChatBlock.addEventListener('click', async () => {
+      if (!activeSeekerThreadId || !window.confirm('Restrict this participant? You will no longer be able to send messages in this conversation.')) return;
+      try {
+        const response = await fetch(`/api/v1/seeker/chat/${encodeURIComponent(activeSeekerThreadId)}/block`, { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(chatErrorMessage(data, 'This conversation could not be restricted.'));
+        }
+        await loadSeekerChatThreads();
+        await openSeekerChatThread(activeSeekerThreadId);
+        setSeekerChatFeedback('Conversation restricted. You can still review its messages.');
+      } catch (error) {
+        setSeekerChatFeedback(error.message || 'This conversation could not be restricted.', true);
+      }
+    });
+  }
+
+  function connectSeekerChatSocket() {
+    if (!seekerChatConnection || !window.WebSocket) return;
+    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    try {
+      seekerChatSocket = new WebSocket(`${scheme}//${window.location.host}/ws/chat/seeker`);
+    } catch (error) {
+      seekerChatConnection.textContent = 'Live updates unavailable · Sending remains available';
+      seekerChatConnection.dataset.state = 'offline';
+      seekerChatReconnectTimer = setTimeout(connectSeekerChatSocket, 3000);
+      return;
+    }
+    seekerChatSocket.onopen = () => {
+      seekerChatConnection.textContent = 'Live';
+      seekerChatConnection.dataset.state = 'online';
+      clearTimeout(seekerChatReconnectTimer);
+      clearInterval(seekerChatPingTimer);
+      seekerChatPingTimer = setInterval(() => {
+        if (seekerChatSocket?.readyState === WebSocket.OPEN) {
+          seekerChatSocket.send(JSON.stringify({ action: 'ping' }));
+        }
+      }, 25000);
+    };
+    seekerChatSocket.onmessage = event => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'chat_message') {
+        loadSeekerChatThreads();
+        if (data.thread_id === activeSeekerThreadId) {
+          openSeekerChatThread(activeSeekerThreadId);
+        }
+      } else if (data.type === 'presence') {
+        const current = seekerThreadData.find(thread => thread.id === activeSeekerThreadId);
+        if (current) seekerChatConnection.textContent = data.status === 'online' ? `${current.name} is online` : 'Live';
+      }
+    };
+    seekerChatSocket.onclose = event => {
+      clearInterval(seekerChatPingTimer);
+      seekerChatConnection.textContent = 'Live updates unavailable · Sending remains available';
+      seekerChatConnection.dataset.state = 'offline';
+      if (event.code === 4401 || event.code === 4404) {
+        seekerChatConnection.textContent = 'Sign in to use chat';
+        return;
+      }
+      seekerChatReconnectTimer = setTimeout(connectSeekerChatSocket, 3000);
+    };
+    seekerChatSocket.onerror = () => {
+      seekerChatSocket?.close();
+    };
+  }
+  connectSeekerChatSocket();
+  loadSeekerChatThreads();
+  loadAvailableChatDonors();
+
+  window.selectSeekerChatThread = openSeekerChatThread;
+  window.openChatWithDonor = function (donorId) {
+    activateSection('section-seeker-chat');
+    startSeekerChat(donorId);
   };
 
   // Sync with API to load any dynamic requests from server
@@ -406,10 +926,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 area: apiReq.area || apiReq.district || 'Dhaka',
                 units: apiReq.units || 1,
                 needed_date: 'Immediate',
-                status: apiReq.is_emergency ? 'Emergency' : 'Active',
+                status: apiReq.is_emergency ? (apiReq.status || 'Emergency') : (apiReq.status || 'Active'),
                 is_emergency: apiReq.is_emergency ? 1 : 0,
-                responses_count: apiReq.is_emergency ? 4 : 2,
-                created_at: 'Recently'
+                responses_count: 0,
+                created_at: apiReq.created_at || 'Recently'
               });
             }
           });
@@ -420,6 +940,63 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Seeker requests API fetch skipped:', err);
     }
+  }
+
+  const emergencyRequestForm = document.getElementById('emergencyRequestForm');
+  if (emergencyRequestForm) {
+    emergencyRequestForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!emergencyRequestForm.reportValidity()) return;
+
+      const submitButton = document.getElementById('submitEmergencyRequest');
+      const feedback = document.getElementById('emergencyRequestFeedback');
+      const formData = new FormData(emergencyRequestForm);
+      const payload = Object.fromEntries(formData.entries());
+      payload.units = Number(payload.units);
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending emergency request...';
+      feedback.hidden = true;
+
+      try {
+        const response = await fetch('/api/v1/seeker/requests/emergency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(' ')
+            : data.detail;
+          throw new Error(detail || data.message || 'Could not create the emergency request.');
+        }
+
+        await loadSeekerRequestsFromApi();
+        const notification = data.notifications || {};
+        let notificationMessage = '';
+        if (notification.status === 'not_configured') {
+          notificationMessage = ' SMS alerts were not sent because the SMS gateway is not configured.';
+        } else if (notification.status === 'failed' || notification.status === 'partial') {
+          notificationMessage = ` SMS delivery: ${notification.sent} sent, ${notification.failed} failed.`;
+        } else if (notification.status === 'no_matches') {
+          notificationMessage = ' No available matching donors were found to notify.';
+        } else if (notification.status === 'sent') {
+          notificationMessage = ` SMS alerts sent to ${notification.sent} matching donor(s).`;
+        }
+
+        feedback.textContent = `Emergency request #${data.request.id} is active and can be tracked in My Posted Blood Requests.${notificationMessage}`;
+        feedback.hidden = false;
+        emergencyRequestForm.reset();
+        showToast(`Emergency request #${data.request.id} created.`);
+      } catch (error) {
+        feedback.textContent = error.message || 'The emergency request could not be submitted. Please try again.';
+        feedback.hidden = false;
+        showToast(feedback.textContent, 'error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = '<span aria-hidden="true">🚨</span> Broadcast Emergency Request';
+      }
+    });
   }
 
   // Update user name in sidebar, avatar circle, and banner greeting
@@ -462,7 +1039,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (settingsForm) {
     settingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const newName = document.getElementById('setSeekerName')?.value.trim() || 'Nabil Hasan';
       const settingsPayload = {
         full_name: newName,

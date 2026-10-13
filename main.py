@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import asyncio
 import hashlib
@@ -39,6 +41,7 @@ OTP_RESEND_SECONDS = 60
 OTP_MAX_ATTEMPTS = 5
 PASSWORD_HASH_ITERATIONS = 310_000
 OTP_HASH_ITERATIONS = 120_000
+BLOOD_GROUPS = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 
 
 def initialize_urgent_database():
@@ -56,7 +59,14 @@ def initialize_urgent_database():
                     distance_km REAL,
                     expires_at TEXT NOT NULL,
                     contact_phone TEXT,
-                    is_emergency INTEGER DEFAULT 0
+                    is_emergency INTEGER DEFAULT 0,
+                    owner_phone TEXT,
+                    patient_name TEXT NOT NULL DEFAULT '',
+                    units INTEGER NOT NULL DEFAULT 1,
+                    urgency_level TEXT NOT NULL DEFAULT 'Standard',
+                    reason TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL DEFAULT 'Active',
+                    created_at TEXT
                 );
                 CREATE TABLE IF NOT EXISTS donor_request_responses (
                     id INTEGER PRIMARY KEY,
@@ -87,8 +97,90 @@ def initialize_urgent_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_donation_history_donor_date
                     ON donor_donation_history(donor_phone, donated_at DESC);
+                CREATE TABLE IF NOT EXISTS chat_threads (
+                    id TEXT PRIMARY KEY,
+                    donor_phone TEXT NOT NULL,
+                    seeker_phone TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    UNIQUE (donor_phone, seeker_phone)
+                );
+                CREATE TABLE IF NOT EXISTS chat_messages (
+                    id TEXT PRIMARY KEY,
+                    thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+                    sender_phone TEXT NOT NULL,
+                    text TEXT NOT NULL,
+                    sent_at TEXT NOT NULL,
+                    read_at TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_time
+                    ON chat_messages(thread_id, sent_at, id);
+                CREATE TABLE IF NOT EXISTS chat_blocks (
+                    blocker_phone TEXT NOT NULL,
+                    blocked_phone TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (blocker_phone, blocked_phone),
+                    CHECK (blocker_phone != blocked_phone)
+                );
+                CREATE TABLE IF NOT EXISTS chat_reports (
+                    id INTEGER PRIMARY KEY,
+                    thread_id TEXT NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+                    reporter_phone TEXT NOT NULL,
+                    reported_phone TEXT NOT NULL,
+                    message_id TEXT REFERENCES chat_messages(id) ON DELETE SET NULL,
+                    reason TEXT NOT NULL,
+                    details TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    UNIQUE (thread_id, reporter_phone, message_id)
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_reports_once_per_message
+                    ON chat_reports(thread_id, reporter_phone, COALESCE(message_id, ''));
+                CREATE TABLE IF NOT EXISTS facility_blood_inventory (
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+                    updated_at TEXT,
+                    PRIMARY KEY (facility_phone, blood_group)
+                );
+                CREATE TABLE IF NOT EXISTS facility_inventory_audit (
+                    id INTEGER PRIMARY KEY,
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    previous_quantity INTEGER NOT NULL CHECK (previous_quantity >= 0),
+                    new_quantity INTEGER NOT NULL CHECK (new_quantity >= 0),
+                    actor_phone TEXT NOT NULL,
+                    changed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_facility_inventory_audit_recent
+                    ON facility_inventory_audit(facility_phone, changed_at DESC, id DESC);
                 """
             )
+            connection.execute(
+                """INSERT OR IGNORE INTO chat_threads (id, donor_phone, seeker_phone, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (
+                    "thread-ayesha",
+                    "+8801712345678",
+                    "+8801723456789",
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            blood_request_columns = {
+                row[1] for row in connection.execute("PRAGMA table_info(blood_requests)").fetchall()
+            }
+            request_migrations = {
+                "owner_phone": "TEXT",
+                "patient_name": "TEXT NOT NULL DEFAULT ''",
+                "units": "INTEGER NOT NULL DEFAULT 1",
+                "urgency_level": "TEXT NOT NULL DEFAULT 'Standard'",
+                "reason": "TEXT NOT NULL DEFAULT ''",
+                "status": "TEXT NOT NULL DEFAULT 'Active'",
+                "created_at": "TEXT",
+            }
+            for column, definition in request_migrations.items():
+                if column not in blood_request_columns:
+                    connection.execute(
+                        f"ALTER TABLE blood_requests ADD COLUMN {column} {definition}"
+                    )
             count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
             if count == 0:
                 now = datetime.now(timezone.utc)
@@ -97,6 +189,91 @@ def initialize_urgent_database():
                     ('A+', 'Dhaka Medical College', 'Dhaka', 'Shahbagh', 2.5, '{(now + timedelta(hours=2)).isoformat()}', '+8801700000000', 1),
                     ('O-', 'Square Hospital', 'Dhaka', 'Panthapath', 4.1, '{(now + timedelta(hours=1)).isoformat()}', '+8801700000001', 1);
                 """)
+
+
+def _get_facility_inventory(facility_phone: str) -> list[dict]:
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.executemany(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                [(facility_phone, group) for group in BLOOD_GROUPS],
+            )
+        rows = connection.execute(
+            """SELECT blood_group, quantity, updated_at
+               FROM facility_blood_inventory
+               WHERE facility_phone = ?
+               ORDER BY CASE blood_group
+                   WHEN 'A+' THEN 1 WHEN 'A-' THEN 2
+                   WHEN 'B+' THEN 3 WHEN 'B-' THEN 4
+                   WHEN 'AB+' THEN 5 WHEN 'AB-' THEN 6
+                   WHEN 'O+' THEN 7 WHEN 'O-' THEN 8 END""",
+            (facility_phone,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _update_facility_inventory(
+    facility_phone: str, actor_phone: str, blood_group: str, quantity: int
+) -> dict:
+    initialize_urgent_database()
+    changed_at = datetime.now(timezone.utc).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                (facility_phone, blood_group),
+            )
+            current = connection.execute(
+                """SELECT quantity, updated_at FROM facility_blood_inventory
+                   WHERE facility_phone = ? AND blood_group = ?""",
+                (facility_phone, blood_group),
+            ).fetchone()
+            previous_quantity = current["quantity"]
+            if previous_quantity != quantity:
+                connection.execute(
+                    """UPDATE facility_blood_inventory
+                       SET quantity = ?, updated_at = ?
+                       WHERE facility_phone = ? AND blood_group = ?""",
+                    (quantity, changed_at, facility_phone, blood_group),
+                )
+                connection.execute(
+                    """INSERT INTO facility_inventory_audit
+                       (facility_phone, blood_group, previous_quantity, new_quantity,
+                        actor_phone, changed_at)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        facility_phone,
+                        blood_group,
+                        previous_quantity,
+                        quantity,
+                        actor_phone,
+                        changed_at,
+                    ),
+                )
+    return {
+        "blood_group": blood_group,
+        "quantity": quantity,
+        "updated_at": changed_at if previous_quantity != quantity else current["updated_at"],
+        "changed": previous_quantity != quantity,
+    }
+
+
+def _require_facility_inventory_user(request: Request) -> dict:
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to access facility inventory.")
+    if user.get("role") not in {"hospital", "bank", "blood_bank"}:
+        raise HTTPException(status_code=403, detail="Only hospital and blood bank users can manage inventory.")
+    return user
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -129,6 +306,10 @@ USERS = {
     "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam"},
     "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed"},
     "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin"},
+}
+CHAT_DEMO_ACCOUNTS = {
+    "+8801712345678": "donor",
+    "+8801723456789": "seeker",
 }
 REQUESTS = [
     {
@@ -570,6 +751,13 @@ def sms_is_configured() -> bool:
 
 
 def send_recovery_sms(phone: str, code: str):
+    send_sms_message(
+        phone,
+        f"Your Smart Blood Donor System reset code is {code}. It expires in 10 minutes.",
+    )
+
+
+def send_sms_message(phone: str, message: str):
     account_sid = os.environ["TWILIO_ACCOUNT_SID"]
     auth_token = os.environ["TWILIO_AUTH_TOKEN"]
     from_number = os.environ["TWILIO_FROM_NUMBER"]
@@ -578,7 +766,7 @@ def send_recovery_sms(phone: str, code: str):
         {
             "To": phone,
             "From": from_number,
-            "Body": f"Your Smart Blood Donor System reset code is {code}. It expires in 10 minutes.",
+            "Body": message,
         }
     ).encode("ascii")
     credentials = base64.b64encode(f"{account_sid}:{auth_token}".encode("ascii")).decode("ascii")
@@ -1368,7 +1556,7 @@ class DonorProfileUpdate(BaseModel):
     preferred_donation_types: str = "Whole Blood"
 
 
-VALID_BLOOD_GROUPS = {"A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"}
+VALID_BLOOD_GROUPS = set(BLOOD_GROUPS)
 
 
 @app.get("/api/v1/donor/profile")
@@ -1624,6 +1812,14 @@ async def hospital_dashboard(request: Request):
     user_role = (user.get("role") or "hospital").lower()
     role_display_name = "Blood Bank" if user_role in {"bank", "blood_bank"} else "Hospital"
     portal_title = f"{role_display_name} Portal - Smart Blood Donor System"
+    can_manage_inventory = user_role in {"hospital", "bank", "blood_bank"}
+    inventory = _get_facility_inventory(phone) if can_manage_inventory and phone else []
+    inventory_total_units = sum(item["quantity"] for item in inventory)
+    inventory_low_stock_groups = sum(item["quantity"] < 2 for item in inventory)
+    inventory_last_sync = max(
+        (item["updated_at"] for item in inventory if item["updated_at"]),
+        default="",
+    )
 
     facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
     if facility_settings and facility_settings.get("facility_name") and user:
@@ -1639,6 +1835,11 @@ async def hospital_dashboard(request: Request):
             "role_display_name": role_display_name,
             "title": portal_title,
             "facility_settings": facility_settings,
+            "inventory": inventory,
+            "inventory_total_units": inventory_total_units,
+            "inventory_low_stock_groups": inventory_low_stock_groups,
+            "inventory_last_sync": inventory_last_sync,
+            "can_manage_inventory": can_manage_inventory,
         },
     )
     if should_set_cookie or not request.cookies.get("access_token"):
@@ -1960,7 +2161,6 @@ class SendChatMessagePayload(BaseModel):
     sender: str = "you"
 
 
-@app.websocket("/ws/chat/{role}")
 async def websocket_chat_endpoint(websocket: WebSocket, role: str):
     normalized_role = role.strip().lower()
     await chat_manager.connect(normalized_role, websocket)
@@ -1986,6 +2186,9 @@ async def websocket_chat_endpoint(websocket: WebSocket, role: str):
                     await websocket.send_json({"type": "pong"})
                 elif action == "send_message":
                     thread_id = data.get("thread_id", "")
+                    if not isinstance(thread_id, str):
+                        await websocket.send_json({"type": "error", "detail": "A valid conversation is required."})
+                        continue
                     text = data.get("text", "")
                     if normalized_role == "donor":
                         await send_donor_chat_message(thread_id, SendChatMessagePayload(text=text, sender="you"))
@@ -2022,7 +2225,6 @@ async def websocket_chat_endpoint(websocket: WebSocket, role: str):
         chat_manager.disconnect(normalized_role, websocket)
 
 
-@app.get("/api/v1/donor/chat/threads")
 async def get_donor_chat_threads(category: str | None = None, unread_only: bool = False):
     threads = DONOR_CHAT_THREADS
     if category and category.lower() != "all":
@@ -2038,7 +2240,6 @@ async def get_donor_chat_threads(category: str | None = None, unread_only: bool 
     }
 
 
-@app.get("/api/v1/donor/chat/{thread_id}/messages")
 async def get_donor_chat_messages(thread_id: str):
     messages = DONOR_CHAT_MESSAGES.get(thread_id, [])
     thread_meta = next((t for t in DONOR_CHAT_THREADS if t["id"] == thread_id), None)
@@ -2050,7 +2251,6 @@ async def get_donor_chat_messages(thread_id: str):
     }
 
 
-@app.post("/api/v1/donor/chat/{thread_id}/send")
 async def send_donor_chat_message(thread_id: str, payload: SendChatMessagePayload):
     text = payload.text.strip()
     if not text:
@@ -2151,7 +2351,6 @@ async def send_donor_chat_message(thread_id: str, payload: SendChatMessagePayloa
     }
 
 
-@app.post("/api/v1/donor/chat/{thread_id}/read")
 async def mark_donor_chat_read(thread_id: str):
     for thread in DONOR_CHAT_THREADS:
         if thread["id"] == thread_id:
@@ -2164,6 +2363,560 @@ async def mark_donor_chat_read(thread_id: str):
         "unread_count": 0,
         "total_unread": total_unread,
     }
+
+
+class LiveChatConnectionManager:
+    def __init__(self):
+        self.connections: dict[str, set[WebSocket]] = {}
+
+    async def connect(self, phone: str, websocket: WebSocket):
+        await websocket.accept()
+        self.connections.setdefault(phone, set()).add(websocket)
+
+    def disconnect(self, phone: str, websocket: WebSocket) -> bool:
+        user_connections = self.connections.get(phone)
+        if user_connections:
+            user_connections.discard(websocket)
+            if not user_connections:
+                self.connections.pop(phone, None)
+                return True
+        return False
+
+    async def send_to_user(self, phone: str, event: dict):
+        for connection in list(self.connections.get(phone, set())):
+            try:
+                await connection.send_json(event)
+            except (WebSocketDisconnect, RuntimeError):
+                self.disconnect(phone, connection)
+
+
+live_chat_manager = LiveChatConnectionManager()
+
+
+class LiveChatMessagePayload(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class StartChatPayload(BaseModel):
+    donor_id: str = Field(min_length=1, max_length=64)
+
+
+class ChatReportPayload(BaseModel):
+    reason: str = Field(min_length=1, max_length=32)
+    details: str = Field(default="", max_length=1000)
+    message_id: str | None = None
+
+
+def _chat_user(request: Request, role: str) -> dict:
+    user = _get_current_user(request)
+    if (
+        not user
+        or user.get("role") != role
+        or not user.get("phone")
+        or _chat_account_role(user["phone"]) != role
+    ):
+        raise HTTPException(status_code=401, detail=f"Sign in as a {role} to use chat.")
+    return user
+
+
+def _chat_account_role(phone: str) -> str | None:
+    demo_role = CHAT_DEMO_ACCOUNTS.get(phone)
+    if demo_role:
+        return demo_role
+    if any(
+        donor["phone"] == phone and donor.get("is_available")
+        for donor in SEEKER_MOCK_DONORS
+    ):
+        return "donor"
+    with closing(_connection()) as connection:
+        account = connection.execute(
+            "SELECT role FROM auth_users WHERE phone = ?", (phone,)
+        ).fetchone()
+    return account["role"] if account else None
+
+
+def _chat_websocket_user(websocket: WebSocket, role: str) -> dict | None:
+    token = _decode_jwt(websocket.cookies.get("access_token", ""))
+    if token and token.get("role") == role:
+        if _chat_account_role(token["sub"]) == role:
+            return {"phone": token["sub"], "role": role}
+
+    session_token = websocket.cookies.get(SESSION_COOKIE)
+    if not session_token:
+        return None
+    token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT users.phone, users.role FROM auth_sessions AS sessions
+               JOIN auth_users AS users ON users.id = sessions.user_id
+               WHERE sessions.token_hash = ? AND sessions.expires_at > ?""",
+            (token_hash, int(time.time())),
+        ).fetchone()
+    if row and row["role"] == role:
+        return {"phone": row["phone"], "role": row["role"]}
+    return None
+
+
+def _chat_thread(thread_id: str, user: dict) -> sqlite3.Row:
+    initialize_urgent_database()
+    lookup_id = (
+        "thread-ayesha"
+        if thread_id == "thread-nabil" and user["role"] == "donor"
+        else thread_id
+    )
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            """SELECT * FROM chat_threads
+               WHERE id = ? AND (donor_phone = ? OR seeker_phone = ?)""",
+            (lookup_id, user["phone"], user["phone"]),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    return row
+
+
+def _chat_thread_id_for_role(thread_id: str, role: str) -> str:
+    if thread_id == "thread-ayesha" and role == "donor":
+        return "thread-nabil"
+    return thread_id
+
+
+def _chat_peer_phone(thread: sqlite3.Row, phone: str) -> str:
+    return thread["seeker_phone"] if thread["donor_phone"] == phone else thread["donor_phone"]
+
+
+def _chat_is_restricted(thread: sqlite3.Row) -> bool:
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        blocked = connection.execute(
+            """SELECT 1 FROM chat_blocks
+               WHERE (blocker_phone = ? AND blocked_phone = ?)
+                  OR (blocker_phone = ? AND blocked_phone = ?) LIMIT 1""",
+            (
+                thread["donor_phone"], thread["seeker_phone"],
+                thread["seeker_phone"], thread["donor_phone"],
+            ),
+        ).fetchone()
+    return blocked is not None
+
+
+def _chat_message_dict(row: sqlite3.Row, user: dict) -> dict:
+    own_message = row["sender_phone"] == user["phone"]
+    return {
+        "id": row["id"],
+        "sender": "you" if own_message else ("donor" if user["role"] == "seeker" else "seeker"),
+        "text": row["text"],
+        "time": row["sent_at"],
+        "sent_at": row["sent_at"],
+        "status": "read" if row["read_at"] else "sent",
+    }
+
+
+def _chat_thread_dict(row: sqlite3.Row, user: dict) -> dict:
+    peer_phone = _chat_peer_phone(row, user["phone"])
+    directory_donor = next(
+        (donor for donor in SEEKER_MOCK_DONORS if donor["phone"] == peer_phone),
+        None,
+    )
+    peer = directory_donor or _get_user_by_phone(peer_phone) or {"name": "Chat participant"}
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        last_message = connection.execute(
+            """SELECT text, sent_at FROM chat_messages
+               WHERE thread_id = ? ORDER BY sent_at DESC, rowid DESC LIMIT 1""",
+            (row["id"],),
+        ).fetchone()
+        unread_count = connection.execute(
+            """SELECT COUNT(*) FROM chat_messages
+               WHERE thread_id = ? AND sender_phone != ? AND read_at IS NULL""",
+            (row["id"], user["phone"]),
+        ).fetchone()[0]
+    thread_id = _chat_thread_id_for_role(row["id"], user["role"])
+    return {
+        "id": thread_id,
+        "name": peer.get("name") or "Chat participant",
+        "blood_group": peer.get("blood_group", ""),
+        "last_message": last_message["text"] if last_message else "",
+        "last_time": last_message["sent_at"] if last_message else row["created_at"],
+        "unread_count": unread_count,
+        "restricted": _chat_is_restricted(row),
+    }
+
+
+async def _chat_save_message(thread: sqlite3.Row, user: dict, text: str) -> dict:
+    clean_text = text.strip()
+    if not clean_text:
+        raise HTTPException(status_code=422, detail="Message cannot be empty.")
+    if _chat_is_restricted(thread):
+        raise HTTPException(status_code=403, detail="Messaging is restricted for this conversation.")
+
+    sent_at = datetime.now(timezone.utc).isoformat()
+    message_id = secrets.token_urlsafe(12)
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO chat_messages (id, thread_id, sender_phone, text, sent_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (message_id, thread["id"], user["phone"], clean_text, sent_at),
+            )
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM chat_messages WHERE id = ?", (message_id,)
+        ).fetchone()
+
+    message = _chat_message_dict(row, user)
+    event = {
+        "type": "chat_message",
+        "thread_id": _chat_thread_id_for_role(thread["id"], user["role"]),
+        "message": message,
+        **message,
+    }
+    peer_phone = _chat_peer_phone(thread, user["phone"])
+    peer_role = "donor" if user["role"] == "seeker" else "seeker"
+    await live_chat_manager.send_to_user(peer_phone, {
+        **event,
+        "thread_id": _chat_thread_id_for_role(thread["id"], peer_role),
+        "sender": user["role"],
+    })
+    await live_chat_manager.send_to_user(user["phone"], event)
+    return message
+
+
+def _chat_mark_read(thread: sqlite3.Row, user: dict) -> int:
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE chat_messages SET read_at = ?
+                   WHERE thread_id = ? AND sender_phone != ? AND read_at IS NULL""",
+                (datetime.now(timezone.utc).isoformat(), thread["id"], user["phone"]),
+            )
+        return connection.execute(
+            """SELECT COUNT(*) FROM chat_messages
+               WHERE thread_id = ? AND sender_phone != ? AND read_at IS NULL""",
+            (thread["id"], user["phone"]),
+        ).fetchone()[0]
+
+
+def _chat_list_threads(user: dict, category: str | None = None, unread_only: bool = False) -> dict:
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """SELECT * FROM chat_threads
+               WHERE donor_phone = ? OR seeker_phone = ?
+               ORDER BY created_at DESC""",
+            (user["phone"], user["phone"]),
+        ).fetchall()
+    threads = [_chat_thread_dict(row, user) for row in rows]
+    if unread_only:
+        threads = [thread for thread in threads if thread["unread_count"] > 0]
+    unread = sum(thread["unread_count"] for thread in threads)
+    return {"status": "success", "threads": threads, "total_unread": unread, "count": len(threads)}
+
+
+def _chat_donor_identifier(phone: str) -> str:
+    return f"chat-{hashlib.sha256(phone.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _chat_donor_phone_for_identifier(donor_id: str) -> str | None:
+    for donor in SEEKER_MOCK_DONORS:
+        if donor["id"] == donor_id and _chat_account_role(donor["phone"]) == "donor":
+            return donor["phone"]
+
+    if not donor_id.startswith("chat-"):
+        return None
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """SELECT users.phone FROM auth_users AS users
+               LEFT JOIN donor_profiles AS profiles ON profiles.phone = users.phone
+               WHERE users.role = 'donor' AND COALESCE(profiles.is_available, 1) = 1"""
+        ).fetchall()
+    return next(
+        (row["phone"] for row in rows if _chat_donor_identifier(row["phone"]) == donor_id),
+        None,
+    )
+
+
+def _chat_available_donors() -> list[dict]:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """SELECT users.phone,
+                      COALESCE(NULLIF(profiles.name, ''), users.name, 'Blood donor') AS name,
+                      COALESCE(profiles.blood_group, users.blood_group, '') AS blood_group,
+                      COALESCE(profiles.district, '') AS district,
+                      COALESCE(profiles.area, '') AS area
+               FROM auth_users AS users
+               LEFT JOIN donor_profiles AS profiles ON profiles.phone = users.phone
+               WHERE users.role = 'donor' AND COALESCE(profiles.is_available, 1) = 1"""
+        ).fetchall()
+
+    donors_by_phone = {
+        row["phone"]: {
+            "id": _chat_donor_identifier(row["phone"]),
+            "name": row["name"],
+            "blood_group": row["blood_group"],
+            "district": row["district"],
+            "area": row["area"],
+        }
+        for row in rows
+    }
+    for donor in SEEKER_MOCK_DONORS:
+        if not donor.get("is_available"):
+            continue
+        donors_by_phone.setdefault(
+            donor["phone"],
+            {
+                "id": donor["id"],
+                "name": donor.get("public_name") or donor["name"],
+                "blood_group": donor["blood_group"],
+                "district": donor.get("district", ""),
+                "area": donor.get("area", ""),
+            },
+        )
+    return sorted(donors_by_phone.values(), key=lambda donor: donor["name"].casefold())
+
+
+@app.get("/api/v1/seeker/chat/available-donors")
+async def get_available_chat_donors(request: Request):
+    _chat_user(request, "seeker")
+    return {"status": "success", "donors": _chat_available_donors()}
+
+
+@app.post("/api/v1/seeker/chat/conversations")
+async def start_seeker_chat(payload: StartChatPayload, request: Request):
+    user = _chat_user(request, "seeker")
+    donor = next(
+        (item for item in _chat_available_donors() if item["id"] == payload.donor_id),
+        None,
+    )
+    if not donor:
+        raise HTTPException(status_code=404, detail="Available donor not found.")
+    donor_phone = _chat_donor_phone_for_identifier(payload.donor_id)
+    if not donor_phone:
+        raise HTTPException(status_code=404, detail="Available donor not found.")
+    donor_user = _get_user_by_phone(donor_phone) or next(
+        (
+            {
+                "phone": donor_phone,
+                "name": item["name"],
+                "blood_group": item["blood_group"],
+                "role": "donor",
+            }
+            for item in SEEKER_MOCK_DONORS
+            if item["phone"] == donor_phone and item.get("is_available")
+        ),
+        None,
+    )
+    if not donor_user or _chat_account_role(donor_phone) != "donor":
+        raise HTTPException(status_code=404, detail="This donor does not have an active chat account.")
+    if donor_phone == user["phone"]:
+        raise HTTPException(status_code=422, detail="You cannot start a conversation with yourself.")
+
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO chat_threads (id, donor_phone, seeker_phone, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                (
+                    secrets.token_urlsafe(12),
+                    donor_phone,
+                    user["phone"],
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+        connection.row_factory = sqlite3.Row
+        thread = connection.execute(
+            "SELECT * FROM chat_threads WHERE donor_phone = ? AND seeker_phone = ?",
+            (donor_phone, user["phone"]),
+        ).fetchone()
+    return {"status": "success", "thread": _chat_thread_dict(thread, user)}
+
+
+@app.get("/api/v1/seeker/chat/threads")
+async def get_live_seeker_chat_threads(request: Request):
+    return _chat_list_threads(_chat_user(request, "seeker"))
+
+
+@app.get("/api/v1/donor/chat/threads")
+async def get_live_donor_chat_threads(
+    request: Request, category: str | None = None, unread_only: bool = False
+):
+    user = _chat_user(request, "donor")
+    return _chat_list_threads(user, category, unread_only)
+
+
+@app.get("/api/v1/{role}/chat/{thread_id}/messages")
+async def get_live_chat_messages(role: str, thread_id: str, request: Request):
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=404, detail="Chat endpoint not found.")
+    user = _chat_user(request, role)
+    thread = _chat_thread(thread_id, user)
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """SELECT * FROM chat_messages WHERE thread_id = ?
+               ORDER BY sent_at, rowid""",
+            (thread["id"],),
+        ).fetchall()
+    return {
+        "status": "success",
+        "thread_id": _chat_thread_id_for_role(thread["id"], role),
+        "thread": _chat_thread_dict(thread, user),
+        "messages": [_chat_message_dict(row, user) for row in rows],
+    }
+
+
+@app.post("/api/v1/{role}/chat/{thread_id}/send")
+async def send_live_chat_message(
+    role: str, thread_id: str, payload: LiveChatMessagePayload, request: Request
+):
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=404, detail="Chat endpoint not found.")
+    user = _chat_user(request, role)
+    thread = _chat_thread(thread_id, user)
+    message = await _chat_save_message(thread, user, payload.text)
+    return {"status": "success", "sent": message}
+
+
+@app.post("/api/v1/{role}/chat/{thread_id}/read")
+async def mark_live_chat_read(role: str, thread_id: str, request: Request):
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=404, detail="Chat endpoint not found.")
+    user = _chat_user(request, role)
+    thread = _chat_thread(thread_id, user)
+    unread_count = _chat_mark_read(thread, user)
+    return {"status": "success", "thread_id": thread_id, "unread_count": unread_count}
+
+
+@app.post("/api/v1/{role}/chat/{thread_id}/report")
+async def report_live_chat(role: str, thread_id: str, payload: ChatReportPayload, request: Request):
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=404, detail="Chat endpoint not found.")
+    user = _chat_user(request, role)
+    thread = _chat_thread(thread_id, user)
+    allowed_reasons = {"harassment", "spam", "safety", "other"}
+    if payload.reason not in allowed_reasons:
+        raise HTTPException(status_code=422, detail="Choose a valid report reason.")
+    peer_phone = _chat_peer_phone(thread, user["phone"])
+    if payload.message_id:
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            message_exists = connection.execute(
+                """SELECT 1 FROM chat_messages
+                   WHERE id = ? AND thread_id = ? AND sender_phone = ?""",
+                (payload.message_id, thread["id"], peer_phone),
+            ).fetchone()
+        if not message_exists:
+            raise HTTPException(status_code=404, detail="Reported message not found.")
+    try:
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            with connection:
+                connection.execute(
+                    """INSERT INTO chat_reports
+                       (thread_id, reporter_phone, reported_phone, message_id, reason, details, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        thread["id"], user["phone"], peer_phone, payload.message_id,
+                        payload.reason, payload.details.strip(), datetime.now(timezone.utc).isoformat(),
+                    ),
+                )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="This message has already been reported.") from None
+    return {"status": "success", "message": "Report submitted for review."}
+
+
+@app.post("/api/v1/{role}/chat/{thread_id}/block")
+async def block_live_chat_participant(role: str, thread_id: str, request: Request):
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=404, detail="Chat endpoint not found.")
+    user = _chat_user(request, role)
+    thread = _chat_thread(thread_id, user)
+    peer_phone = _chat_peer_phone(thread, user["phone"])
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO chat_blocks (blocker_phone, blocked_phone, created_at)
+                   VALUES (?, ?, ?)""",
+                (user["phone"], peer_phone, datetime.now(timezone.utc).isoformat()),
+            )
+    return {"status": "success", "restricted": True}
+
+
+@app.websocket("/ws/chat/{role}")
+async def live_websocket_chat(websocket: WebSocket, role: str):
+    if role not in {"donor", "seeker"}:
+        await websocket.accept()
+        await websocket.close(code=4404)
+        return
+    user = _chat_websocket_user(websocket, role)
+    if not user:
+        await websocket.accept()
+        await websocket.close(code=4401, reason="Sign in to use chat.")
+        return
+
+    await live_chat_manager.connect(user["phone"], websocket)
+    await websocket.send_json({"type": "connection_established", "role": role, "status": "connected"})
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        peers = connection.execute(
+            """SELECT CASE WHEN donor_phone = ? THEN seeker_phone ELSE donor_phone END
+               FROM chat_threads WHERE donor_phone = ? OR seeker_phone = ?""",
+            (user["phone"], user["phone"], user["phone"]),
+        ).fetchall()
+    for (peer_phone,) in peers:
+        await live_chat_manager.send_to_user(peer_phone, {
+            "type": "presence", "role": role, "status": "online",
+        })
+
+    try:
+        while True:
+            try:
+                data = await websocket.receive_json()
+            except ValueError:
+                await websocket.send_json({"type": "error", "detail": "Chat event must be valid JSON."})
+                continue
+            if not isinstance(data, dict):
+                await websocket.send_json({"type": "error", "detail": "Chat event must be a JSON object."})
+                continue
+            action = data.get("action")
+            if action == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+            thread_id = data.get("thread_id", "")
+            try:
+                thread = _chat_thread(thread_id, user)
+                if action == "send_message":
+                    payload = LiveChatMessagePayload(text=data.get("text", ""))
+                    await _chat_save_message(thread, user, payload.text)
+                elif action == "typing":
+                    peer_phone = _chat_peer_phone(thread, user["phone"])
+                    await live_chat_manager.send_to_user(peer_phone, {
+                        "type": "typing",
+                        "thread_id": _chat_thread_id_for_role(thread["id"], "donor" if role == "seeker" else "seeker"),
+                        "typing": bool(data.get("typing", True)),
+                        "sender_name": (_get_user_by_phone(user["phone"]) or {}).get("name", "Participant"),
+                    })
+                    await websocket.send_json({"type": "typing_sent", "thread_id": thread_id})
+                elif action == "read":
+                    unread_count = _chat_mark_read(thread, user)
+                    await websocket.send_json({
+                        "type": "read", "thread_id": thread_id, "unread_count": unread_count,
+                    })
+                else:
+                    await websocket.send_json({"type": "error", "detail": "Unsupported chat action."})
+            except HTTPException as error:
+                await websocket.send_json({"type": "error", "detail": error.detail})
+            except ValueError as error:
+                await websocket.send_json({"type": "error", "detail": str(error)})
+    except WebSocketDisconnect:
+        went_offline = live_chat_manager.disconnect(user["phone"], websocket)
+        if went_offline:
+            for (peer_phone,) in peers:
+                await live_chat_manager.send_to_user(peer_phone, {
+                    "type": "presence", "role": role, "status": "offline",
+                })
 
 
 # =============================================================================
@@ -2183,12 +2936,15 @@ class SeekerBloodRequestCreate(BaseModel):
 
 
 class SeekerEmergencyBroadcastCreate(BaseModel):
-    patient_name: str
-    blood_group: str
-    hospital_name: str
-    area: str = "Dhaka"
-    urgency_level: str = "Code Red (Within 1 Hour)"
-    contact_phone: str
+    patient_name: str = Field(min_length=1, max_length=120)
+    blood_group: str = Field(min_length=2, max_length=3)
+    hospital_name: str = Field(min_length=2, max_length=160)
+    area: str = Field(default="Dhaka", min_length=2, max_length=120)
+    district: str = Field(default="Dhaka", min_length=2, max_length=120)
+    units: int = Field(default=1, ge=1, le=20)
+    urgency_level: str = Field(default="Code Red (Within 1 Hour)", min_length=1, max_length=80)
+    contact_phone: str = Field(min_length=7, max_length=24)
+    reason: str = Field(default="", max_length=500)
 
 
 class SeekerContactLogPayload(BaseModel):
@@ -2239,6 +2995,10 @@ class FacilitySettingsPayload(BaseModel):
     daily_inventory_audit: bool = True
     two_factor_auth: bool = True
     maintenance_mode: bool = False
+
+
+class FacilityInventoryUpdatePayload(BaseModel):
+    quantity: int = Field(strict=True, ge=0, le=9223372036854775807)
 
 
 SEEKER_CONTACT_LOGS = [
@@ -2577,6 +3337,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Gold Life Saver",
         "total_donations": 8,
+        "share_donation_summary": True,
         "rating": 4.9,
         "reviews_count": 18,
         "last_donation": "110 days ago",
@@ -2606,6 +3367,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Platinum Donor",
         "total_donations": 12,
+        "share_donation_summary": True,
         "rating": 5.0,
         "reviews_count": 26,
         "last_donation": "95 days ago",
@@ -2634,6 +3396,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Silver Donor",
         "total_donations": 5,
+        "share_donation_summary": True,
         "rating": 4.8,
         "reviews_count": 12,
         "last_donation": "130 days ago",
@@ -2662,6 +3425,7 @@ SEEKER_MOCK_DONORS = [
         "is_available": True,
         "badge_tier": "Rare Hero Tier",
         "total_donations": 15,
+        "share_donation_summary": True,
         "rating": 5.0,
         "reviews_count": 32,
         "last_donation": "105 days ago",
@@ -2730,13 +3494,28 @@ SEEKER_CHAT_MESSAGES = {
 
 
 @app.get("/api/v1/seeker/requests")
-async def get_seeker_requests():
+async def get_seeker_requests(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to view your requests.")
+
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
-        rows = connection.execute(
-            """SELECT id, blood_group, hospital_name, district, area, distance_km,
-                      expires_at, contact_phone, is_emergency
-               FROM blood_requests ORDER BY id DESC LIMIT 20"""
-        ).fetchall()
+        with connection:
+            connection.execute(
+                """UPDATE blood_requests SET status = 'Expired'
+                   WHERE status = 'Active' AND expires_at <= ?
+                     AND (owner_phone = ? OR owner_phone IS NULL)""",
+                (datetime.now(timezone.utc).isoformat(), token["sub"]),
+            )
+            rows = connection.execute(
+                """SELECT id, blood_group, hospital_name, district, area, distance_km,
+                          expires_at, contact_phone, is_emergency, patient_name, units,
+                          urgency_level, reason, status, created_at
+                   FROM blood_requests
+                   WHERE owner_phone = ? OR owner_phone IS NULL
+                   ORDER BY id DESC LIMIT 50""",
+                (token["sub"],),
+            ).fetchall()
         requests_list = [
             {
                 "id": r[0],
@@ -2748,6 +3527,12 @@ async def get_seeker_requests():
                 "expires_at": r[6],
                 "contact_phone": r[7],
                 "is_emergency": bool(r[8]),
+                "patient_name": r[9],
+                "units": r[10],
+                "urgency_level": r[11],
+                "reason": r[12],
+                "status": r[13],
+                "created_at": r[14],
             }
             for r in rows
         ]
@@ -2755,20 +3540,23 @@ async def get_seeker_requests():
 
 
 @app.post("/api/v1/seeker/requests")
-async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
+async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request: Request):
     group = payload.blood_group.strip().upper()
     if group not in VALID_BLOOD_GROUPS:
         raise HTTPException(status_code=422, detail="Invalid blood group")
 
     now = datetime.now(timezone.utc)
     expires_at = (now + timedelta(hours=24)).isoformat()
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    owner_phone = token.get("sub") if token and token.get("role") == "seeker" else None
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             cursor = connection.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
-                       expires_at, contact_phone, is_emergency
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       expires_at, contact_phone, is_emergency, owner_phone,
+                       patient_name, units, urgency_level, reason, status, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     group,
                     payload.hospital_name.strip(),
@@ -2778,6 +3566,13 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
                     expires_at,
                     payload.contact_phone.strip(),
                     1 if payload.is_emergency else 0,
+                    owner_phone,
+                    payload.patient_name.strip(),
+                    payload.units,
+                    "Standard",
+                    payload.reason.strip(),
+                    "Active",
+                    now.isoformat(),
                 ),
             )
             new_id = cursor.lastrowid
@@ -2793,53 +3588,179 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate):
             "area": payload.area,
             "units": payload.units,
             "is_emergency": payload.is_emergency,
+            "status": "Active",
+            "created_at": now.isoformat(),
             "expires_at": expires_at,
         },
     }
 
 
 @app.post("/api/v1/seeker/requests/emergency")
-async def create_seeker_emergency_broadcast(payload: SeekerEmergencyBroadcastCreate):
+async def create_seeker_emergency_broadcast(
+    payload: SeekerEmergencyBroadcastCreate,
+    request: Request,
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to create an emergency request.")
+
+    required_values = {
+        "patient name": payload.patient_name,
+        "hospital": payload.hospital_name,
+        "area": payload.area,
+        "district": payload.district,
+        "contact phone": payload.contact_phone,
+    }
+    for label, value in required_values.items():
+        if not value.strip():
+            raise HTTPException(status_code=422, detail=f"{label.title()} is required.")
+
     group = payload.blood_group.strip().upper()
     if group not in VALID_BLOOD_GROUPS:
         raise HTTPException(status_code=422, detail="Invalid blood group")
 
+    expiration_hours = {
+        "Code Red (Within 1 Hour)": 1,
+        "Critical (Within 3 Hours)": 3,
+        "Urgent (Within 6 Hours)": 6,
+    }
+    if payload.urgency_level not in expiration_hours:
+        raise HTTPException(status_code=422, detail="Select a valid emergency urgency level.")
+
     now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(hours=3)).isoformat()
+    created_at = now.isoformat()
+    expires_at = (now + timedelta(hours=expiration_hours[payload.urgency_level])).isoformat()
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             cursor = connection.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
-                       expires_at, contact_phone, is_emergency
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       expires_at, contact_phone, is_emergency, owner_phone,
+                       patient_name, units, urgency_level, reason, status, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     group,
                     payload.hospital_name.strip(),
-                    "Dhaka",
+                    payload.district.strip(),
                     payload.area.strip() or "Dhaka",
                     1.5,
                     expires_at,
                     payload.contact_phone.strip(),
                     1,
+                    token["sub"],
+                    payload.patient_name.strip(),
+                    payload.units,
+                    payload.urgency_level,
+                    payload.reason.strip(),
+                    "Active",
+                    created_at,
                 ),
             )
             new_id = cursor.lastrowid
 
+    matching_donor_groups = {
+        donor_group
+        for donor_group, compatible_recipients in DONOR_MATCH_COMPATIBILITY.items()
+        if group in compatible_recipients
+    }
+    with closing(_connection()) as connection:
+        donors = connection.execute(
+            """SELECT donor_profiles.phone, donor_profiles.blood_group
+               FROM donor_profiles
+               JOIN auth_users ON auth_users.phone = donor_profiles.phone
+               WHERE auth_users.role = 'donor'
+                 AND COALESCE(donor_profiles.is_available, 1) = 1"""
+        ).fetchall()
+    matching_donors = [
+        donor[0]
+        for donor in donors
+        if donor[1] in matching_donor_groups and donor[0] != token["sub"]
+    ]
+
+    notification = {
+        "channel": "sms",
+        "status": "not_configured",
+        "matched_donors": len(matching_donors),
+        "sent": 0,
+        "failed": 0,
+    }
+    if sms_is_configured():
+        for donor_phone in matching_donors:
+            try:
+                send_sms_message(
+                    donor_phone,
+                    (
+                        f"Emergency blood request: {group}, {payload.units} unit(s) needed at "
+                        f"{payload.hospital_name.strip()}, {payload.area.strip()}, "
+                        f"{payload.district.strip()}. Please sign in to respond."
+                    ),
+                )
+                notification["sent"] += 1
+            except (OSError, urllib.error.URLError, TimeoutError):
+                notification["failed"] += 1
+                logger.exception("Emergency blood request SMS delivery failed for request %s", new_id)
+        if notification["failed"]:
+            notification["status"] = "partial" if notification["sent"] else "failed"
+        else:
+            notification["status"] = "sent" if notification["sent"] else "no_matches"
+
     return {
         "status": "success",
-        "message": "Emergency SOS broadcast alert dispatched to nearby donors",
-        "broadcast_count": 18,
+        "message": "Emergency blood request created and matching donors were notified according to system settings.",
+        "broadcast_count": notification["matched_donors"],
+        "notifications": notification,
         "request": {
             "id": new_id,
             "patient_name": payload.patient_name,
             "blood_group": group,
-            "hospital_name": payload.hospital_name,
+            "hospital_name": payload.hospital_name.strip(),
+            "district": payload.district.strip(),
+            "area": payload.area.strip(),
+            "units": payload.units,
             "urgency_level": payload.urgency_level,
             "is_emergency": True,
+            "status": "Active",
+            "reason": payload.reason.strip(),
+            "created_at": created_at,
             "expires_at": expires_at,
         },
     }
+
+
+def _seeker_donor_with_safe_location(donor: dict) -> dict:
+    safe_donor = dict(donor)
+    if "lat" in donor and "lng" in donor:
+        exact_location_shared = donor.get("share_exact_location") is True
+        safe_donor["lat"] = float(donor["lat"]) if exact_location_shared else round(float(donor["lat"]), 2)
+        safe_donor["lng"] = float(donor["lng"]) if exact_location_shared else round(float(donor["lng"]), 2)
+    return safe_donor
+
+
+def _public_seeker_donor(donor: dict) -> dict:
+    verified = bool(donor.get("nid_verified") or donor.get("is_verified"))
+    name = donor.get("public_name") or donor.get("name")
+    if donor.get("share_name") is False:
+        name = donor.get("public_identifier") or "Private donor"
+    safe_location = _seeker_donor_with_safe_location(donor)
+
+    public_donor = {
+        "id": donor["id"],
+        "name": name or donor.get("public_identifier") or "Donor",
+        "blood_group": donor["blood_group"],
+        "district": donor.get("district", ""),
+        "area": donor.get("area", ""),
+        "distance_km": donor.get("distance_km"),
+        "is_available": bool(donor.get("is_available", False)),
+        "is_verified": verified,
+        "verification_status": "verified" if verified else "not_verified",
+        "location_precision": "exact" if donor.get("share_exact_location") is True else "approximate",
+    }
+    if "lat" in safe_location and "lng" in safe_location:
+        public_donor["lat"] = safe_location["lat"]
+        public_donor["lng"] = safe_location["lng"]
+    if donor.get("share_donation_summary") is True and donor.get("total_donations") is not None:
+        public_donor["donation_count"] = int(donor["total_donations"])
+    return public_donor
 
 
 @app.get("/api/v1/seeker/donors")
@@ -2859,8 +3780,18 @@ async def get_seeker_donors(
     if query:
         q = query.strip().lower()
         donors = [
-            d for d in donors
-            if q in d.get("area", "").lower() or q in d.get("district", "").lower()
+            donor
+            for donor in donors
+            if any(
+                q in str(value or "").lower()
+                for value in (
+                    donor.get("public_name"),
+                    donor.get("name") if donor.get("share_name") is not False else None,
+                    donor.get("public_identifier"),
+                    donor.get("area"),
+                    donor.get("district"),
+                )
+            )
         ]
     if location:
         selected_location = location.strip().lower()
@@ -2871,27 +3802,47 @@ async def get_seeker_donors(
         ]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
-    directory_donors = [
-        {
+    donors = [_public_seeker_donor(donor) for donor in donors]
+    return {"status": "success", "count": len(donors), "donors": donors}
+
+
+@app.get("/api/v1/seeker/donors/map")
+async def get_seeker_donor_map(
+    blood_group: str | None = None,
+    radius_km: float = Query(default=15.0, ge=1.0, le=30.0),
+):
+    selected_group = blood_group.strip().replace(" ", "+").upper() if blood_group else ""
+    donors = [
+        donor for donor in SEEKER_MOCK_DONORS
+        if donor.get("is_available") and donor.get("distance_km", float("inf")) <= radius_km
+    ]
+    if selected_group:
+        donors = [donor for donor in donors if donor.get("blood_group", "").upper() == selected_group]
+
+    map_donors = []
+    for donor in donors:
+        exact_location_shared = donor.get("share_exact_location") is True
+        latitude = float(donor["lat"])
+        longitude = float(donor["lng"])
+        map_donors.append({
             "blood_group": donor["blood_group"],
             "district": donor.get("district", "Dhaka"),
             "area": donor.get("area", "Dhaka"),
             "distance_km": donor["distance_km"],
-            "is_available": bool(donor["is_available"]),
-            "is_verified": bool(donor.get("nid_verified", False)),
-            "location_precision": "approximate",
-        }
-        for donor in donors
-    ]
-    return {"status": "success", "count": len(directory_donors), "donors": directory_donors}
+            "lat": latitude if exact_location_shared else round(latitude, 2),
+            "lng": longitude if exact_location_shared else round(longitude, 2),
+            "location_precision": "exact" if exact_location_shared else "approximate",
+        })
+
+    return {"status": "success", "count": len(map_donors), "donors": map_donors}
 
 
 @app.get("/api/v1/seeker/donors/{donor_id}")
 async def get_seeker_donor_detail(donor_id: str):
     donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
     if not donor:
-        donor = SEEKER_MOCK_DONORS[0]
-    return {"status": "success", "donor": donor}
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    return {"status": "success", "donor": _public_seeker_donor(donor)}
 
 
 @app.post("/api/v1/seeker/contact/log")
@@ -2913,7 +3864,6 @@ async def get_seeker_contact_logs():
     return {"status": "success", "count": len(SEEKER_CONTACT_LOGS), "logs": SEEKER_CONTACT_LOGS}
 
 
-@app.get("/api/v1/seeker/chat/threads")
 async def get_seeker_chat_threads():
     return {
         "status": "success",
@@ -2922,7 +3872,6 @@ async def get_seeker_chat_threads():
     }
 
 
-@app.get("/api/v1/seeker/chat/{thread_id}/messages")
 async def get_seeker_chat_messages(thread_id: str):
     messages = SEEKER_CHAT_MESSAGES.get(thread_id, [])
     thread_meta = next((t for t in SEEKER_CHAT_THREADS if t["id"] == thread_id), None)
@@ -2934,7 +3883,6 @@ async def get_seeker_chat_messages(thread_id: str):
     }
 
 
-@app.post("/api/v1/seeker/chat/{thread_id}/send")
 async def send_seeker_chat_message(thread_id: str, payload: SendChatMessagePayload):
     text = payload.text.strip()
     if not text:
@@ -3029,7 +3977,6 @@ async def send_seeker_chat_message(thread_id: str, payload: SendChatMessagePaylo
     return {"status": "success", "sent": new_msg, "reply": reply_msg}
 
 
-@app.post("/api/v1/seeker/chat/{thread_id}/read")
 async def mark_seeker_chat_read(thread_id: str):
     for thread in SEEKER_CHAT_THREADS:
         if thread["id"] == thread_id:
@@ -3150,6 +4097,28 @@ async def delete_seeker_account(request: Request, response: Response):
     }
 
 
+@app.get("/api/v1/facility/inventory")
+async def get_facility_inventory(request: Request):
+    user = _require_facility_inventory_user(request)
+    inventory = _get_facility_inventory(user["phone"])
+    return {"status": "success", "inventory": inventory}
+
+
+@app.put("/api/v1/facility/inventory/{blood_group}")
+async def update_facility_inventory(
+    blood_group: str,
+    payload: FacilityInventoryUpdatePayload,
+    request: Request,
+):
+    user = _require_facility_inventory_user(request)
+    if blood_group not in BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Choose a valid blood group.")
+    result = _update_facility_inventory(
+        user["phone"], user["phone"], blood_group, payload.quantity
+    )
+    return {"status": "success", "item": result}
+
+
 @app.get("/api/v1/hospital/settings")
 @app.get("/api/v1/facility/settings")
 async def get_hospital_settings(request: Request):
@@ -3266,8 +4235,3 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
-
-
-
-

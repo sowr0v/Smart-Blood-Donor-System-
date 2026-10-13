@@ -779,14 +779,18 @@
               </div>
 
               <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <a href="tel:+8801700000001" id="chatCallBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem; text-decoration: none;">
-                  📞 Call Desk
-                </a>
-                <button type="button" id="chatLocationBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem;">
-                  📍 Hospital Location
+                <label class="visually-hidden" for="chatReportReason">Report reason</label>
+                <select id="chatReportReason" class="btn-donor-outline" aria-label="Report reason">
+                  <option value="harassment">Harassment</option>
+                  <option value="spam">Spam</option>
+                  <option value="safety">Safety concern</option>
+                  <option value="other">Other</option>
+                </select>
+                <button type="button" id="chatReportBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem;">
+                  Report
                 </button>
-                <button type="button" id="chatClearBtn" class="btn-donor-outline" style="padding: 6px 10px; font-size: 0.8rem;" title="Clear conversation history">
-                  🗑️
+                <button type="button" id="chatBlockBtn" class="btn-donor-outline" style="padding: 6px 12px; font-size: 0.8rem;">
+                  Restrict
                 </button>
               </div>
             </div>
