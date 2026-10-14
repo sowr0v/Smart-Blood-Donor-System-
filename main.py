@@ -64,6 +64,7 @@ def initialize_urgent_database():
                     owner_phone TEXT,
                     patient_name TEXT NOT NULL DEFAULT '',
                     units INTEGER NOT NULL DEFAULT 1,
+                    needed_at TEXT,
                     urgency_level TEXT NOT NULL DEFAULT 'Standard',
                     reason TEXT NOT NULL DEFAULT '',
                     status TEXT NOT NULL DEFAULT 'Active',
@@ -172,6 +173,7 @@ def initialize_urgent_database():
                 "owner_phone": "TEXT",
                 "patient_name": "TEXT NOT NULL DEFAULT ''",
                 "units": "INTEGER NOT NULL DEFAULT 1",
+                "needed_at": "TEXT",
                 "urgency_level": "TEXT NOT NULL DEFAULT 'Standard'",
                 "reason": "TEXT NOT NULL DEFAULT ''",
                 "status": "TEXT NOT NULL DEFAULT 'Active'",
@@ -2925,15 +2927,15 @@ async def live_websocket_chat(websocket: WebSocket, role: str):
 # =============================================================================
 
 class SeekerBloodRequestCreate(BaseModel):
-    patient_name: str
-    blood_group: str
-    hospital_name: str
-    area: str = "Dhaka"
-    district: str = "Dhaka"
-    units: int = 1
-    contact_phone: str
-    reason: str = ""
-    is_emergency: bool = False
+    patient_name: str = Field(min_length=1, max_length=120)
+    blood_group: str = Field(min_length=2, max_length=3)
+    hospital_name: str = Field(min_length=2, max_length=160)
+    area: str = Field(min_length=2, max_length=120)
+    district: str = Field(min_length=2, max_length=120)
+    units: int = Field(strict=True, ge=1, le=20)
+    needed_at: datetime
+    contact_phone: str = Field(min_length=7, max_length=24)
+    reason: str = Field(default="", max_length=500)
 
 
 class SeekerEmergencyBroadcastCreate(BaseModel):
@@ -3518,6 +3520,7 @@ async def get_seeker_requests(request: Request):
     if not token or token.get("role") != "seeker":
         raise HTTPException(status_code=401, detail="Sign in as a blood seeker to view your requests.")
 
+    initialize_urgent_database()
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             connection.execute(
@@ -3529,7 +3532,7 @@ async def get_seeker_requests(request: Request):
             rows = connection.execute(
                 """SELECT id, blood_group, hospital_name, district, area, distance_km,
                           expires_at, contact_phone, is_emergency, patient_name, units,
-                          urgency_level, reason, status, created_at
+                          urgency_level, reason, status, created_at, needed_at
                    FROM blood_requests
                    WHERE owner_phone = ? OR owner_phone IS NULL
                    ORDER BY id DESC LIMIT 50""",
@@ -3552,6 +3555,7 @@ async def get_seeker_requests(request: Request):
                 "reason": r[12],
                 "status": r[13],
                 "created_at": r[14],
+                "needed_at": r[15],
             }
             for r in rows
         ]
@@ -3560,38 +3564,62 @@ async def get_seeker_requests(request: Request):
 
 @app.post("/api/v1/seeker/requests")
 async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to create a request.")
+
+    required_values = {
+        "patient name": payload.patient_name,
+        "hospital": payload.hospital_name,
+        "district": payload.district,
+        "area": payload.area,
+        "contact phone": payload.contact_phone,
+    }
+    for label, value in required_values.items():
+        if not value.strip():
+            raise HTTPException(status_code=422, detail=f"{label.title()} is required.")
+
     group = payload.blood_group.strip().upper()
     if group not in VALID_BLOOD_GROUPS:
-        raise HTTPException(status_code=422, detail="Invalid blood group")
+        raise HTTPException(status_code=422, detail="Invalid blood group.")
 
     now = datetime.now(timezone.utc)
-    expires_at = (now + timedelta(hours=24)).isoformat()
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    owner_phone = token.get("sub") if token and token.get("role") == "seeker" else None
+    dhaka_timezone = timezone(timedelta(hours=6))
+    needed_at = payload.needed_at
+    if needed_at.tzinfo is None:
+        needed_at = needed_at.replace(tzinfo=dhaka_timezone)
+    needed_at = needed_at.astimezone(timezone.utc)
+    if needed_at <= now:
+        raise HTTPException(status_code=422, detail="Required date and time must be in the future.")
+
+    initialize_urgent_database()
+    created_at = now.isoformat()
+    expires_at = max(now + timedelta(hours=24), needed_at + timedelta(hours=24)).isoformat()
     with closing(sqlite3.connect(DATABASE_PATH)) as connection:
         with connection:
             cursor = connection.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
                        expires_at, contact_phone, is_emergency, owner_phone,
-                       patient_name, units, urgency_level, reason, status, created_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       patient_name, units, needed_at, urgency_level, reason, status, created_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     group,
                     payload.hospital_name.strip(),
-                    payload.district.strip() or "Dhaka",
-                    payload.area.strip() or "Dhaka",
+                    payload.district.strip(),
+                    payload.area.strip(),
                     2.0,
                     expires_at,
                     payload.contact_phone.strip(),
-                    1 if payload.is_emergency else 0,
-                    owner_phone,
+                    0,
+                    token["sub"],
                     payload.patient_name.strip(),
                     payload.units,
+                    needed_at.isoformat(),
                     "Standard",
                     payload.reason.strip(),
                     "Active",
-                    now.isoformat(),
+                    created_at,
                 ),
             )
             new_id = cursor.lastrowid
@@ -3606,9 +3634,10 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request
             "hospital_name": payload.hospital_name,
             "area": payload.area,
             "units": payload.units,
-            "is_emergency": payload.is_emergency,
+            "needed_at": needed_at.isoformat(),
+            "is_emergency": False,
             "status": "Active",
-            "created_at": now.isoformat(),
+            "created_at": created_at,
             "expires_at": expires_at,
         },
     }

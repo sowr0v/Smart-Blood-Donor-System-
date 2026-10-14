@@ -526,6 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>
             <div style="font-weight: 600; font-size: 0.88rem;">${escapeHtml(hospitalName)}</div>
             <div style="font-size: 0.76rem; color: var(--text-secondary);">${escapeHtml(areaName)} • ${escapeHtml(units)} Bag(s)</div>
+            ${req.needed_date ? `<div style="font-size: 0.76rem; color: var(--text-secondary);">Needed: ${escapeHtml(req.needed_date)}</div>` : ''}
           </td>
           <td>${statusBadge}</td>
           <td>
@@ -925,7 +926,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hospital: apiReq.hospital_name,
                 area: apiReq.area || apiReq.district || 'Dhaka',
                 units: apiReq.units || 1,
-                needed_date: 'Immediate',
+                needed_date: apiReq.needed_at
+                  ? new Date(apiReq.needed_at).toLocaleString()
+                  : (apiReq.is_emergency ? 'Immediate' : 'Not specified'),
                 status: apiReq.is_emergency ? (apiReq.status || 'Emergency') : (apiReq.status || 'Active'),
                 is_emergency: apiReq.is_emergency ? 1 : 0,
                 responses_count: 0,
@@ -940,6 +943,62 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Seeker requests API fetch skipped:', err);
     }
+  }
+
+  const standardRequestForm = document.getElementById('standardRequestForm');
+  if (standardRequestForm) {
+    const neededAtInput = document.getElementById('standardNeededAt');
+    if (neededAtInput) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      neededAtInput.min = now.toISOString().slice(0, 16);
+    }
+
+    standardRequestForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!standardRequestForm.reportValidity()) return;
+
+      const submitButton = document.getElementById('submitStandardRequest');
+      const feedback = document.getElementById('standardRequestFeedback');
+      const payload = Object.fromEntries(new FormData(standardRequestForm).entries());
+      payload.units = Number(payload.units);
+      submitButton.disabled = true;
+      submitButton.textContent = 'Creating request...';
+      feedback.hidden = true;
+
+      try {
+        const response = await fetch('/api/v1/seeker/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(' ')
+            : data.detail;
+          throw new Error(detail || data.message || 'Could not create the blood request.');
+        }
+
+        await loadSeekerRequestsFromApi();
+        feedback.textContent = `Blood request #${data.request.id} created successfully and is active in My Posted Blood Requests.`;
+        feedback.hidden = false;
+        standardRequestForm.reset();
+        if (neededAtInput) {
+          const now = new Date();
+          now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+          neededAtInput.min = now.toISOString().slice(0, 16);
+        }
+        showToast(`Blood request #${data.request.id} created.`);
+      } catch (error) {
+        feedback.textContent = error.message || 'The blood request could not be submitted. Please try again.';
+        feedback.hidden = false;
+        showToast(feedback.textContent, 'error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Create Blood Request';
+      }
+    });
   }
 
   const emergencyRequestForm = document.getElementById('emergencyRequestForm');

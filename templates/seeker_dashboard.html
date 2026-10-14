@@ -340,7 +340,67 @@
       </section>
 
       <!-- ================= 2. CREATE STANDARD BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-standard-request"></section>
+      <section class="dashboard-content-section" id="section-standard-request" aria-labelledby="standard-request-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🩸</span>
+            <div>
+              <h2 id="standard-request-title">Create Standard Blood Request</h2>
+              <div class="card-subtitle">Share the blood requirement and care-facility details so suitable donors can respond.</div>
+            </div>
+          </div>
+
+          <form id="standardRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="standardPatientName">Patient name</label>
+                <input id="standardPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardBloodGroup">Blood group</label>
+                <select id="standardBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="standardHospital">Hospital or care facility</label>
+                <input id="standardHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardUnits">Units needed</label>
+                <input id="standardUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardDistrict">District</label>
+                <input id="standardDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardArea">Area / neighborhood</label>
+                <input id="standardArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardNeededAt">When is the blood needed?</label>
+                <input id="standardNeededAt" name="needed_at" type="datetime-local" required>
+                <small class="card-subtitle">Enter Bangladesh local time.</small>
+              </div>
+              <div class="form-field-group">
+                <label for="standardContactPhone">Contact phone</label>
+                <input id="standardContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="standardReason">Additional details (optional)</label>
+              <textarea id="standardReason" name="reason" rows="3" maxlength="500" placeholder="Share useful details for responding donors"></textarea>
+            </div>
+            <p id="standardRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitStandardRequest" type="submit" class="btn btn-primary" style="margin-top: 18px;">
+              Create Blood Request
+            </button>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
       <section class="dashboard-content-section" id="section-emergency-request">
