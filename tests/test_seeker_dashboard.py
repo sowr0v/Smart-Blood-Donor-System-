@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
@@ -34,6 +35,9 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Create Standard Blood Request", html)
         self.assertIn('id="section-standard-request"', html)
         self.assertIn('id="nav-item-standard-request"', html)
+        self.assertIn('id="standardRequestForm"', html)
+        self.assertIn('name="needed_at"', html)
+        self.assertIn('id="standardRequestFeedback"', html)
 
         # 3. Create Emergency Blood Request
         self.assertIn("Create Emergency Blood Request", html)
@@ -94,16 +98,66 @@ class SeekerDashboardTests(unittest.TestCase):
             "area": "Dhanmondi",
             "district": "Dhaka",
             "units": 2,
+            "needed_at": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
             "contact_phone": "+8801723456789",
             "reason": "Scheduled Surgery",
-            "is_emergency": False,
         }
-        response = self.client.post("/api/v1/seeker/requests", json=payload)
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json=payload,
+            cookies={"access_token": token},
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertEqual(data["request"]["patient_name"], "Test Patient")
         self.assertEqual(data["request"]["blood_group"], "B+")
+        self.assertFalse(data["request"]["is_emergency"])
+        self.assertTrue(data["request"]["needed_at"])
+
+        tracked = self.client.get("/api/v1/seeker/requests", cookies={"access_token": token})
+        self.assertEqual(tracked.status_code, 200)
+        saved_request = next(
+            item for item in tracked.json()["requests"] if item["id"] == data["request"]["id"]
+        )
+        self.assertEqual(saved_request["needed_at"], data["request"]["needed_at"])
+        self.assertEqual(saved_request["status"], "Active")
+
+    def test_standard_blood_request_requires_seeker_session(self):
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json={
+                "patient_name": "Test Patient",
+                "blood_group": "B+",
+                "hospital_name": "Test Hospital",
+                "area": "Dhanmondi",
+                "district": "Dhaka",
+                "units": 1,
+                "needed_at": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                "contact_phone": "+8801723456789",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_standard_blood_request_rejects_past_required_time(self):
+        payload = {
+            "patient_name": "Test Patient",
+            "blood_group": "B+",
+            "hospital_name": "Test Hospital",
+            "area": "Dhanmondi",
+            "district": "Dhaka",
+            "units": 1,
+            "needed_at": "2000-01-01T12:00:00+06:00",
+            "contact_phone": "+8801723456789",
+        }
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json=payload,
+            cookies={"access_token": token},
+        )
+        self.assertEqual(response.status_code, 422)
 
     def test_create_emergency_blood_broadcast_api(self):
         payload = {
