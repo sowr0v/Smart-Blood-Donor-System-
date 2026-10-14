@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import HTTPException, Response
 from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 AUTH_DATABASE_PATH = Path(
@@ -2999,6 +3000,24 @@ class FacilityInventoryUpdatePayload(BaseModel):
     quantity: int = Field(strict=True, ge=0, le=9223372036854775807)
 
 
+class InstitutionalBloodRequestPayload(BaseModel):
+    blood_group: str = Field(..., min_length=2, max_length=5)
+    units_requested: int = Field(..., ge=1, le=1000)
+    priority: str = Field(default="Normal")  # Routine, Normal, Urgent, Critical
+    department: str = Field(default="General Transfusion")
+    patient_diagnosis: Optional[str] = Field(default="")
+    required_within_hours: Optional[int] = Field(default=24, ge=1, le=168)
+    notes: Optional[str] = Field(default="")
+
+
+class InstitutionalBloodAllocationPayload(BaseModel):
+    units_allocated: int = Field(..., ge=1, le=1000)
+    source_facility: Optional[str] = Field(default="Central Blood Reserve")
+    batch_number: Optional[str] = Field(default="")
+    allocated_by: Optional[str] = Field(default="Lead Medical Officer")
+    notes: Optional[str] = Field(default="")
+
+
 SEEKER_CONTACT_LOGS = [
     {
         "donor_name": "Ayesha Rahman",
@@ -4106,6 +4125,267 @@ async def update_facility_inventory(
         user["phone"], user["phone"], blood_group, payload.quantity
     )
     return {"status": "success", "item": result}
+
+
+# ============================================================================
+# Institutional Blood Requests & Allocations (Hospitals & Blood Banks)
+# ============================================================================
+
+INSTITUTIONAL_BLOOD_REQUESTS = [
+    {
+        "id": "inst-req-101",
+        "facility_name": "Dhaka General Hospital",
+        "facility_phone": "+8801734567890",
+        "blood_group": "O-",
+        "units_requested": 4,
+        "units_allocated": 2,
+        "priority": "Critical",
+        "department": "Emergency Trauma Unit",
+        "patient_diagnosis": "Multi-organ polytrauma patient (ICU Bed 04)",
+        "required_within_hours": 2,
+        "status": "Partially Allocated",
+        "notes": "Urgent allocation required from Red Crescent or external bank.",
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
+        "allocations": [
+            {
+                "allocation_id": "alloc-001",
+                "units": 2,
+                "source_facility": "Red Crescent Blood Bank",
+                "batch_number": "BN-2026-OMIN-092",
+                "allocated_by": "Dr. Farhana Ahmed",
+                "timestamp": (datetime.now(timezone.utc) - timedelta(minutes=45)).isoformat(),
+                "notes": "2 units cold-chain packed and dispatched via courier.",
+            }
+        ],
+    },
+    {
+        "id": "inst-req-102",
+        "facility_name": "Dhaka General Hospital",
+        "facility_phone": "+8801734567890",
+        "blood_group": "A+",
+        "units_requested": 6,
+        "units_allocated": 6,
+        "priority": "Urgent",
+        "department": "Cardiothoracic Surgery",
+        "patient_diagnosis": "Elective CABG procedure scheduled tomorrow morning",
+        "required_within_hours": 12,
+        "status": "Fully Allocated",
+        "notes": "Pre-screened PRBC units reserved.",
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=5)).isoformat(),
+        "allocations": [
+            {
+                "allocation_id": "alloc-002",
+                "units": 6,
+                "source_facility": "Central Hospital Reserve",
+                "batch_number": "BN-2026-APOS-441",
+                "allocated_by": "Dr. Rafiqul Islam",
+                "timestamp": (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(),
+                "notes": "Assigned from Main Blood Bank Cold Store Shelf B.",
+            }
+        ],
+    },
+    {
+        "id": "inst-req-103",
+        "facility_name": "Dhaka General Hospital",
+        "facility_phone": "+8801734567890",
+        "blood_group": "B+",
+        "units_requested": 3,
+        "units_allocated": 0,
+        "priority": "Normal",
+        "department": "Hematology & Oncology",
+        "patient_diagnosis": "Thalassemia transfusion support cycle",
+        "required_within_hours": 36,
+        "status": "Pending",
+        "notes": "Awaiting cross-matching from incoming donor drives.",
+        "created_at": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+        "allocations": [],
+    },
+]
+
+
+def _require_authorized_facility_user(request: Request) -> dict:
+    """Ensure user is an authorized hospital, blood bank, or facility admin user."""
+    user = _get_current_user(request)
+    if not user:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        phone = token.get("sub") if token and token.get("role") in {"hospital", "bank", "blood_bank", "admin"} else None
+        role = token.get("role", "hospital") if token else "hospital"
+        if phone:
+            user = USERS.get(phone, {"name": "Authorized Facility", "role": role, "phone": phone})
+        else:
+            # Demo fallback for testing without full cookie
+            is_demo = request.headers.get("x-demo-mode") == "true" or request.query_params.get("demo") == "1"
+            if is_demo:
+                user = {"name": "Dhaka General Hospital", "role": "hospital", "phone": "+8801734567890"}
+            else:
+                raise HTTPException(status_code=401, detail="Sign in with authorized hospital or blood bank credentials.")
+    if user.get("role") not in {"hospital", "bank", "blood_bank", "admin"}:
+        raise HTTPException(status_code=403, detail="Only authorized hospital and blood bank users can manage institutional requests.")
+    return user
+
+
+@app.get("/api/v1/hospital/institutional-requests")
+@app.get("/api/v1/facility/institutional-requests")
+async def get_institutional_blood_requests(
+    request: Request,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    blood_group: Optional[str] = None,
+):
+    _ = _require_authorized_facility_user(request)
+    results = INSTITUTIONAL_BLOOD_REQUESTS
+
+    if status and status.lower() != "all":
+        results = [r for r in results if r.get("status", "").lower() == status.lower()]
+    if priority and priority.lower() != "all":
+        results = [r for r in results if r.get("priority", "").lower() == priority.lower()]
+    if blood_group and blood_group.lower() != "all":
+        results = [r for r in results if r.get("blood_group", "").upper() == blood_group.upper()]
+
+    return {
+        "status": "success",
+        "count": len(results),
+        "requests": results,
+    }
+
+
+@app.post("/api/v1/hospital/institutional-requests")
+@app.post("/api/v1/facility/institutional-requests")
+async def create_institutional_blood_request(
+    payload: InstitutionalBloodRequestPayload,
+    request: Request,
+):
+    user = _require_authorized_facility_user(request)
+    blood_group = payload.blood_group.strip().upper()
+    if blood_group not in BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Invalid blood group specified.")
+
+    valid_priorities = {"Routine", "Normal", "Urgent", "Critical"}
+    clean_priority = payload.priority.capitalize() if payload.priority else "Normal"
+    if clean_priority not in valid_priorities:
+        clean_priority = "Normal"
+
+    req_id = f"inst-req-{int(datetime.now(timezone.utc).timestamp()) % 100000}"
+    new_req = {
+        "id": req_id,
+        "facility_name": user.get("name", "Institutional Facility"),
+        "facility_phone": user.get("phone", "+8801734567890"),
+        "blood_group": blood_group,
+        "units_requested": payload.units_requested,
+        "units_allocated": 0,
+        "priority": clean_priority,
+        "department": payload.department.strip() or "General Transfusion",
+        "patient_diagnosis": payload.patient_diagnosis.strip() if payload.patient_diagnosis else "",
+        "required_within_hours": payload.required_within_hours or 24,
+        "status": "Pending",
+        "notes": payload.notes.strip() if payload.notes else "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "allocations": [],
+    }
+
+    INSTITUTIONAL_BLOOD_REQUESTS.insert(0, new_req)
+    return {
+        "status": "success",
+        "message": "Institutional blood request created successfully.",
+        "request": new_req,
+    }
+
+
+@app.get("/api/v1/hospital/institutional-requests/{request_id}")
+@app.get("/api/v1/facility/institutional-requests/{request_id}")
+async def get_institutional_blood_request_detail(
+    request_id: str,
+    request: Request,
+):
+    _ = _require_authorized_facility_user(request)
+    for req in INSTITUTIONAL_BLOOD_REQUESTS:
+        if req["id"] == request_id:
+            return {"status": "success", "request": req}
+    raise HTTPException(status_code=404, detail="Institutional blood request not found.")
+
+
+@app.post("/api/v1/hospital/institutional-requests/{request_id}/allocate")
+@app.post("/api/v1/facility/institutional-requests/{request_id}/allocate")
+async def record_blood_allocation(
+    request_id: str,
+    payload: InstitutionalBloodAllocationPayload,
+    request: Request,
+):
+    user = _require_authorized_facility_user(request)
+    target_req = None
+    for req in INSTITUTIONAL_BLOOD_REQUESTS:
+        if req["id"] == request_id:
+            target_req = req
+            break
+
+    if not target_req:
+        raise HTTPException(status_code=404, detail="Institutional blood request not found.")
+
+    remaining_needed = max(0, target_req["units_requested"] - target_req["units_allocated"])
+    if remaining_needed == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="This request is already fully allocated. No additional units required."
+        )
+
+    allocated_units = min(payload.units_allocated, remaining_needed)
+    target_req["units_allocated"] += allocated_units
+
+    if target_req["units_allocated"] >= target_req["units_requested"]:
+        target_req["status"] = "Fully Allocated"
+    else:
+        target_req["status"] = "Partially Allocated"
+
+    alloc_id = f"alloc-{int(datetime.now(timezone.utc).timestamp()) % 10000}"
+    allocation_record = {
+        "allocation_id": alloc_id,
+        "units": allocated_units,
+        "source_facility": payload.source_facility or user.get("name", "Internal Facility Reserve"),
+        "batch_number": payload.batch_number or f"BATCH-{target_req['blood_group']}-{int(datetime.now(timezone.utc).timestamp()) % 1000}",
+        "allocated_by": payload.allocated_by or user.get("manager_name", "Duty Officer"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "notes": payload.notes or "Blood units assigned to institutional request.",
+    }
+
+    target_req["allocations"].append(allocation_record)
+
+    return {
+        "status": "success",
+        "message": f"{allocated_units} unit(s) of {target_req['blood_group']} successfully allocated.",
+        "request": target_req,
+        "allocation": allocation_record,
+    }
+
+
+@app.patch("/api/v1/hospital/institutional-requests/{request_id}/status")
+@app.patch("/api/v1/facility/institutional-requests/{request_id}/status")
+async def update_institutional_request_status(
+    request_id: str,
+    request: Request,
+):
+    _ = _require_authorized_facility_user(request)
+    body = await request.json()
+    new_status = body.get("status")
+    valid_statuses = {"Pending", "Under Review", "Partially Allocated", "Fully Allocated", "Dispatched", "Fulfilled", "Cancelled"}
+    if not new_status or new_status not in valid_statuses:
+        raise HTTPException(status_code=422, detail="Invalid status provided.")
+
+    target_req = None
+    for req in INSTITUTIONAL_BLOOD_REQUESTS:
+        if req["id"] == request_id:
+            target_req = req
+            break
+
+    if not target_req:
+        raise HTTPException(status_code=404, detail="Institutional blood request not found.")
+
+    target_req["status"] = new_status
+    return {
+        "status": "success",
+        "message": f"Status updated to '{new_status}' successfully.",
+        "request": target_req,
+    }
+
 
 
 @app.get("/api/v1/hospital/settings")
