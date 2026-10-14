@@ -73,6 +73,8 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Direct Contact Action (Call / WhatsApp CTA)", html)
         self.assertIn('id="section-direct-contact"', html)
         self.assertIn('id="nav-item-direct-contact"', html)
+        self.assertIn('id="directContactDonors"', html)
+        self.assertIn("phone numbers are private by default", html)
 
         # 8. Real-Time In-App 1-on-1 Chat
         self.assertIn("Real-Time In-App 1-on-1 Chat", html)
@@ -375,6 +377,55 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("verification_status", donor)
         self.assertNotIn("phone", donor)
         self.assertNotIn("screening", donor)
+
+    def test_direct_donor_contact_requires_seeker_session(self):
+        anonymous_response = self.client.post("/api/v1/seeker/donors/dn-001/contact")
+        donor_response = self.client.post(
+            "/api/v1/seeker/donors/dn-001/contact",
+            cookies={"access_token": _generate_jwt("+8801712345678", "donor")},
+        )
+        self.assertEqual(anonymous_response.status_code, 401)
+        self.assertEqual(donor_response.status_code, 403)
+
+    def test_direct_donor_contact_hides_number_without_explicit_consent(self):
+        with patch(
+            "main._get_donor_profile",
+            return_value={
+                "phone": "+8801712345678",
+                "is_available": True,
+                "share_direct_contact": False,
+            },
+        ):
+            response = self.client.post(
+                "/api/v1/seeker/donors/dn-001/contact",
+                cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("+8801712345678", response.text)
+
+    def test_direct_donor_contact_returns_number_only_after_opt_in(self):
+        seeker_cookies = {"access_token": _generate_jwt("+8801723456789", "seeker")}
+        with patch(
+            "main._get_donor_profile",
+            return_value={
+                "phone": "+8801712345678",
+                "is_available": True,
+                "share_direct_contact": True,
+            },
+        ):
+            contact_response = self.client.post(
+                "/api/v1/seeker/donors/dn-001/contact",
+                cookies=seeker_cookies,
+            )
+            directory_response = self.client.get("/api/v1/seeker/donors")
+
+        self.assertEqual(contact_response.status_code, 200)
+        self.assertEqual(contact_response.json()["donor"]["phone"], "+8801712345678")
+        self.assertEqual(directory_response.status_code, 200)
+        self.assertTrue(
+            all("phone" not in donor for donor in directory_response.json()["donors"])
+        )
 
     def test_seeker_contact_log_flow(self):
         post_resp = self.client.post(

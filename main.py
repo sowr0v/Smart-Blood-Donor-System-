@@ -595,6 +595,7 @@ def initialize_auth_database():
                     allergies TEXT,
                     fitness_status TEXT NOT NULL DEFAULT 'Eligible',
                     preferred_donation_types TEXT NOT NULL DEFAULT 'Whole Blood',
+                    share_direct_contact INTEGER NOT NULL DEFAULT 0,
                     is_available INTEGER NOT NULL DEFAULT 1,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
@@ -640,6 +641,10 @@ def initialize_auth_database():
             if "is_available" not in donor_profile_columns:
                 connection.execute(
                     "ALTER TABLE donor_profiles ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1"
+                )
+            if "share_direct_contact" not in donor_profile_columns:
+                connection.execute(
+                    "ALTER TABLE donor_profiles ADD COLUMN share_direct_contact INTEGER NOT NULL DEFAULT 0"
                 )
             auth_user_columns = {
                 row[1]
@@ -1506,6 +1511,7 @@ def _default_donor_profile(phone: str) -> dict:
         "allergies": "Penicillin",
         "fitness_status": "Eligible",
         "preferred_donation_types": "Whole Blood",
+        "share_direct_contact": False,
         "is_available": True,
         "updated_at": int(time.time()),
     }
@@ -1518,7 +1524,7 @@ def _get_donor_profile(phone: str) -> dict:
             """SELECT phone, name, email, date_of_birth, gender, blood_group,
                       district, area, address, last_donation, medical_conditions,
                       medications, allergies, fitness_status, preferred_donation_types,
-                      is_available, updated_at
+                      share_direct_contact, is_available, updated_at
                FROM donor_profiles WHERE phone = ?""",
             (phone,),
         ).fetchone()
@@ -1531,8 +1537,9 @@ def _get_donor_profile(phone: str) -> dict:
                 """INSERT INTO donor_profiles (
                        phone, name, email, date_of_birth, gender, blood_group, district,
                        area, address, last_donation, medical_conditions, medications,
-                       allergies, fitness_status, preferred_donation_types, is_available, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       allergies, fitness_status, preferred_donation_types,
+                       share_direct_contact, is_available, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 tuple(profile.values()),
             )
         return profile
@@ -1556,6 +1563,10 @@ class DonorProfileUpdate(BaseModel):
     preferred_donation_types: str = "Whole Blood"
 
 
+class DonorDirectContactPreference(BaseModel):
+    share_direct_contact: bool
+
+
 VALID_BLOOD_GROUPS = set(BLOOD_GROUPS)
 
 
@@ -1568,6 +1579,45 @@ async def get_donor_profile(request: Request):
     if not phone:
         raise HTTPException(status_code=401, detail="Sign in required to access donor profile.")
     return {"status": "success", "profile": _get_donor_profile(phone)}
+
+
+@app.get("/api/v1/donor/direct-contact-preference")
+async def get_donor_direct_contact_preference(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to manage contact preferences.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can manage contact preferences.")
+
+    profile = _get_donor_profile(token["sub"])
+    return {
+        "status": "success",
+        "share_direct_contact": bool(profile["share_direct_contact"]),
+    }
+
+
+@app.put("/api/v1/donor/direct-contact-preference")
+async def update_donor_direct_contact_preference(
+    payload: DonorDirectContactPreference,
+    request: Request,
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to manage contact preferences.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can manage contact preferences.")
+    phone = token["sub"]
+    _get_donor_profile(phone)
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                "UPDATE donor_profiles SET share_direct_contact = ?, updated_at = ? WHERE phone = ?",
+                (int(payload.share_direct_contact), int(time.time()), phone),
+            )
+    return {
+        "status": "success",
+        "share_direct_contact": payload.share_direct_contact,
+    }
 
 
 @app.post("/api/v1/donor/profile")
@@ -3861,6 +3911,37 @@ async def get_seeker_donor_detail(donor_id: str):
     if not donor:
         raise HTTPException(status_code=404, detail="Donor profile not found.")
     return {"status": "success", "donor": _public_seeker_donor(donor)}
+
+
+@app.post("/api/v1/seeker/donors/{donor_id}/contact")
+async def get_permitted_seeker_donor_contact(donor_id: str, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to contact donors.")
+    if token.get("role") != "seeker":
+        raise HTTPException(status_code=403, detail="Only blood seekers can use direct donor contact.")
+
+    donor = next((item for item in SEEKER_MOCK_DONORS if item["id"] == donor_id), None)
+    if donor is None:
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    if not donor.get("is_available"):
+        raise HTTPException(status_code=403, detail="This donor is not currently available.")
+
+    profile = _get_donor_profile(donor["phone"])
+    if not profile["is_available"]:
+        raise HTTPException(status_code=403, detail="This donor is not currently available.")
+    if not profile["share_direct_contact"]:
+        raise HTTPException(status_code=403, detail="This donor has not enabled direct contact.")
+
+    return {
+        "status": "success",
+        "donor": {
+            "id": donor["id"],
+            "name": _public_seeker_donor(donor)["name"],
+            "blood_group": donor["blood_group"],
+            "phone": profile["phone"],
+        },
+    }
 
 
 @app.post("/api/v1/seeker/contact/log")
