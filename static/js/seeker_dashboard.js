@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showToast = showToast;
 
   // Activate Section
-  function activateSection(targetId) {
+  function activateSection(targetId, scrollTargetId) {
     if (!targetId) return;
     const cleanId = targetId.replace('#', '');
     const targetSection = document.getElementById(cleanId);
@@ -34,12 +34,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     navItems.forEach(item => {
       const target = item.getAttribute('data-target') || item.getAttribute('href');
-      if (target && target.replace('#', '') === cleanId) {
+      if (target && target.replace('#', '') === cleanId && !item.hasAttribute('data-scroll-target')) {
         item.classList.add('active');
       } else {
         item.classList.remove('active');
       }
     });
+
+    if (scrollTargetId) {
+      const shortcut = Array.from(navItems).find(
+        item => item.getAttribute('data-scroll-target') === scrollTargetId
+      );
+      if (shortcut) shortcut.classList.add('active');
+    }
 
     if (mobileSidebar && mobileSidebar.classList.contains('mobile-open')) {
       mobileSidebar.classList.remove('mobile-open');
@@ -54,6 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (cleanId === 'section-donor-directory') loadDonorDirectory();
     if (cleanId === 'section-donor-credentials') loadPublicDonorProfiles();
+    if (cleanId === 'section-direct-contact') loadDirectContactDonors();
 
     if (history.pushState) {
       history.pushState(null, null, `#${cleanId}`);
@@ -61,7 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
       location.hash = `#${cleanId}`;
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (scrollTargetId) {
+      window.requestAnimationFrame(() => {
+        const scrollTarget = document.getElementById(scrollTargetId);
+        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
   window.activateSection = activateSection;
 
@@ -70,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const target = btn.getAttribute('data-target') || btn.getAttribute('href');
-      activateSection(target);
+      activateSection(target, btn.getAttribute('data-scroll-target'));
     });
   });
 
@@ -370,6 +385,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function loadDirectContactDonors() {
+    const donorGrid = document.getElementById('directContactDonors');
+    const status = document.getElementById('directContactStatus');
+    if (!donorGrid || !status) return;
+
+    status.textContent = 'Loading available donors...';
+    status.setAttribute('aria-busy', 'true');
+    donorGrid.replaceChildren();
+    try {
+      const response = await fetch('/api/v1/seeker/donors?radius_km=30');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        const detail = Array.isArray(data.detail)
+          ? data.detail.map(item => item.msg).join(' ')
+          : data.detail;
+        throw new Error(detail || 'Could not load donors for direct contact.');
+      }
+
+      const donors = Array.isArray(data.donors) ? data.donors : [];
+      if (!donors.length) {
+        status.textContent = 'No donor profiles are available right now.';
+        return;
+      }
+
+      status.textContent = 'Choose an available donor to check whether they permit direct contact.';
+      donors.forEach(donor => {
+        const card = document.createElement('article');
+        card.className = 'donor-card';
+        const title = document.createElement('h3');
+        title.className = 'donor-card-name';
+        title.textContent = donor.name || 'Donor';
+        const details = document.createElement('p');
+        details.className = 'donor-card-loc';
+        details.textContent = [
+          donor.blood_group || 'Blood group not shared',
+          donor.area,
+          donor.district
+        ].filter(Boolean).join(' · ');
+        const availability = document.createElement('p');
+        availability.textContent = donor.is_available ? 'Available' : 'Not currently available';
+        const contactStatus = document.createElement('p');
+        contactStatus.setAttribute('role', 'status');
+        const actions = document.createElement('div');
+        actions.className = 'direct-contact-actions';
+        const contactButton = document.createElement('button');
+        contactButton.type = 'button';
+        contactButton.className = 'btn-card-action primary';
+        contactButton.textContent = 'Check contact options';
+        contactButton.disabled = !donor.is_available;
+        contactButton.addEventListener('click', async () => {
+          contactButton.disabled = true;
+          contactStatus.textContent = 'Checking donor consent...';
+          actions.replaceChildren();
+          try {
+            const contactResponse = await fetch(
+              `/api/v1/seeker/donors/${encodeURIComponent(donor.id)}/contact`,
+              { method: 'POST' }
+            );
+            const contactData = await contactResponse.json();
+            if (!contactResponse.ok || contactData.status !== 'success') {
+              const detail = Array.isArray(contactData.detail)
+                ? contactData.detail.map(item => item.msg).join(' ')
+                : contactData.detail;
+              throw new Error(detail || 'Direct contact is not available for this donor.');
+            }
+
+            const contact = contactData.donor;
+            const phone = String(contact.phone || '');
+            const whatsappPhone = phone.replace(/\D/g, '');
+            if (!phone || !whatsappPhone) {
+              throw new Error('The donor contact number is not valid for direct contact.');
+            }
+            const callLink = document.createElement('a');
+            callLink.className = 'btn-card-action primary';
+            callLink.href = `tel:${phone}`;
+            callLink.textContent = `Call ${phone}`;
+            const whatsappLink = document.createElement('a');
+            whatsappLink.className = 'btn-card-action';
+            whatsappLink.href = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent('Hello, I found your donor profile and would like to discuss a blood donation.')}`;
+            whatsappLink.target = '_blank';
+            whatsappLink.rel = 'noopener noreferrer';
+            whatsappLink.textContent = 'Message on WhatsApp';
+            actions.append(callLink, whatsappLink);
+            contactStatus.textContent = 'This donor has opted in to direct contact. Choose a contact method:';
+            contactButton.textContent = 'Refresh contact permission';
+          } catch (error) {
+            contactStatus.textContent = error.message || 'Could not check donor contact permission.';
+          } finally {
+            contactButton.disabled = false;
+          }
+        });
+        card.append(title, details, availability, contactButton, contactStatus, actions);
+        donorGrid.append(card);
+      });
+    } catch (error) {
+      status.textContent = error.message || 'Donors could not be loaded. Please try again.';
+    } finally {
+      status.removeAttribute('aria-busy');
+    }
+  }
+
   document.getElementById('dirBloodFilter')?.addEventListener('change', loadDonorDirectory);
   document.getElementById('dirAvailableOnly')?.addEventListener('change', loadDonorDirectory);
   document.getElementById('dirSearch')?.addEventListener('input', () => {
@@ -513,6 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>
             <div style="font-weight: 600; font-size: 0.88rem;">${escapeHtml(hospitalName)}</div>
             <div style="font-size: 0.76rem; color: var(--text-secondary);">${escapeHtml(areaName)} • ${escapeHtml(units)} Bag(s)</div>
+            ${req.needed_date ? `<div style="font-size: 0.76rem; color: var(--text-secondary);">Needed: ${escapeHtml(req.needed_date)}</div>` : ''}
           </td>
           <td>${statusBadge}</td>
           <td>
@@ -912,7 +1029,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hospital: apiReq.hospital_name,
                 area: apiReq.area || apiReq.district || 'Dhaka',
                 units: apiReq.units || 1,
-                needed_date: 'Immediate',
+                needed_date: apiReq.needed_at
+                  ? new Date(apiReq.needed_at).toLocaleString()
+                  : (apiReq.is_emergency ? 'Immediate' : 'Not specified'),
                 status: apiReq.is_emergency ? (apiReq.status || 'Emergency') : (apiReq.status || 'Active'),
                 is_emergency: apiReq.is_emergency ? 1 : 0,
                 responses_count: 0,
@@ -927,6 +1046,102 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Seeker requests API fetch skipped:', err);
     }
+  }
+
+  async function loadSeekerLowStockAlerts() {
+    const status = document.getElementById('seekerLowStockAlertsStatus');
+    const list = document.getElementById('seekerLowStockAlertsList');
+    if (!status || !list) return;
+
+    try {
+      const response = await fetch('/api/v1/seeker/inventory/alerts');
+      if (response.status === 401) {
+        status.textContent = 'Sign in to check alerts for your active blood requests.';
+        return;
+      }
+      if (!response.ok) throw new Error('Low-stock alert request failed');
+
+      const data = await response.json();
+      if (data.status !== 'success' || !Array.isArray(data.alerts)) {
+        throw new Error('Low-stock alert response was invalid');
+      }
+
+      list.replaceChildren();
+      if (data.alerts.length === 0) {
+        status.textContent = data.active_request_count
+          ? 'No active request currently matches a reported low-stock blood group.'
+          : 'Create an active blood request to receive matching low-stock alerts here.';
+        return;
+      }
+
+      status.textContent = 'Low stock has been reported for the blood group(s) below. Confirm availability directly before making arrangements:';
+      data.alerts.forEach(alert => {
+        const item = document.createElement('li');
+        const requestLabel = alert.request_count === 1 ? 'active request' : 'active requests';
+        item.textContent = `${alert.blood_group}: matches ${alert.request_count} ${requestLabel}.`;
+        list.appendChild(item);
+      });
+    } catch (error) {
+      console.error('Could not load seeker low-stock alerts:', error);
+      status.textContent = 'Low-stock alerts could not be loaded. Please refresh the dashboard.';
+    }
+  }
+
+  const standardRequestForm = document.getElementById('standardRequestForm');
+  if (standardRequestForm) {
+    const neededAtInput = document.getElementById('standardNeededAt');
+    if (neededAtInput) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      neededAtInput.min = now.toISOString().slice(0, 16);
+    }
+
+    standardRequestForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!standardRequestForm.reportValidity()) return;
+
+      const submitButton = document.getElementById('submitStandardRequest');
+      const feedback = document.getElementById('standardRequestFeedback');
+      const payload = Object.fromEntries(new FormData(standardRequestForm).entries());
+      payload.units = Number(payload.units);
+      submitButton.disabled = true;
+      submitButton.textContent = 'Creating request...';
+      feedback.hidden = true;
+
+      try {
+        const response = await fetch('/api/v1/seeker/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(' ')
+            : data.detail;
+          throw new Error(detail || data.message || 'Could not create the blood request.');
+        }
+
+        await loadSeekerRequestsFromApi();
+        await loadSeekerLowStockAlerts();
+        feedback.textContent = `Blood request #${data.request.id} created successfully and is active in My Posted Blood Requests.`;
+        feedback.hidden = false;
+        standardRequestForm.reset();
+        if (neededAtInput) {
+          const now = new Date();
+          now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+          neededAtInput.min = now.toISOString().slice(0, 16);
+        }
+        showToast(`Blood request #${data.request.id} created.`);
+      } catch (error) {
+        feedback.textContent = error.message || 'The blood request could not be submitted. Please try again.';
+        feedback.hidden = false;
+        showToast(feedback.textContent, 'error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Create Blood Request';
+      }
+    });
   }
 
   const emergencyRequestForm = document.getElementById('emergencyRequestForm');
@@ -959,6 +1174,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await loadSeekerRequestsFromApi();
+        await loadSeekerLowStockAlerts();
         const notification = data.notifications || {};
         let notificationMessage = '';
         if (notification.status === 'not_configured') {
@@ -1220,6 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateMetrics();
   renderSeekerRequestsTable('all');
   loadSeekerRequestsFromApi();
+  loadSeekerLowStockAlerts();
   loadSeekerSettingsFromApi();
 
   // Initialize view from URL hash if provided

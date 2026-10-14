@@ -682,6 +682,47 @@
   font-size: 0.84rem;
 }
 
+.seeker-low-stock-alerts {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid #FCD34D;
+  border-radius: 12px;
+  background: #FFFBEB;
+  color: #78350F;
+}
+
+.seeker-low-stock-alerts-icon {
+  font-size: 1.45rem;
+  line-height: 1.4;
+}
+
+.seeker-low-stock-alerts-content {
+  min-width: 0;
+}
+
+.seeker-low-stock-alerts h2 {
+  margin: 0 0 4px;
+  color: #92400E;
+  font-size: 0.96rem;
+}
+
+.seeker-low-stock-alerts p,
+.seeker-low-stock-alerts li {
+  margin: 0;
+  color: #78350F;
+  font-size: 0.84rem;
+}
+
+.seeker-low-stock-alerts ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
 #emergencyRequestFeedback {
   margin: 16px 0 0;
   padding: 12px 14px;

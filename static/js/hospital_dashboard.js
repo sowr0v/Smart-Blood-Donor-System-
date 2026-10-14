@@ -51,6 +51,75 @@ function formatInventoryTimestamp(timestamp) {
   });
 }
 
+window.refreshFacilityStockAlerts = async function () {
+  const tableBody = document.getElementById("stockAlertsTableBody");
+  const summary = document.getElementById("stockAlertsSummary");
+  const status = document.getElementById("stockAlertsStatus");
+  if (!tableBody || !summary || !status) return;
+
+  status.textContent = "";
+  try {
+    const response = await fetch("/api/v1/facility/inventory/alerts", {
+      headers: { "Accept": "application/json" },
+      cache: "no-store",
+    });
+    const result = await response.json();
+    if (!response.ok || result.status !== "success") {
+      const detail = Array.isArray(result.detail)
+        ? result.detail.map((item) => item.msg).join(" ")
+        : result.detail;
+      throw new Error(detail || "Could not load low-stock alerts.");
+    }
+
+    const alerts = Array.isArray(result.alerts) ? result.alerts : [];
+    const activeCount = Number(result.active_count) || 0;
+    summary.textContent = `${activeCount} active low-stock alert${activeCount === 1 ? "" : "s"} · threshold ${result.threshold} units or fewer`;
+    tableBody.replaceChildren();
+    if (!alerts.length) {
+      const row = document.createElement("tr");
+      const emptyCell = document.createElement("td");
+      emptyCell.colSpan = 5;
+      emptyCell.textContent = "No low-stock alerts recorded.";
+      row.append(emptyCell);
+      tableBody.append(row);
+    } else {
+      alerts.forEach((alert) => {
+        const row = document.createElement("tr");
+        row.style.borderBottom = "1px solid rgba(30, 41, 59, 0.7)";
+        const group = document.createElement("th");
+        group.scope = "row";
+        group.style.padding = "14px 16px";
+        group.textContent = alert.blood_group;
+        const quantity = document.createElement("td");
+        quantity.style.padding = "14px 16px";
+        quantity.textContent = `${alert.quantity} units`;
+        const threshold = document.createElement("td");
+        threshold.style.padding = "14px 16px";
+        threshold.textContent = `${alert.threshold} units`;
+        const alertStatus = document.createElement("td");
+        alertStatus.style.padding = "14px 16px";
+        alertStatus.textContent = alert.status === "active" ? "Low stock — reorder" : "Resolved";
+        const changed = document.createElement("td");
+        changed.style.padding = "14px 16px";
+        changed.textContent = formatInventoryTimestamp(alert.resolved_at || alert.triggered_at);
+        row.append(group, quantity, threshold, alertStatus, changed);
+        tableBody.append(row);
+      });
+    }
+
+    const lowGroups = document.getElementById("kpiLowGroups");
+    if (lowGroups) lowGroups.textContent = String(activeCount);
+    const lowStockSummary = document.getElementById("kpiLowStockSummary");
+    if (lowStockSummary) {
+      lowStockSummary.textContent = `${activeCount} blood group(s) at or below the ${result.threshold}-unit threshold`;
+    }
+    const lowStockStatus = document.getElementById("kpiLowStockStatus");
+    if (lowStockStatus) lowStockStatus.textContent = activeCount ? "Replenish" : "On target";
+  } catch (error) {
+    status.textContent = error.message || "Could not load low-stock alerts.";
+  }
+};
+
 window.saveFacilityInventory = async function (bloodGroup, inputId, saveButton) {
   if (saveButton.disabled) return;
   const quantityInput = document.getElementById(inputId);
@@ -105,10 +174,18 @@ window.saveFacilityInventory = async function (bloodGroup, inputId, saveButton) 
     if (totalDisplay) totalDisplay.textContent = total;
     const inventoryTotalDisplay = document.getElementById("inventoryTotalUnits");
     if (inventoryTotalDisplay) inventoryTotalDisplay.textContent = total;
+    const lowStockThreshold = Number(
+      document.getElementById("facilityStockThreshold")?.value
+        || document.getElementById("inventoryLowStockGroups")?.dataset.lowStockThreshold
+        || 5
+    );
     const lowStockCount = [...document.querySelectorAll("[data-inventory-quantity]")]
-      .filter((item) => Number(item.textContent) < 2).length;
+      .filter((item) => Number(item.textContent) <= lowStockThreshold).length;
     const lowStockDisplay = document.getElementById("inventoryLowStockGroups");
-    if (lowStockDisplay) lowStockDisplay.textContent = lowStockCount;
+    if (lowStockDisplay) {
+      lowStockDisplay.textContent = lowStockCount;
+      lowStockDisplay.dataset.lowStockThreshold = String(lowStockThreshold);
+    }
 
     const updatedAt = form.closest("tr").querySelector(".inventory-updated-at");
     if (updatedAt) {
@@ -123,6 +200,7 @@ window.saveFacilityInventory = async function (bloodGroup, inputId, saveButton) 
     const message = result.item.changed ? `${bloodGroup} stock updated.` : "Stock is unchanged.";
     feedback.textContent = message;
     showMasterToast(message, result.item.changed ? "✅" : "ℹ️");
+    await window.refreshFacilityStockAlerts();
   } catch (error) {
     const message = error.message || "Could not update inventory. Please try again.";
     feedback.textContent = message;
@@ -171,6 +249,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (history.replaceState) {
       history.replaceState(null, null, "#" + targetId);
     }
+    if (targetId === "section-stock-alerts") {
+      window.refreshFacilityStockAlerts();
+    }
   }
 
   // Attach click listeners to sidebar navigation items
@@ -180,6 +261,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const targetId = btn.getAttribute("data-target");
       activateTab(targetId);
     });
+    document.getElementById("refreshStockAlerts")?.addEventListener(
+      "click",
+      window.refreshFacilityStockAlerts
+    );
+    document.getElementById("goToStockThresholdSettings")?.addEventListener("click", () => {
+      activateTab("section-hospital-settings");
+    });
+    window.refreshFacilityStockAlerts();
   });
 
   // Mobile sidebar drawer toggle
@@ -513,6 +602,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (resp.ok) {
           const resData = await resp.json();
+          await window.refreshFacilityStockAlerts();
           showMasterToast("Facility Profile & Portal Settings saved successfully!", "💾");
 
           const heroTitle = document.querySelector(".master-hero-title");

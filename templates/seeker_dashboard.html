@@ -101,6 +101,13 @@
           </svg>
           <span class="nav-item-title">Blood Seeker Personal Dashboard</span>
         </button>
+        <button type="button" class="seeker-nav-item" data-target="section-seeker-dashboard" data-scroll-target="seekerLowStockAlerts" id="nav-item-low-stock-alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+            <path d="M10 21h4"/>
+          </svg>
+          <span class="nav-item-title">Low-Stock Alerts for My Requests</span>
+        </button>
 
         <div class="sidebar-section-title" style="margin-top: 8px;">Request Creation</div>
 
@@ -222,6 +229,15 @@
           </div>
         </div>
 
+        <section class="seeker-low-stock-alerts" id="seekerLowStockAlerts" aria-labelledby="seekerLowStockAlertsTitle" aria-live="polite">
+          <div class="seeker-low-stock-alerts-icon" aria-hidden="true">🩸</div>
+          <div class="seeker-low-stock-alerts-content">
+            <h2 id="seekerLowStockAlertsTitle">Low-stock alerts for your active requests</h2>
+            <p id="seekerLowStockAlertsStatus">Checking stock alerts for your active requests…</p>
+            <ul id="seekerLowStockAlertsList"></ul>
+          </div>
+        </section>
+
         <!-- 4 Metric Cards -->
         <div class="metrics-grid-4">
           <article class="metric-stat-box">
@@ -340,7 +356,67 @@
       </section>
 
       <!-- ================= 2. CREATE STANDARD BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-standard-request"></section>
+      <section class="dashboard-content-section" id="section-standard-request" aria-labelledby="standard-request-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🩸</span>
+            <div>
+              <h2 id="standard-request-title">Create Standard Blood Request</h2>
+              <div class="card-subtitle">Share the blood requirement and care-facility details so suitable donors can respond.</div>
+            </div>
+          </div>
+
+          <form id="standardRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="standardPatientName">Patient name</label>
+                <input id="standardPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardBloodGroup">Blood group</label>
+                <select id="standardBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="standardHospital">Hospital or care facility</label>
+                <input id="standardHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardUnits">Units needed</label>
+                <input id="standardUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardDistrict">District</label>
+                <input id="standardDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardArea">Area / neighborhood</label>
+                <input id="standardArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardNeededAt">When is the blood needed?</label>
+                <input id="standardNeededAt" name="needed_at" type="datetime-local" required>
+                <small class="card-subtitle">Enter Bangladesh local time.</small>
+              </div>
+              <div class="form-field-group">
+                <label for="standardContactPhone">Contact phone</label>
+                <input id="standardContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="standardReason">Additional details (optional)</label>
+              <textarea id="standardReason" name="reason" rows="3" maxlength="500" placeholder="Share useful details for responding donors"></textarea>
+            </div>
+            <p id="standardRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitStandardRequest" type="submit" class="btn btn-primary" style="margin-top: 18px;">
+              Create Blood Request
+            </button>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
       <section class="dashboard-content-section" id="section-emergency-request">
@@ -518,7 +594,22 @@
       </section>
 
       <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
-      <section class="dashboard-content-section" id="section-direct-contact"></section>
+      <section class="dashboard-content-section" id="section-direct-contact" aria-labelledby="direct-contact-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 12px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">📞</span>
+            <div>
+              <h2 id="direct-contact-title">Direct Donor Contact</h2>
+              <div class="card-subtitle">Call or message available donors who have explicitly enabled direct contact.</div>
+            </div>
+          </div>
+          <p class="donor-profile-privacy">
+            Donor phone numbers are private by default. A number is requested only when you choose a donor and is returned only when that donor has opted in and is available.
+          </p>
+          <p id="directContactStatus" role="status" aria-live="polite">Loading available donors...</p>
+          <div id="directContactDonors" class="donor-directory-grid" aria-live="polite"></div>
+        </div>
+      </section>
 
       <!-- ================= 8. REAL-TIME IN-APP 1-ON-1 CHAT ================= -->
       <section class="dashboard-content-section" id="section-seeker-chat" aria-labelledby="seeker-chat-title">
