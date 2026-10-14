@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
@@ -34,6 +35,9 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Create Standard Blood Request", html)
         self.assertIn('id="section-standard-request"', html)
         self.assertIn('id="nav-item-standard-request"', html)
+        self.assertIn('id="standardRequestForm"', html)
+        self.assertIn('name="needed_at"', html)
+        self.assertIn('id="standardRequestFeedback"', html)
 
         # 3. Create Emergency Blood Request
         self.assertIn("Create Emergency Blood Request", html)
@@ -69,6 +73,8 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Direct Contact Action (Call / WhatsApp CTA)", html)
         self.assertIn('id="section-direct-contact"', html)
         self.assertIn('id="nav-item-direct-contact"', html)
+        self.assertIn('id="directContactDonors"', html)
+        self.assertIn("phone numbers are private by default", html)
 
         # 8. Real-Time In-App 1-on-1 Chat
         self.assertIn("Real-Time In-App 1-on-1 Chat", html)
@@ -94,16 +100,66 @@ class SeekerDashboardTests(unittest.TestCase):
             "area": "Dhanmondi",
             "district": "Dhaka",
             "units": 2,
+            "needed_at": (datetime.now(timezone.utc) + timedelta(days=2)).isoformat(),
             "contact_phone": "+8801723456789",
             "reason": "Scheduled Surgery",
-            "is_emergency": False,
         }
-        response = self.client.post("/api/v1/seeker/requests", json=payload)
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json=payload,
+            cookies={"access_token": token},
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
         self.assertEqual(data["request"]["patient_name"], "Test Patient")
         self.assertEqual(data["request"]["blood_group"], "B+")
+        self.assertFalse(data["request"]["is_emergency"])
+        self.assertTrue(data["request"]["needed_at"])
+
+        tracked = self.client.get("/api/v1/seeker/requests", cookies={"access_token": token})
+        self.assertEqual(tracked.status_code, 200)
+        saved_request = next(
+            item for item in tracked.json()["requests"] if item["id"] == data["request"]["id"]
+        )
+        self.assertEqual(saved_request["needed_at"], data["request"]["needed_at"])
+        self.assertEqual(saved_request["status"], "Active")
+
+    def test_standard_blood_request_requires_seeker_session(self):
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json={
+                "patient_name": "Test Patient",
+                "blood_group": "B+",
+                "hospital_name": "Test Hospital",
+                "area": "Dhanmondi",
+                "district": "Dhaka",
+                "units": 1,
+                "needed_at": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                "contact_phone": "+8801723456789",
+            },
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_standard_blood_request_rejects_past_required_time(self):
+        payload = {
+            "patient_name": "Test Patient",
+            "blood_group": "B+",
+            "hospital_name": "Test Hospital",
+            "area": "Dhanmondi",
+            "district": "Dhaka",
+            "units": 1,
+            "needed_at": "2000-01-01T12:00:00+06:00",
+            "contact_phone": "+8801723456789",
+        }
+        token = _generate_jwt("+8801723456789", "seeker")
+        response = self.client.post(
+            "/api/v1/seeker/requests",
+            json=payload,
+            cookies={"access_token": token},
+        )
+        self.assertEqual(response.status_code, 422)
 
     def test_create_emergency_blood_broadcast_api(self):
         payload = {
@@ -321,6 +377,55 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("verification_status", donor)
         self.assertNotIn("phone", donor)
         self.assertNotIn("screening", donor)
+
+    def test_direct_donor_contact_requires_seeker_session(self):
+        anonymous_response = self.client.post("/api/v1/seeker/donors/dn-001/contact")
+        donor_response = self.client.post(
+            "/api/v1/seeker/donors/dn-001/contact",
+            cookies={"access_token": _generate_jwt("+8801712345678", "donor")},
+        )
+        self.assertEqual(anonymous_response.status_code, 401)
+        self.assertEqual(donor_response.status_code, 403)
+
+    def test_direct_donor_contact_hides_number_without_explicit_consent(self):
+        with patch(
+            "main._get_donor_profile",
+            return_value={
+                "phone": "+8801712345678",
+                "is_available": True,
+                "share_direct_contact": False,
+            },
+        ):
+            response = self.client.post(
+                "/api/v1/seeker/donors/dn-001/contact",
+                cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("+8801712345678", response.text)
+
+    def test_direct_donor_contact_returns_number_only_after_opt_in(self):
+        seeker_cookies = {"access_token": _generate_jwt("+8801723456789", "seeker")}
+        with patch(
+            "main._get_donor_profile",
+            return_value={
+                "phone": "+8801712345678",
+                "is_available": True,
+                "share_direct_contact": True,
+            },
+        ):
+            contact_response = self.client.post(
+                "/api/v1/seeker/donors/dn-001/contact",
+                cookies=seeker_cookies,
+            )
+            directory_response = self.client.get("/api/v1/seeker/donors")
+
+        self.assertEqual(contact_response.status_code, 200)
+        self.assertEqual(contact_response.json()["donor"]["phone"], "+8801712345678")
+        self.assertEqual(directory_response.status_code, 200)
+        self.assertTrue(
+            all("phone" not in donor for donor in directory_response.json()["donors"])
+        )
 
     def test_seeker_contact_log_flow(self):
         post_resp = self.client.post(

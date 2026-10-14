@@ -48,6 +48,7 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn('id="summaryMedicalConditions"', html)
         self.assertIn('id="summaryMedications"', html)
         self.assertIn('id="summaryAllergies"', html)
+        self.assertIn('id="settingAllowSeekerContact"', html)
 
     def test_donor_in_app_chat_rendered(self):
         token = _generate_jwt("+8801712345678", "donor")
@@ -140,6 +141,43 @@ class DonorDashboardTests(unittest.TestCase):
             cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
         )
         self.assertEqual(seeker_response.status_code, 403)
+
+    def test_direct_contact_preference_is_private_and_persisted(self):
+        import sqlite3
+        from main import AUTH_DATABASE_PATH
+
+        donor_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        donor_cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        try:
+            anonymous = self.client.get("/api/v1/donor/direct-contact-preference")
+            self.assertEqual(anonymous.status_code, 401)
+
+            initial = self.client.get(
+                "/api/v1/donor/direct-contact-preference",
+                cookies=donor_cookies,
+            )
+            self.assertEqual(initial.status_code, 200)
+            self.assertFalse(initial.json()["share_direct_contact"])
+
+            enabled = self.client.put(
+                "/api/v1/donor/direct-contact-preference",
+                json={"share_direct_contact": True},
+                cookies=donor_cookies,
+            )
+            self.assertEqual(enabled.status_code, 200)
+            self.assertTrue(enabled.json()["share_direct_contact"])
+
+            saved = self.client.get(
+                "/api/v1/donor/direct-contact-preference",
+                cookies=donor_cookies,
+            )
+            self.assertTrue(saved.json()["share_direct_contact"])
+        finally:
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.execute(
+                    "DELETE FROM donor_profiles WHERE phone = ?",
+                    (donor_phone,),
+                )
 
     def test_availability_is_persisted_and_gates_matching(self):
         import sqlite3
