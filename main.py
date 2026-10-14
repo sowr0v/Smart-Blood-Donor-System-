@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import base64
 import asyncio
 import hashlib
@@ -3770,6 +3772,7 @@ def _public_seeker_donor(donor: dict) -> dict:
         "is_available": bool(donor.get("is_available", False)),
         "is_verified": verified,
         "verification_status": "verified" if verified else "not_verified",
+        "location_precision": "exact" if donor.get("share_exact_location") is True else "approximate",
     }
     if "lat" in safe_location and "lng" in safe_location:
         public_donor["lat"] = safe_location["lat"]
@@ -3785,6 +3788,7 @@ async def get_seeker_donors(
     radius_km: float = 30.0,
     available_only: bool = False,
     query: str | None = None,
+    location: str | None = None,
 ):
     donors = list(SEEKER_MOCK_DONORS)
     if blood_group:
@@ -3807,6 +3811,13 @@ async def get_seeker_donors(
                     donor.get("district"),
                 )
             )
+        ]
+    if location:
+        selected_location = location.strip().lower()
+        donors = [
+            d for d in donors
+            if selected_location in d.get("area", "").lower()
+            or selected_location in d.get("district", "").lower()
         ]
 
     donors = [d for d in donors if d["distance_km"] <= radius_km]
