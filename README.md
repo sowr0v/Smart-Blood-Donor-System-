@@ -96,6 +96,8 @@ Matching available donor profiles are selected using the system's blood-group co
 
 Hospital and blood bank dashboards display facility-specific quantities for all eight ABO/Rh blood groups. Authenticated hospital and blood bank users can update a quantity with `PUT /api/v1/facility/inventory/{blood_group}` using `{"quantity": 0}` or another non-negative whole number; `GET /api/v1/facility/inventory` returns the current matrix. Other roles cannot read or modify facility inventory. Stock and its change audit trail are stored in `urgent_requests.db` (or the configured `SBDS_DATABASE_PATH`); unchanged quantities do not create duplicate audit records.
 
+The facility settings screen defines a low-stock threshold from 0 to 50 units. When any blood group reaches or falls below that threshold, an active alert is recorded and shown on the Low Blood Stock Alerts dashboard; it is marked resolved when stock rises above the threshold. `GET /api/v1/facility/inventory/alerts` returns the signed-in facility's alert history and current status. Administrators can monitor aggregated facility alerts through `GET /api/v1/admin/facility/inventory/alerts`; only authenticated administrators can access that cross-facility view. Authenticated seekers can use `GET /api/v1/seeker/inventory/alerts` to see a privacy-safe notice only when an active request's blood group is low at one or more facilities; the response does not disclose facility identities or stock quantities.
+
 ### Authentication Flow
 
 ```text

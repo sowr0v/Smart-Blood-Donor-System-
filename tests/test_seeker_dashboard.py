@@ -1,9 +1,19 @@
+import sqlite3
 import unittest
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
-from main import app, _generate_jwt
+from main import (
+    BLOOD_GROUPS,
+    _generate_jwt,
+    app,
+    initialize_auth_database,
+    initialize_urgent_database,
+)
 
 
 class SeekerDashboardTests(unittest.TestCase):
@@ -30,6 +40,10 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Blood Seeker Personal Dashboard", html)
         self.assertIn('id="section-seeker-dashboard"', html)
         self.assertIn('id="nav-item-seeker-dashboard"', html)
+        self.assertIn('id="nav-item-low-stock-alerts"', html)
+        self.assertIn("Low-Stock Alerts for My Requests", html)
+        self.assertIn('id="seekerLowStockAlerts"', html)
+        self.assertIn("Low-stock alerts for your active requests", html)
 
         # 2. Create Standard Blood Request
         self.assertIn("Create Standard Blood Request", html)
@@ -91,6 +105,73 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Seeker Portal Settings &amp; Preferences", html)
         self.assertIn('id="section-seeker-settings"', html)
         self.assertIn('id="nav-item-seeker-settings"', html)
+
+    def test_seeker_low_stock_alerts_match_only_their_active_request_groups(self):
+        with TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "urgent_requests.db"
+            auth_database_path = Path(temp_dir) / "auth.db"
+            with (
+                patch("main.DATABASE_PATH", database_path),
+                patch("main.AUTH_DATABASE_PATH", auth_database_path),
+            ):
+                initialize_auth_database()
+                initialize_urgent_database()
+
+                hospital_phone = "+8801734567890"
+                bank_phone = "+8801734567891"
+                seeker_phone = "+8801723456789"
+                with closing(sqlite3.connect(database_path)) as connection:
+                    with connection:
+                        for phone in (hospital_phone, bank_phone):
+                            for group in BLOOD_GROUPS:
+                                quantity = 0 if phone == hospital_phone and group == "A+" else 20
+                                connection.execute(
+                                    """INSERT INTO facility_blood_inventory
+                                       (facility_phone, blood_group, quantity)
+                                       VALUES (?, ?, ?)""",
+                                    (phone, group, quantity),
+                                )
+
+                        active_expiry = (
+                            datetime.now(timezone.utc) + timedelta(days=1)
+                        ).isoformat()
+                        expired_expiry = (
+                            datetime.now(timezone.utc) - timedelta(days=1)
+                        ).isoformat()
+                        for group, expiry, status in (
+                            ("A+", active_expiry, "Active"),
+                            ("O+", active_expiry, "Active"),
+                            ("A+", expired_expiry, "Active"),
+                            ("A+", active_expiry, "Fulfilled"),
+                        ):
+                            connection.execute(
+                                """INSERT INTO blood_requests
+                                   (blood_group, hospital_name, expires_at, owner_phone, status)
+                                   VALUES (?, 'Test Hospital', ?, ?, ?)""",
+                                (group, expiry, seeker_phone, status),
+                            )
+
+                response = self.client.get(
+                    "/api/v1/seeker/inventory/alerts",
+                    cookies={
+                        "access_token": _generate_jwt(seeker_phone, "seeker")
+                    },
+                )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["active_request_count"], 2)
+        self.assertEqual(
+            data["alerts"],
+            [{"blood_group": "A+", "request_count": 1}],
+        )
+        self.assertNotIn("facility_name", response.text)
+        self.assertNotIn("facility_phone", response.text)
+        self.assertNotIn("quantity", response.text)
+
+    def test_seeker_low_stock_alerts_require_seeker_authentication(self):
+        response = self.client.get("/api/v1/seeker/inventory/alerts")
+        self.assertEqual(response.status_code, 401)
 
     def test_create_standard_blood_request_api(self):
         payload = {

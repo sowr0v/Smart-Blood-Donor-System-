@@ -151,6 +151,21 @@ def initialize_urgent_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_facility_inventory_audit_recent
                     ON facility_inventory_audit(facility_phone, changed_at DESC, id DESC);
+                CREATE TABLE IF NOT EXISTS facility_inventory_alerts (
+                    id INTEGER PRIMARY KEY,
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    threshold INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('active', 'resolved')),
+                    triggered_at TEXT NOT NULL,
+                    resolved_at TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_facility_inventory_alert_active
+                    ON facility_inventory_alerts(facility_phone, blood_group)
+                    WHERE status = 'active';
+                CREATE INDEX IF NOT EXISTS idx_facility_inventory_alert_recent
+                    ON facility_inventory_alerts(facility_phone, triggered_at DESC, id DESC);
                 """
             )
             connection.execute(
@@ -264,6 +279,73 @@ def _update_facility_inventory(
         "updated_at": changed_at if previous_quantity != quantity else current["updated_at"],
         "changed": previous_quantity != quantity,
     }
+
+
+def _sync_facility_inventory_alerts(facility_phone: str, threshold: int) -> list[dict]:
+    initialize_urgent_database()
+    now = datetime.now(timezone.utc).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.executemany(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                [(facility_phone, group) for group in BLOOD_GROUPS],
+            )
+            inventory = connection.execute(
+                """SELECT blood_group, quantity
+                   FROM facility_blood_inventory
+                   WHERE facility_phone = ?""",
+                (facility_phone,),
+            ).fetchall()
+            for item in inventory:
+                active_alert = connection.execute(
+                    """SELECT id FROM facility_inventory_alerts
+                       WHERE facility_phone = ? AND blood_group = ? AND status = 'active'""",
+                    (facility_phone, item["blood_group"]),
+                ).fetchone()
+                if item["quantity"] <= threshold:
+                    if active_alert:
+                        connection.execute(
+                            """UPDATE facility_inventory_alerts
+                               SET threshold = ?, quantity = ?
+                               WHERE id = ?""",
+                            (threshold, item["quantity"], active_alert["id"]),
+                        )
+                    else:
+                        connection.execute(
+                            """INSERT INTO facility_inventory_alerts (
+                                   facility_phone, blood_group, threshold, quantity,
+                                   status, triggered_at
+                               ) VALUES (?, ?, ?, ?, 'active', ?)""",
+                            (
+                                facility_phone,
+                                item["blood_group"],
+                                threshold,
+                                item["quantity"],
+                                now,
+                            ),
+                        )
+                elif active_alert:
+                    connection.execute(
+                        """UPDATE facility_inventory_alerts
+                           SET threshold = ?, quantity = ?, status = 'resolved', resolved_at = ?
+                           WHERE id = ?""",
+                        (threshold, item["quantity"], now, active_alert["id"]),
+                    )
+
+        rows = connection.execute(
+            """SELECT id, blood_group, threshold, quantity, status, triggered_at, resolved_at
+               FROM facility_inventory_alerts
+               WHERE facility_phone = ?
+               ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END,
+                        triggered_at DESC, id DESC
+               LIMIT 24""",
+            (facility_phone,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def _require_facility_inventory_user(request: Request) -> dict:
@@ -1865,13 +1947,21 @@ async def hospital_dashboard(request: Request):
     can_manage_inventory = user_role in {"hospital", "bank", "blood_bank"}
     inventory = _get_facility_inventory(phone) if can_manage_inventory and phone else []
     inventory_total_units = sum(item["quantity"] for item in inventory)
-    inventory_low_stock_groups = sum(item["quantity"] < 2 for item in inventory)
     inventory_last_sync = max(
         (item["updated_at"] for item in inventory if item["updated_at"]),
         default="",
     )
 
     facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
+    inventory_threshold = facility_settings["low_stock_threshold"]
+    inventory_low_stock_groups = sum(
+        item["quantity"] <= inventory_threshold for item in inventory
+    )
+    inventory_alerts = (
+        _sync_facility_inventory_alerts(phone, inventory_threshold)
+        if can_manage_inventory and phone
+        else []
+    )
     if facility_settings and facility_settings.get("facility_name") and user:
         user = {**user, "name": facility_settings["facility_name"]}
 
@@ -1889,6 +1979,8 @@ async def hospital_dashboard(request: Request):
             "inventory_total_units": inventory_total_units,
             "inventory_low_stock_groups": inventory_low_stock_groups,
             "inventory_last_sync": inventory_last_sync,
+            "inventory_threshold": inventory_threshold,
+            "inventory_alerts": inventory_alerts,
             "can_manage_inventory": can_manage_inventory,
         },
     )
@@ -3037,7 +3129,7 @@ class FacilitySettingsPayload(BaseModel):
     ultra_freezer_active: bool = True
     nat_screening: bool = True
     continuous_shift: bool = True
-    low_stock_threshold: int = 5
+    low_stock_threshold: int = Field(default=5, strict=True, ge=0, le=50)
     auto_sos_dispatch: bool = True
     inter_facility_network: bool = True
     audio_siren: bool = True
@@ -3589,6 +3681,72 @@ async def get_seeker_requests(request: Request):
             for r in rows
         ]
     return {"status": "success", "count": len(requests_list), "requests": requests_list}
+
+
+@app.get("/api/v1/seeker/inventory/alerts")
+async def get_seeker_inventory_alerts(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to view low-stock alerts.")
+
+    seeker_phone = token["sub"]
+    now = datetime.now(timezone.utc).isoformat()
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE blood_requests SET status = 'Expired'
+                   WHERE status = 'Active' AND expires_at <= ? AND owner_phone = ?""",
+                (now, seeker_phone),
+            )
+        rows = connection.execute(
+            """SELECT blood_group, COUNT(*) AS request_count
+               FROM blood_requests
+               WHERE owner_phone = ? AND status = 'Active'
+               GROUP BY blood_group""",
+            (seeker_phone,),
+        ).fetchall()
+        request_counts = {row[0]: row[1] for row in rows}
+        inventory_phones = {
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
+            ).fetchall()
+        }
+
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        settings_phones = {
+            row[0]
+            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
+        }
+
+    low_stock_groups = set()
+    for phone in inventory_phones | settings_phones:
+        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+        role = str(user.get("role", "")).lower()
+        if role not in {"hospital", "bank", "blood_bank"}:
+            continue
+        settings = _get_facility_settings(phone, role, user.get("name", ""))
+        alerts = _sync_facility_inventory_alerts(
+            phone, settings["low_stock_threshold"]
+        )
+        low_stock_groups.update(
+            alert["blood_group"]
+            for alert in alerts
+            if alert["status"] == "active"
+        )
+
+    alerts = [
+        {"blood_group": blood_group, "request_count": request_counts[blood_group]}
+        for blood_group in BLOOD_GROUPS
+        if blood_group in request_counts and blood_group in low_stock_groups
+    ]
+    return {
+        "status": "success",
+        "alerts": alerts,
+        "active_request_count": sum(request_counts.values()),
+    }
 
 
 @app.post("/api/v1/seeker/requests")
@@ -4203,6 +4361,70 @@ async def get_facility_inventory(request: Request):
     return {"status": "success", "inventory": inventory}
 
 
+@app.get("/api/v1/facility/inventory/alerts")
+async def get_facility_inventory_alerts(request: Request):
+    user = _require_facility_inventory_user(request)
+    settings = _get_facility_settings(
+        user["phone"],
+        user.get("role", "hospital"),
+        user.get("name", ""),
+    )
+    alerts = _sync_facility_inventory_alerts(
+        user["phone"], settings["low_stock_threshold"]
+    )
+    return {
+        "status": "success",
+        "threshold": settings["low_stock_threshold"],
+        "alerts": alerts,
+        "active_count": sum(alert["status"] == "active" for alert in alerts),
+    }
+
+
+@app.get("/api/v1/admin/facility/inventory/alerts")
+async def get_admin_facility_inventory_alerts(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as an administrator to view facility alerts.")
+    if token.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can view cross-facility inventory alerts.")
+
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        inventory_phones = {
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
+            ).fetchall()
+        }
+    with closing(_connection()) as connection:
+        settings_phones = {
+            row[0]
+            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
+        }
+
+    facilities = []
+    for phone in sorted(inventory_phones | settings_phones):
+        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+        role = str(user.get("role", "")).lower()
+        if role not in {"hospital", "bank", "blood_bank"}:
+            continue
+        settings = _get_facility_settings(phone, role, user.get("name", ""))
+        alerts = _sync_facility_inventory_alerts(phone, settings["low_stock_threshold"])
+        facilities.append({
+            "facility_name": settings["facility_name"],
+            "threshold": settings["low_stock_threshold"],
+            "active_count": sum(alert["status"] == "active" for alert in alerts),
+            "alerts": alerts,
+        })
+
+    return {
+        "status": "success",
+        "facility_count": len(facilities),
+        "active_count": sum(facility["active_count"] for facility in facilities),
+        "facilities": facilities,
+    }
+
+
 @app.put("/api/v1/facility/inventory/{blood_group}")
 async def update_facility_inventory(
     blood_group: str,
@@ -4215,6 +4437,12 @@ async def update_facility_inventory(
     result = _update_facility_inventory(
         user["phone"], user["phone"], blood_group, payload.quantity
     )
+    settings = _get_facility_settings(
+        user["phone"],
+        user.get("role", "hospital"),
+        user.get("name", ""),
+    )
+    _sync_facility_inventory_alerts(user["phone"], settings["low_stock_threshold"])
     return {"status": "success", "item": result}
 
 
@@ -4243,14 +4471,13 @@ async def get_hospital_settings(request: Request):
 @app.post("/api/v1/hospital/settings")
 @app.post("/api/v1/facility/settings")
 async def save_hospital_settings(payload: FacilitySettingsPayload, request: Request):
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = payload.phone.strip()
-    if not phone and token:
-        phone = token.get("sub", "")
-    if not phone:
-        phone = "+8801734567890"
+    user = _require_facility_inventory_user(request)
+    phone = user["phone"]
+    if payload.phone.strip() and payload.phone.strip() != phone:
+        raise HTTPException(status_code=403, detail="You can only update your own facility settings.")
 
     saved = _save_facility_settings(phone, payload.model_dump())
+    _sync_facility_inventory_alerts(phone, saved["low_stock_threshold"])
     return {
         "status": "success",
         "message": "Facility profile and portal settings saved successfully",
