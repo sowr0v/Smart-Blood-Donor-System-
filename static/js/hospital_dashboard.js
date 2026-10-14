@@ -706,7 +706,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-
 // ============================================================
 // 2. Donor Search & Direct Outreach – Hospital Portal Section
 // ============================================================
@@ -1002,4 +1001,400 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+/* ==========================================================================
+   5. Institutional Blood Request & Allocation JavaScript
+   ========================================================================== */
+
+(function () {
+  let cachedRequests = [];
+
+  function escHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function getPriorityBadgeClass(priority) {
+    const p = (priority || "").toLowerCase();
+    if (p === "critical") return "inst-priority-critical";
+    if (p === "urgent") return "inst-priority-urgent";
+    if (p === "normal") return "inst-priority-normal";
+    return "inst-priority-routine";
+  }
+
+  function getStatusBadgeClass(status) {
+    const s = (status || "").toLowerCase().replace(/\s+/g, "-");
+    if (s.includes("partially")) return "inst-status-partially-allocated";
+    if (s.includes("fully")) return "inst-status-fully-allocated";
+    if (s.includes("dispatched") || s.includes("fulfilled")) return "inst-status-dispatched";
+    return "inst-status-pending";
+  }
+
+  window.loadInstitutionalRequests = async function (forceToast = false) {
+    const tbody = document.getElementById("instRequestsTableBody");
+    const emptyState = document.getElementById("instRequestsEmpty");
+    if (!tbody) return;
+
+    try {
+      const response = await fetch("/api/v1/hospital/institutional-requests");
+      if (!response.ok) {
+        throw new Error("Failed to fetch institutional requests");
+      }
+      const data = await response.json();
+      cachedRequests = data.requests || [];
+      renderRequestsTable(cachedRequests);
+      updateKpis(cachedRequests);
+      if (forceToast && typeof window.showToast === "function") {
+        window.showToast("Institutional requests refreshed");
+      }
+    } catch (err) {
+      console.error("loadInstitutionalRequests error:", err);
+      if (typeof window.showToast === "function") {
+        window.showToast("Could not load requests", "error");
+      }
+    }
+  };
+
+  function updateKpis(requests) {
+    const total = requests.length;
+    let pending = 0;
+    let totalNeeded = 0;
+    let totalAlloc = 0;
+
+    requests.forEach((r) => {
+      if (r.status === "Pending") pending++;
+      totalNeeded += r.units_requested || 0;
+      totalAlloc += r.units_allocated || 0;
+    });
+
+    const elTotal = document.getElementById("kpiTotalRequests");
+    const elPending = document.getElementById("kpiPendingRequests");
+    const elAlloc = document.getElementById("kpiUnitsAllocated");
+    const elRate = document.getElementById("kpiFulfillmentRate");
+
+    if (elTotal) elTotal.textContent = total;
+    if (elPending) elPending.textContent = pending;
+    if (elAlloc) elAlloc.textContent = `${totalAlloc} / ${totalNeeded}`;
+    if (elRate) {
+      const rate = totalNeeded > 0 ? Math.round((totalAlloc / totalNeeded) * 100) : 0;
+      elRate.textContent = `${rate}%`;
+    }
+  }
+
+  window.filterInstitutionalRequests = function () {
+    const statusVal = document.getElementById("instFilterStatus") ? document.getElementById("instFilterStatus").value : "All";
+    const prioVal = document.getElementById("instFilterPriority") ? document.getElementById("instFilterPriority").value : "All";
+    const bgVal = document.getElementById("instFilterBloodGroup") ? document.getElementById("instFilterBloodGroup").value : "All";
+
+    let filtered = cachedRequests;
+    if (statusVal !== "All") {
+      filtered = filtered.filter((r) => (r.status || "").toLowerCase() === statusVal.toLowerCase());
+    }
+    if (prioVal !== "All") {
+      filtered = filtered.filter((r) => (r.priority || "").toLowerCase() === prioVal.toLowerCase());
+    }
+    if (bgVal !== "All") {
+      filtered = filtered.filter((r) => (r.blood_group || "").toUpperCase() === bgVal.toUpperCase());
+    }
+
+    renderRequestsTable(filtered);
+  };
+
+  function renderRequestsTable(requests) {
+    const tbody = document.getElementById("instRequestsTableBody");
+    const emptyState = document.getElementById("instRequestsEmpty");
+    if (!tbody) return;
+
+    if (!requests || requests.length === 0) {
+      tbody.innerHTML = "";
+      if (emptyState) emptyState.style.display = "block";
+      return;
+    }
+
+    if (emptyState) emptyState.style.display = "none";
+
+    tbody.innerHTML = requests
+      .map((req) => {
+        const remaining = Math.max(0, req.units_requested - req.units_allocated);
+        const isFullyAllocated = remaining === 0;
+
+        return `
+        <tr>
+          <td>
+            <div style="font-weight: 700; color: var(--text-primary);">${escHtml(req.id)}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">${escHtml(req.facility_name || "Internal Facility")}</div>
+          </td>
+          <td>
+            <span class="inst-badge-bg">${escHtml(req.blood_group)}</span>
+          </td>
+          <td>
+            <div style="font-weight: 600;">${req.units_allocated} / ${req.units_requested} Bags</div>
+            <div style="font-size: 0.76rem; color: ${remaining > 0 ? '#e11d48' : '#10b981'}; font-weight: 500;">
+              ${remaining > 0 ? `${remaining} remaining` : 'Fully Allocated'}
+            </div>
+          </td>
+          <td>
+            <span class="inst-priority-badge ${getPriorityBadgeClass(req.priority)}">
+              ${escHtml(req.priority)}
+            </span>
+          </td>
+          <td>
+            <div style="font-weight: 600;">${escHtml(req.department || "General")}</div>
+            <div style="font-size: 0.76rem; color: var(--text-muted); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escHtml(req.patient_diagnosis || "")}">
+              ${escHtml(req.patient_diagnosis || "Not specified")}
+            </div>
+          </td>
+          <td>
+            <span class="inst-status-badge ${getStatusBadgeClass(req.status)}">
+              ${escHtml(req.status)}
+            </span>
+          </td>
+          <td>
+            <div class="inst-action-btns">
+              ${
+                !isFullyAllocated
+                  ? `<button type="button" class="btn-inst-action btn-inst-allocate" onclick="window.openAllocateModal('${escHtml(req.id)}')">Allocate</button>`
+                  : ""
+              }
+              <button type="button" class="btn-inst-action" onclick="window.openDetailsModal('${escHtml(req.id)}')">Details</button>
+            </div>
+          </td>
+        </tr>
+      `;
+      })
+      .join("");
+  }
+
+  // Create Request Modal
+  window.openNewRequestModal = function () {
+    const modal = document.getElementById("modalCreateRequest");
+    const form = document.getElementById("formCreateInstitutionalRequest");
+    if (form) form.reset();
+    if (modal) modal.classList.add("open");
+  };
+
+  window.closeNewRequestModal = function () {
+    const modal = document.getElementById("modalCreateRequest");
+    if (modal) modal.classList.remove("open");
+  };
+
+  window.handleCreateRequestSubmit = async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnSubmitCreateRequest");
+    if (btn) btn.disabled = true;
+
+    const payload = {
+      blood_group: document.getElementById("reqBloodGroup").value,
+      units_requested: parseInt(document.getElementById("reqUnits").value, 10),
+      priority: document.getElementById("reqPriority").value,
+      department: document.getElementById("reqDepartment").value,
+      patient_diagnosis: document.getElementById("reqDiagnosis").value,
+      required_within_hours: parseInt(document.getElementById("reqRequiredHours").value, 10) || 24,
+      notes: document.getElementById("reqNotes").value,
+    };
+
+    try {
+      const res = await fetch("/api/v1/hospital/institutional-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        if (typeof window.showToast === "function") {
+          window.showToast("Institutional blood request created successfully!");
+        }
+        window.closeNewRequestModal();
+        window.loadInstitutionalRequests();
+      } else {
+        if (typeof window.showToast === "function") {
+          window.showToast(data.detail || data.message || "Failed to create request", "error");
+        }
+      }
+    } catch (err) {
+      console.error("Create request error:", err);
+      if (typeof window.showToast === "function") {
+        window.showToast("Network error creating request", "error");
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // Blood Allocation Modal
+  window.openAllocateModal = function (requestId) {
+    const target = cachedRequests.find((r) => r.id === requestId);
+    if (!target) return;
+
+    const modal = document.getElementById("modalAllocateBlood");
+    const summaryBox = document.getElementById("allocSummaryBox");
+    const inputHidden = document.getElementById("allocTargetRequestId");
+    const inputUnits = document.getElementById("allocUnits");
+
+    const remaining = Math.max(0, target.units_requested - target.units_allocated);
+
+    if (inputHidden) inputHidden.value = target.id;
+    if (inputUnits) {
+      inputUnits.value = remaining > 0 ? remaining : 1;
+      inputUnits.max = remaining;
+    }
+
+    if (summaryBox) {
+      summaryBox.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <div>
+            <strong style="font-size: 1rem;">${escHtml(target.id)}</strong> - 
+            <span class="inst-badge-bg">${escHtml(target.blood_group)}</span>
+          </div>
+          <span class="inst-priority-badge ${getPriorityBadgeClass(target.priority)}">${escHtml(target.priority)}</span>
+        </div>
+        <div style="font-size: 0.84rem; color: var(--text-muted);">
+          Department: <strong>${escHtml(target.department || 'General')}</strong> &bull;
+          Allocated: <strong>${target.units_allocated} / ${target.units_requested} Units</strong> &bull;
+          Needed: <strong style="color: #e11d48;">${remaining} more unit(s)</strong>
+        </div>
+      `;
+    }
+
+    if (modal) modal.classList.add("open");
+  };
+
+  window.closeAllocateModal = function () {
+    const modal = document.getElementById("modalAllocateBlood");
+    if (modal) modal.classList.remove("open");
+  };
+
+  window.handleRecordAllocationSubmit = async function (e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnSubmitAllocation");
+    if (btn) btn.disabled = true;
+
+    const requestId = document.getElementById("allocTargetRequestId").value;
+    const payload = {
+      units_allocated: parseInt(document.getElementById("allocUnits").value, 10),
+      batch_number: document.getElementById("allocBatchNumber").value,
+      source_facility: document.getElementById("allocSourceFacility").value,
+      allocated_by: document.getElementById("allocAllocatedBy").value,
+      notes: document.getElementById("allocNotes").value,
+    };
+
+    try {
+      const res = await fetch(`/api/v1/hospital/institutional-requests/${requestId}/allocate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        if (typeof window.showToast === "function") {
+          window.showToast(data.message || "Blood units allocated successfully!");
+        }
+        window.closeAllocateModal();
+        window.loadInstitutionalRequests();
+      } else {
+        if (typeof window.showToast === "function") {
+          window.showToast(data.detail || data.message || "Failed to record allocation", "error");
+        }
+      }
+    } catch (err) {
+      console.error("Allocation error:", err);
+      if (typeof window.showToast === "function") {
+        window.showToast("Network error recording allocation", "error");
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  };
+
+  // Details Modal
+  window.openDetailsModal = function (requestId) {
+    const target = cachedRequests.find((r) => r.id === requestId);
+    if (!target) return;
+
+    const modal = document.getElementById("modalRequestDetails");
+    const container = document.getElementById("detailsModalContent");
+    const title = document.getElementById("detailsModalTitle");
+
+    if (title) title.textContent = `Request Details: ${target.id}`;
+
+    const allocationsHtml =
+      target.allocations && target.allocations.length > 0
+        ? `
+        <h4 style="margin: 18px 0 10px 0; font-size: 0.95rem; font-weight: 700;">Recorded Allocations (${target.allocations.length})</h4>
+        <div style="background: var(--surface); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem;">
+            <thead>
+              <tr style="background: #f8fafc; text-align: left;">
+                <th style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">Batch / Serial</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">Units</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">Source / Officer</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">Time</th>
+                <th style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${target.allocations
+                .map(
+                  (a) => `
+                <tr>
+                  <td style="padding: 8px 12px; font-weight: 600; border-bottom: 1px solid var(--border-color);">${escHtml(a.batch_number || "N/A")}</td>
+                  <td style="padding: 8px 12px; font-weight: 700; color: #e11d48; border-bottom: 1px solid var(--border-color);">${a.units} Bags</td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">${escHtml(a.source_facility)}<br><small style="color: var(--text-muted);">${escHtml(a.allocated_by)}</small></td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">${new Date(a.timestamp).toLocaleString()}</td>
+                  <td style="padding: 8px 12px; border-bottom: 1px solid var(--border-color);">${escHtml(a.notes || "-")}</td>
+                </tr>
+              `
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
+      `
+        : `
+        <div style="background: #f8fafc; border: 1px dashed var(--border-color); border-radius: 8px; padding: 20px; text-align: center; margin-top: 14px; font-size: 0.85rem; color: var(--text-muted);">
+          No blood units have been allocated to this request yet.
+        </div>
+      `;
+
+    if (container) {
+      container.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.88rem;">
+          <div><strong>Facility:</strong> ${escHtml(target.facility_name)}</div>
+          <div><strong>Blood Group:</strong> <span class="inst-badge-bg">${escHtml(target.blood_group)}</span></div>
+          <div><strong>Requested Units:</strong> ${target.units_requested} Bags</div>
+          <div><strong>Allocated Units:</strong> ${target.units_allocated} Bags</div>
+          <div><strong>Priority:</strong> <span class="inst-priority-badge ${getPriorityBadgeClass(target.priority)}">${escHtml(target.priority)}</span></div>
+          <div><strong>Status:</strong> <span class="inst-status-badge ${getStatusBadgeClass(target.status)}">${escHtml(target.status)}</span></div>
+          <div><strong>Department:</strong> ${escHtml(target.department || "General")}</div>
+          <div><strong>Needed Within:</strong> ${target.required_within_hours || 24} Hours</div>
+        </div>
+        ${target.patient_diagnosis ? `<div style="margin-top: 10px; font-size: 0.86rem;"><strong>Diagnosis / Clinical Reason:</strong> ${escHtml(target.patient_diagnosis)}</div>` : ""}
+        ${target.notes ? `<div style="margin-top: 6px; font-size: 0.86rem;"><strong>Notes:</strong> ${escHtml(target.notes)}</div>` : ""}
+        ${allocationsHtml}
+      `;
+    }
+
+    if (modal) modal.classList.add("open");
+  };
+
+  window.closeDetailsModal = function () {
+    const modal = document.getElementById("modalRequestDetails");
+    if (modal) modal.classList.remove("open");
+  };
+
+  // Wire automatic tab activation
+  const navItem = document.getElementById("nav-item-blood-allocation");
+  if (navItem) {
+    navItem.addEventListener("click", function () {
+      window.loadInstitutionalRequests();
+    });
+  }
+})();
 

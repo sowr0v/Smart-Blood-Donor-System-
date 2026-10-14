@@ -340,7 +340,67 @@
       </section>
 
       <!-- ================= 2. CREATE STANDARD BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-standard-request"></section>
+      <section class="dashboard-content-section" id="section-standard-request" aria-labelledby="standard-request-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🩸</span>
+            <div>
+              <h2 id="standard-request-title">Create Standard Blood Request</h2>
+              <div class="card-subtitle">Share the blood requirement and care-facility details so suitable donors can respond.</div>
+            </div>
+          </div>
+
+          <form id="standardRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="standardPatientName">Patient name</label>
+                <input id="standardPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardBloodGroup">Blood group</label>
+                <select id="standardBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="standardHospital">Hospital or care facility</label>
+                <input id="standardHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardUnits">Units needed</label>
+                <input id="standardUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardDistrict">District</label>
+                <input id="standardDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardArea">Area / neighborhood</label>
+                <input id="standardArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardNeededAt">When is the blood needed?</label>
+                <input id="standardNeededAt" name="needed_at" type="datetime-local" required>
+                <small class="card-subtitle">Enter Bangladesh local time.</small>
+              </div>
+              <div class="form-field-group">
+                <label for="standardContactPhone">Contact phone</label>
+                <input id="standardContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="standardReason">Additional details (optional)</label>
+              <textarea id="standardReason" name="reason" rows="3" maxlength="500" placeholder="Share useful details for responding donors"></textarea>
+            </div>
+            <p id="standardRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitStandardRequest" type="submit" class="btn btn-primary" style="margin-top: 18px;">
+              Create Blood Request
+            </button>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
       <section class="dashboard-content-section" id="section-emergency-request">
@@ -472,38 +532,52 @@
 
       <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
       <section class="dashboard-content-section" id="section-donor-directory" aria-labelledby="donor-directory-title">
-        <div class="seeker-card">
-          <header class="donor-directory-header">
+        <div class="seeker-card directory-card">
+          <header class="directory-heading">
             <div>
               <span class="eyebrow">Donor discovery</span>
-              <h2 id="donor-directory-title">Donor Directory</h2>
-              <p class="card-subtitle">Find donors by blood group and review the information they have chosen to share.</p>
+              <h2 id="donor-directory-title">Donor Directory Search &amp; Proximity Filtering</h2>
+              <p class="card-subtitle">Find available donors by blood group and nearby area.</p>
             </div>
+            <span class="directory-privacy-badge">Approximate locations</span>
           </header>
-          <div class="donor-directory-filters">
-            <label for="dirBloodFilter">Blood group</label>
-            <select id="dirBloodFilter">
-              <option value="">All groups</option>
-              <option value="A+">A+</option>
-              <option value="A-">A-</option>
-              <option value="B+">B+</option>
-              <option value="B-">B-</option>
-              <option value="AB+">AB+</option>
-              <option value="AB-">AB-</option>
-              <option value="O+">O+</option>
-              <option value="O-">O-</option>
-            </select>
-            <label class="donor-directory-search" for="dirSearch">
-              Search name or area
-              <input id="dirSearch" type="search" autocomplete="off" placeholder="Search donors">
+
+          <div class="directory-filters-bar" aria-label="Filter donors">
+            <label class="directory-location-filter" for="dirLocationFilter">
+              Area or district
+              <input type="search" id="dirLocationFilter" placeholder="e.g. Dhanmondi or Dhaka" autocomplete="off">
             </label>
-            <label class="donor-directory-available">
-              <input id="dirAvailableOnly" type="checkbox">
-              Available now
+            <label for="dirBloodFilter">
+              Blood group
+              <select id="dirBloodFilter">
+                <option value="">All groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
             </label>
+            <label class="directory-radius-filter" for="dirRadiusSlider">
+              <span>Distance <output id="dirRadiusValue" for="dirRadiusSlider">15 km</output></span>
+              <input type="range" id="dirRadiusSlider" min="1" max="30" value="15">
+            </label>
+            <label class="directory-availability-filter" for="dirAvailFilter">
+              <input type="checkbox" id="dirAvailFilter" checked>
+              <span>Available now</span>
+            </label>
+            <button type="button" class="directory-clear-button" id="dirClearFilters">Clear filters</button>
           </div>
-          <p id="donorDirectoryStatus" role="status" aria-live="polite">Loading donors...</p>
-          <div id="donorDirectoryGrid" class="donor-directory-grid"></div>
+
+          <div class="directory-results-heading">
+            <p id="donorDirectoryStatus" role="status" aria-live="polite">Choose filters to search nearby donors.</p>
+            <span id="dirResultsCount" aria-label="Matching donors">0</span>
+          </div>
+          <div class="donor-directory-grid" id="donorDirectoryGrid" aria-live="polite"></div>
+          <p class="directory-privacy-note">Donor names, contact details, medical records, and exact locations are not shown in this directory.</p>
         </div>
       </section>
 
