@@ -3004,6 +3004,36 @@ class FacilityInventoryUpdatePayload(BaseModel):
     quantity: int = Field(strict=True, ge=0, le=9223372036854775807)
 
 
+class HospitalDonorOutreachPayload(BaseModel):
+    donor_id: str
+    donor_name: str
+    blood_group: str
+    contact_type: str  # "call", "message", "dispatch"
+    notes: str = ""
+
+
+HOSPITAL_OUTREACH_LOGS: list[dict] = [
+    {
+        "donor_id": "dn-004",
+        "donor_name": "Rafiqul Islam",
+        "blood_group": "O-",
+        "contact_type": "call",
+        "notes": "Donor confirmed availability for NICU emergency. ETA 25 mins.",
+        "initiated_by": "+8801734567890",
+        "created_at": "35 mins ago",
+    },
+    {
+        "donor_id": "dn-002",
+        "donor_name": "Tanvir Ahmed",
+        "blood_group": "O+",
+        "contact_type": "message",
+        "notes": "Sent pre-screening checklist via in-app message. Awaiting donor confirmation.",
+        "initiated_by": "+8801734567890",
+        "created_at": "2 hours ago",
+    },
+]
+
+
 class InstitutionalBloodRequestPayload(BaseModel):
     blood_group: str = Field(..., min_length=2, max_length=5)
     units_requested: int = Field(..., ge=1, le=1000)
@@ -4167,6 +4197,147 @@ async def update_facility_inventory(
     return {"status": "success", "item": result}
 
 
+# ---------------------------------------------------------------------------
+# Hospital / Blood Bank – Donor Search & Direct Outreach
+# ---------------------------------------------------------------------------
+
+HOSPITAL_AUTHORIZED_ROLES = {"hospital", "bank", "blood_bank", "admin"}
+
+
+def _hospital_donor_view(donor: dict) -> dict:
+    """Return a donor profile suitable for hospital/blood-bank users.
+
+    Hospitals receive slightly more context than the fully-anonymous public
+    view (e.g. badge tier, response time, bio, medical screening summary),
+    but exact phone numbers and NID details are still gated behind the
+    donor's explicit consent flag ``share_contact_hospital``.
+    """
+    verified = bool(donor.get("nid_verified") or donor.get("is_verified"))
+    name = donor.get("public_name") or donor.get("name") or "Anonymous Donor"
+    if donor.get("share_name") is False:
+        name = donor.get("public_identifier") or "Private Donor"
+
+    safe_lat = round(float(donor["lat"]), 2) if not donor.get("share_exact_location") else float(donor["lat"])
+    safe_lng = round(float(donor["lng"]), 2) if not donor.get("share_exact_location") else float(donor["lng"])
+
+    result: dict = {
+        "id": donor["id"],
+        "name": name,
+        "blood_group": donor["blood_group"],
+        "district": donor.get("district", ""),
+        "area": donor.get("area", ""),
+        "distance_km": donor.get("distance_km"),
+        "is_available": bool(donor.get("is_available", False)),
+        "is_verified": verified,
+        "verification_status": "verified" if verified else "not_verified",
+        "badge_tier": donor.get("badge_tier", ""),
+        "response_time": donor.get("response_time", ""),
+        "reliability": donor.get("reliability", ""),
+        "last_donation": donor.get("last_donation", ""),
+        "lat": safe_lat,
+        "lng": safe_lng,
+    }
+    # Only expose bio and medical summary if donor has opted to share
+    if donor.get("share_donation_summary") is True:
+        result["donation_count"] = int(donor.get("total_donations", 0))
+        result["bio"] = donor.get("bio", "")
+        result["hemoglobin"] = donor.get("hemoglobin", "")
+        result["screening"] = donor.get("screening", "")
+    # Authorised contact info only if donor explicitly shares with facilities
+    if donor.get("share_contact_hospital") is True:
+        result["contact_phone"] = donor.get("formatted_phone") or donor.get("phone", "")
+        result["contact_available"] = True
+    else:
+        result["contact_available"] = False
+        result["contact_note"] = "Donor has restricted direct contact. Use in-app messaging."
+    return result
+
+
+@app.get("/api/v1/hospital/donors")
+async def get_hospital_donors(
+    request: Request,
+    blood_group: str | None = None,
+    available_only: bool = False,
+    query: str | None = None,
+    location: str | None = None,
+    radius_km: float = Query(default=30.0, ge=1.0, le=100.0),
+):
+    """Donor search endpoint for authorised hospital / blood-bank users.
+
+    Privacy rules:
+    - All donors in the mock dataset are returned (subject to filters).
+    - Phone numbers are only revealed if the donor has ``share_contact_hospital=True``.
+    - Exact GPS coordinates are only revealed if ``share_exact_location=True``.
+    """
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    # Demo / unauthenticated access is allowed so the portal renders without login
+    if token and token.get("role") not in HOSPITAL_AUTHORIZED_ROLES:
+        raise HTTPException(status_code=403, detail="Only hospital and blood bank users can search the donor directory.")
+
+    donors = list(SEEKER_MOCK_DONORS)
+
+    if blood_group:
+        bg = blood_group.strip().replace(" ", "+").upper()
+        donors = [d for d in donors if d["blood_group"] == bg]
+    if available_only:
+        donors = [d for d in donors if d.get("is_available")]
+    if query:
+        q = query.strip().lower()
+        donors = [
+            d for d in donors
+            if any(
+                q in str(v or "").lower()
+                for v in (d.get("name"), d.get("area"), d.get("district"), d.get("blood_group"), d.get("bio", ""))
+            )
+        ]
+    if location:
+        loc = location.strip().lower()
+        donors = [
+            d for d in donors
+            if loc in (d.get("area") or "").lower() or loc in (d.get("district") or "").lower()
+        ]
+
+    donors = [d for d in donors if d.get("distance_km", float("inf")) <= radius_km]
+    donors = [_hospital_donor_view(d) for d in donors]
+    return {"status": "success", "count": len(donors), "donors": donors}
+
+
+@app.get("/api/v1/hospital/donors/{donor_id}")
+async def get_hospital_donor_detail(donor_id: str, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if token and token.get("role") not in HOSPITAL_AUTHORIZED_ROLES:
+        raise HTTPException(status_code=403, detail="Only hospital users can view donor profiles.")
+    donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
+    if not donor:
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    return {"status": "success", "donor": _hospital_donor_view(donor)}
+
+
+@app.post("/api/v1/hospital/outreach/log")
+async def log_hospital_outreach(payload: HospitalDonorOutreachPayload, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    initiated_by = token.get("sub", "anonymous") if token else "anonymous"
+    log_entry = {
+        "donor_id": payload.donor_id,
+        "donor_name": payload.donor_name,
+        "blood_group": payload.blood_group,
+        "contact_type": payload.contact_type,
+        "notes": payload.notes or "Outreach action dispatched via Hospital Portal",
+        "initiated_by": initiated_by,
+        "created_at": "Just now",
+    }
+    HOSPITAL_OUTREACH_LOGS.insert(0, log_entry)
+    return {"status": "success", "log": log_entry}
+
+
+@app.get("/api/v1/hospital/outreach/logs")
+async def get_hospital_outreach_logs(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if token and token.get("role") not in HOSPITAL_AUTHORIZED_ROLES:
+        raise HTTPException(status_code=403, detail="Access restricted to hospital users.")
+    return {"status": "success", "count": len(HOSPITAL_OUTREACH_LOGS), "logs": HOSPITAL_OUTREACH_LOGS}
+
+
 # ============================================================================
 # Institutional Blood Requests & Allocations (Hospitals & Blood Banks)
 # ============================================================================
@@ -4425,7 +4596,6 @@ async def update_institutional_request_status(
         "message": f"Status updated to '{new_status}' successfully.",
         "request": target_req,
     }
-
 
 
 @app.get("/api/v1/hospital/settings")
