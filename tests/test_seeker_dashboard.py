@@ -404,6 +404,23 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertNotIn("+8801712345678", response.text)
 
+    def test_direct_donor_contact_hides_number_when_donor_is_unavailable(self):
+        with patch(
+            "main._get_donor_profile",
+            return_value={
+                "phone": "+8801712345678",
+                "is_available": False,
+                "share_direct_contact": True,
+            },
+        ):
+            response = self.client.post(
+                "/api/v1/seeker/donors/dn-001/contact",
+                cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertNotIn("+8801712345678", response.text)
+
     def test_direct_donor_contact_returns_number_only_after_opt_in(self):
         seeker_cookies = {"access_token": _generate_jwt("+8801723456789", "seeker")}
         with patch(

@@ -438,11 +438,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const contact = contactData.donor;
-            const phone = String(contact.phone || '');
-            const whatsappPhone = phone.replace(/\D/g, '');
-            if (!phone || !whatsappPhone) {
+            const phone = String(contact.phone || '').trim().replace(/[\s()-]/g, '');
+            if (!/^\+?\d{6,15}$/.test(phone)) {
               throw new Error('The donor contact number is not valid for direct contact.');
             }
+            const whatsappPhone = phone.replace(/^\+/, '');
             const callLink = document.createElement('a');
             callLink.className = 'btn-card-action primary';
             callLink.href = `tel:${phone}`;
