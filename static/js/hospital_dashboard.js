@@ -73,7 +73,10 @@ window.refreshFacilityStockAlerts = async function () {
 
     const alerts = Array.isArray(result.alerts) ? result.alerts : [];
     const activeCount = Number(result.active_count) || 0;
-    summary.textContent = `${activeCount} active low-stock alert${activeCount === 1 ? "" : "s"} · threshold ${result.threshold} units or fewer`;
+    const activeGroups = Array.isArray(result.active_groups) ? result.active_groups : [];
+    summary.textContent = activeGroups.length
+      ? `Active low-stock groups: ${activeGroups.join(", ")}`
+      : "No blood groups are currently below their minimum stock thresholds.";
     tableBody.replaceChildren();
     if (!alerts.length) {
       const row = document.createElement("tr");
@@ -111,7 +114,9 @@ window.refreshFacilityStockAlerts = async function () {
     if (lowGroups) lowGroups.textContent = String(activeCount);
     const lowStockSummary = document.getElementById("kpiLowStockSummary");
     if (lowStockSummary) {
-      lowStockSummary.textContent = `${activeCount} blood group(s) at or below the ${result.threshold}-unit threshold`;
+      lowStockSummary.textContent = activeGroups.length
+        ? `Low: ${activeGroups.join(", ")}`
+        : "No blood groups currently below threshold";
     }
     const lowStockStatus = document.getElementById("kpiLowStockStatus");
     if (lowStockStatus) lowStockStatus.textContent = activeCount ? "Replenish" : "On target";
@@ -174,18 +179,12 @@ window.saveFacilityInventory = async function (bloodGroup, inputId, saveButton) 
     if (totalDisplay) totalDisplay.textContent = total;
     const inventoryTotalDisplay = document.getElementById("inventoryTotalUnits");
     if (inventoryTotalDisplay) inventoryTotalDisplay.textContent = total;
-    const lowStockThreshold = Number(
-      document.getElementById("facilityStockThreshold")?.value
-        || document.getElementById("inventoryLowStockGroups")?.dataset.lowStockThreshold
-        || 5
-    );
+    const thresholdData = document.getElementById("inventoryLowStockGroups")?.dataset.thresholds || "{}";
+    const thresholds = JSON.parse(thresholdData);
     const lowStockCount = [...document.querySelectorAll("[data-inventory-quantity]")]
-      .filter((item) => Number(item.textContent) <= lowStockThreshold).length;
+      .filter((item) => Number(item.textContent) <= Number(thresholds[item.dataset.inventoryQuantity])).length;
     const lowStockDisplay = document.getElementById("inventoryLowStockGroups");
-    if (lowStockDisplay) {
-      lowStockDisplay.textContent = lowStockCount;
-      lowStockDisplay.dataset.lowStockThreshold = String(lowStockThreshold);
-    }
+    if (lowStockDisplay) lowStockDisplay.textContent = lowStockCount;
 
     const updatedAt = form.closest("tr").querySelector(".inventory-updated-at");
     if (updatedAt) {
@@ -265,9 +264,6 @@ document.addEventListener("DOMContentLoaded", () => {
       "click",
       window.refreshFacilityStockAlerts
     );
-    document.getElementById("goToStockThresholdSettings")?.addEventListener("click", () => {
-      activateTab("section-hospital-settings");
-    });
     window.refreshFacilityStockAlerts();
   });
 
@@ -583,7 +579,6 @@ document.addEventListener("DOMContentLoaded", () => {
         ultra_freezer_active: document.getElementById("toggleUltraFreezer")?.checked ?? true,
         nat_screening: document.getElementById("toggleNatScreening")?.checked ?? true,
         continuous_shift: document.getElementById("toggleContinuousShift")?.checked ?? true,
-        low_stock_threshold: parseInt(document.getElementById("facilityStockThreshold")?.value || "5", 10),
         auto_sos_dispatch: document.getElementById("toggleAutoSos")?.checked ?? true,
         inter_facility_network: document.getElementById("toggleInterFacility")?.checked ?? true,
         audio_siren: document.getElementById("toggleAudioSiren")?.checked ?? true,

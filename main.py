@@ -281,7 +281,9 @@ def _update_facility_inventory(
     }
 
 
-def _sync_facility_inventory_alerts(facility_phone: str, threshold: int) -> list[dict]:
+def _sync_facility_inventory_alerts(
+    facility_phone: str, thresholds: dict[str, int]
+) -> list[dict]:
     initialize_urgent_database()
     now = datetime.now(timezone.utc).isoformat()
     with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
@@ -301,6 +303,7 @@ def _sync_facility_inventory_alerts(facility_phone: str, threshold: int) -> list
                 (facility_phone,),
             ).fetchall()
             for item in inventory:
+                threshold = thresholds[item["blood_group"]]
                 active_alert = connection.execute(
                     """SELECT id FROM facility_inventory_alerts
                        WHERE facility_phone = ? AND blood_group = ? AND status = 'active'""",
@@ -346,6 +349,68 @@ def _sync_facility_inventory_alerts(facility_phone: str, threshold: int) -> list
             (facility_phone,),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def _get_blood_stock_thresholds() -> dict[str, int]:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            "SELECT blood_group, threshold FROM blood_stock_thresholds"
+        ).fetchall()
+    return {row["blood_group"]: row["threshold"] for row in rows}
+
+
+def _save_blood_stock_threshold(blood_group: str, threshold: int) -> None:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO blood_stock_thresholds (blood_group, threshold, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(blood_group) DO UPDATE SET
+                       threshold = excluded.threshold,
+                       updated_at = excluded.updated_at""",
+                (blood_group, threshold, int(time.time())),
+            )
+
+
+def _require_admin(request: Request) -> dict:
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in as an administrator to manage blood stock thresholds.",
+        )
+    if token.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can manage blood stock thresholds.",
+        )
+    return token
+
+
+def _get_facility_inventory_users() -> list[tuple[str, dict]]:
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        inventory_phones = {
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
+            ).fetchall()
+        }
+    with closing(_connection()) as connection:
+        settings_phones = {
+            row[0]
+            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
+        }
+
+    facility_users = []
+    for phone in sorted(inventory_phones | settings_phones):
+        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+        if str(user.get("role", "")).lower() in {"hospital", "bank", "blood_bank"}:
+            facility_users.append((phone, user))
+    return facility_users
 
 
 def _require_facility_inventory_user(request: Request) -> dict:
@@ -714,7 +779,17 @@ def initialize_auth_database():
                     maintenance_mode INTEGER DEFAULT 0,
                     updated_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS blood_stock_thresholds (
+                    blood_group TEXT PRIMARY KEY,
+                    threshold INTEGER NOT NULL CHECK (threshold >= 0 AND threshold <= 50),
+                    updated_at INTEGER NOT NULL
+                );
                 """
+            )
+            connection.executemany(
+                """INSERT OR IGNORE INTO blood_stock_thresholds
+                   (blood_group, threshold, updated_at) VALUES (?, 5, ?)""",
+                [(group, int(time.time())) for group in BLOOD_GROUPS],
             )
             donor_profile_columns = {
                 row[1]
@@ -1953,12 +2028,15 @@ async def hospital_dashboard(request: Request):
     )
 
     facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
-    inventory_threshold = facility_settings["low_stock_threshold"]
-    inventory_low_stock_groups = sum(
-        item["quantity"] <= inventory_threshold for item in inventory
-    )
+    inventory_thresholds = _get_blood_stock_thresholds()
+    low_stock_blood_groups = [
+        item["blood_group"]
+        for item in inventory
+        if item["quantity"] <= inventory_thresholds[item["blood_group"]]
+    ]
+    inventory_low_stock_groups = len(low_stock_blood_groups)
     inventory_alerts = (
-        _sync_facility_inventory_alerts(phone, inventory_threshold)
+        _sync_facility_inventory_alerts(phone, inventory_thresholds)
         if can_manage_inventory and phone
         else []
     )
@@ -1978,8 +2056,9 @@ async def hospital_dashboard(request: Request):
             "inventory": inventory,
             "inventory_total_units": inventory_total_units,
             "inventory_low_stock_groups": inventory_low_stock_groups,
+            "low_stock_blood_groups": low_stock_blood_groups,
             "inventory_last_sync": inventory_last_sync,
-            "inventory_threshold": inventory_threshold,
+            "inventory_thresholds": inventory_thresholds,
             "inventory_alerts": inventory_alerts,
             "can_manage_inventory": can_manage_inventory,
         },
@@ -2000,10 +2079,19 @@ async def hospital_dashboard(request: Request):
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "admin":
+        return RedirectResponse(url="/login?next=/admin/dashboard", status_code=303)
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
-        context={"request": request, "role": "Admin", "title": "Admin Console"},
+        context={
+            "request": request,
+            "role": "Admin",
+            "title": "Admin Console",
+            "blood_groups": BLOOD_GROUPS,
+            "stock_thresholds": _get_blood_stock_thresholds(),
+        },
     )
 
 
@@ -3143,6 +3231,10 @@ class FacilityInventoryUpdatePayload(BaseModel):
     quantity: int = Field(strict=True, ge=0, le=9223372036854775807)
 
 
+class AdminBloodStockThresholdPayload(BaseModel):
+    threshold: int = Field(strict=True, ge=0, le=50)
+
+
 SEEKER_CONTACT_LOGS = [
     {
         "donor_name": "Ayesha Rahman",
@@ -3721,16 +3813,14 @@ async def get_seeker_inventory_alerts(request: Request):
             for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
         }
 
+    thresholds = _get_blood_stock_thresholds()
     low_stock_groups = set()
     for phone in inventory_phones | settings_phones:
         user = _get_user_by_phone(phone) or USERS.get(phone, {})
         role = str(user.get("role", "")).lower()
         if role not in {"hospital", "bank", "blood_bank"}:
             continue
-        settings = _get_facility_settings(phone, role, user.get("name", ""))
-        alerts = _sync_facility_inventory_alerts(
-            phone, settings["low_stock_threshold"]
-        )
+        alerts = _sync_facility_inventory_alerts(phone, thresholds)
         low_stock_groups.update(
             alert["blood_group"]
             for alert in alerts
@@ -4364,19 +4454,48 @@ async def get_facility_inventory(request: Request):
 @app.get("/api/v1/facility/inventory/alerts")
 async def get_facility_inventory_alerts(request: Request):
     user = _require_facility_inventory_user(request)
-    settings = _get_facility_settings(
-        user["phone"],
-        user.get("role", "hospital"),
-        user.get("name", ""),
-    )
-    alerts = _sync_facility_inventory_alerts(
-        user["phone"], settings["low_stock_threshold"]
-    )
+    thresholds = _get_blood_stock_thresholds()
+    alerts = _sync_facility_inventory_alerts(user["phone"], thresholds)
+    active_groups = [
+        alert["blood_group"]
+        for alert in alerts
+        if alert["status"] == "active"
+    ]
     return {
         "status": "success",
-        "threshold": settings["low_stock_threshold"],
+        "thresholds": thresholds,
         "alerts": alerts,
-        "active_count": sum(alert["status"] == "active" for alert in alerts),
+        "active_count": len(active_groups),
+        "active_groups": active_groups,
+    }
+
+
+@app.get("/api/v1/admin/blood-stock-thresholds")
+async def get_admin_blood_stock_thresholds(request: Request):
+    _require_admin(request)
+    return {
+        "status": "success",
+        "thresholds": _get_blood_stock_thresholds(),
+    }
+
+
+@app.put("/api/v1/admin/blood-stock-thresholds/{blood_group}")
+async def update_admin_blood_stock_threshold(
+    blood_group: str,
+    payload: AdminBloodStockThresholdPayload,
+    request: Request,
+):
+    _require_admin(request)
+    if blood_group not in BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Choose a valid blood group.")
+    _save_blood_stock_threshold(blood_group, payload.threshold)
+    thresholds = _get_blood_stock_thresholds()
+    for phone, _ in _get_facility_inventory_users():
+        _sync_facility_inventory_alerts(phone, thresholds)
+    return {
+        "status": "success",
+        "blood_group": blood_group,
+        "threshold": payload.threshold,
     }
 
 
@@ -4388,32 +4507,22 @@ async def get_admin_facility_inventory_alerts(request: Request):
     if token.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Only administrators can view cross-facility inventory alerts.")
 
-    initialize_urgent_database()
-    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
-        inventory_phones = {
-            row[0]
-            for row in connection.execute(
-                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
-            ).fetchall()
-        }
-    with closing(_connection()) as connection:
-        settings_phones = {
-            row[0]
-            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
-        }
-
+    thresholds = _get_blood_stock_thresholds()
     facilities = []
-    for phone in sorted(inventory_phones | settings_phones):
-        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+    for phone, user in _get_facility_inventory_users():
         role = str(user.get("role", "")).lower()
-        if role not in {"hospital", "bank", "blood_bank"}:
-            continue
         settings = _get_facility_settings(phone, role, user.get("name", ""))
-        alerts = _sync_facility_inventory_alerts(phone, settings["low_stock_threshold"])
+        alerts = _sync_facility_inventory_alerts(phone, thresholds)
+        active_groups = [
+            alert["blood_group"]
+            for alert in alerts
+            if alert["status"] == "active"
+        ]
         facilities.append({
             "facility_name": settings["facility_name"],
-            "threshold": settings["low_stock_threshold"],
-            "active_count": sum(alert["status"] == "active" for alert in alerts),
+            "thresholds": thresholds,
+            "active_groups": active_groups,
+            "active_count": len(active_groups),
             "alerts": alerts,
         })
 
@@ -4421,6 +4530,7 @@ async def get_admin_facility_inventory_alerts(request: Request):
         "status": "success",
         "facility_count": len(facilities),
         "active_count": sum(facility["active_count"] for facility in facilities),
+        "thresholds": thresholds,
         "facilities": facilities,
     }
 
@@ -4437,12 +4547,9 @@ async def update_facility_inventory(
     result = _update_facility_inventory(
         user["phone"], user["phone"], blood_group, payload.quantity
     )
-    settings = _get_facility_settings(
-        user["phone"],
-        user.get("role", "hospital"),
-        user.get("name", ""),
+    _sync_facility_inventory_alerts(
+        user["phone"], _get_blood_stock_thresholds()
     )
-    _sync_facility_inventory_alerts(user["phone"], settings["low_stock_threshold"])
     return {"status": "success", "item": result}
 
 
@@ -4477,7 +4584,7 @@ async def save_hospital_settings(payload: FacilitySettingsPayload, request: Requ
         raise HTTPException(status_code=403, detail="You can only update your own facility settings.")
 
     saved = _save_facility_settings(phone, payload.model_dump())
-    _sync_facility_inventory_alerts(phone, saved["low_stock_threshold"])
+    _sync_facility_inventory_alerts(phone, _get_blood_stock_thresholds())
     return {
         "status": "success",
         "message": "Facility profile and portal settings saved successfully",

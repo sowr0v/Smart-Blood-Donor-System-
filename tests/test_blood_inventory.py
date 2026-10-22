@@ -12,6 +12,7 @@ from main import (
     BLOOD_GROUPS,
     DATABASE_PATH,
     _generate_jwt,
+    _get_blood_stock_thresholds,
     app,
     initialize_urgent_database,
 )
@@ -24,12 +25,16 @@ class FacilityBloodInventoryTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         initialize_urgent_database()
+        self.original_thresholds = _get_blood_stock_thresholds()
         self._clear_inventory(self.hospital_phone)
         self._clear_inventory(self.bank_phone)
         self.hospital_cookies = {
             "access_token": _generate_jwt(self.hospital_phone, "hospital")
         }
         self.bank_cookies = {"access_token": _generate_jwt(self.bank_phone, "bank")}
+        self.admin_cookies = {
+            "access_token": _generate_jwt("+8801745678901", "admin")
+        }
         self.client.post(
             "/api/v1/facility/settings/reset",
             cookies=self.hospital_cookies,
@@ -40,6 +45,15 @@ class FacilityBloodInventoryTests(unittest.TestCase):
         )
 
     def tearDown(self):
+        with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+            with connection:
+                connection.executemany(
+                    "UPDATE blood_stock_thresholds SET threshold = ? WHERE blood_group = ?",
+                    [
+                        (threshold, group)
+                        for group, threshold in self.original_thresholds.items()
+                    ],
+                )
         self._clear_inventory(self.hospital_phone)
         self._clear_inventory(self.bank_phone)
         self.client.post(
@@ -99,13 +113,15 @@ class FacilityBloodInventoryTests(unittest.TestCase):
             self.assertNotIn('class="inventory-hero-facility"', dashboard.text)
             self.assertIn('id="inventoryTotalUnits">0</strong>', dashboard.text)
             self.assertIn(
-                f'id="inventoryLowStockGroups" data-low-stock-threshold="{threshold}">8</strong>',
+                'id="inventoryLowStockGroups" data-thresholds=',
                 dashboard.text,
             )
+            self.assertIn('id="inventoryLowStockGroups"', dashboard.text)
             self.assertIn('id="inventoryLastMatrixSync"', dashboard.text)
             self.assertIn('id="stockAlertsTableBody"', dashboard.text)
             self.assertIn('id="stockAlertsSummary"', dashboard.text)
-            self.assertIn('id="facilityStockThreshold" min="0" max="50"', dashboard.text)
+            self.assertIn("administrator-defined minimum", dashboard.text)
+            self.assertNotIn('id="facilityStockThreshold"', dashboard.text)
             self.assertNotIn("TOTAL UNITS IN STOCK", dashboard.text)
             self.assertNotIn("CRITICAL / LOW STOCK", dashboard.text)
             self.assertNotIn("LAST MATRIX SYNC", dashboard.text)
@@ -228,10 +244,10 @@ class FacilityBloodInventoryTests(unittest.TestCase):
             )
             self.assertEqual(response.status_code, 200)
 
-        threshold_saved = self.client.post(
-            "/api/v1/hospital/settings",
-            json={"low_stock_threshold": 5},
-            cookies=self.hospital_cookies,
+        threshold_saved = self.client.put(
+            "/api/v1/admin/blood-stock-thresholds/A%2B",
+            json={"threshold": 5},
+            cookies=self.admin_cookies,
         )
         self.assertEqual(threshold_saved.status_code, 200)
 
@@ -247,7 +263,7 @@ class FacilityBloodInventoryTests(unittest.TestCase):
         )
         self.assertEqual(alerts.status_code, 200)
         data = alerts.json()
-        self.assertEqual(data["threshold"], 5)
+        self.assertEqual(data["thresholds"]["A+"], 5)
         self.assertEqual(data["active_count"], 1)
         active_alert = next(item for item in data["alerts"] if item["blood_group"] == "A+")
         self.assertEqual(active_alert["status"], "active")
@@ -279,17 +295,24 @@ class FacilityBloodInventoryTests(unittest.TestCase):
         self.assertIsNotNone(resolved_alert["resolved_at"])
         self.assertEqual(history["active_count"], 0)
 
-        threshold_update = self.client.post(
-            "/api/v1/hospital/settings",
-            json={"low_stock_threshold": 6},
-            cookies=self.hospital_cookies,
+        threshold_update = self.client.put(
+            "/api/v1/admin/blood-stock-thresholds/A%2B",
+            json={"threshold": 6},
+            cookies=self.admin_cookies,
         )
         self.assertEqual(threshold_update.status_code, 200)
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            active_after_threshold_change = connection.execute(
+                """SELECT COUNT(*) FROM facility_inventory_alerts
+                   WHERE facility_phone = ? AND blood_group = 'A+' AND status = 'active'""",
+                (self.hospital_phone,),
+            ).fetchone()[0]
+        self.assertEqual(active_after_threshold_change, 1)
         threshold_alerts = self.client.get(
             "/api/v1/facility/inventory/alerts",
             cookies=self.hospital_cookies,
         ).json()
-        self.assertEqual(threshold_alerts["threshold"], 6)
+        self.assertEqual(threshold_alerts["thresholds"]["A+"], 6)
         self.assertEqual(threshold_alerts["active_count"], 1)
         self.assertEqual(
             next(
@@ -331,6 +354,44 @@ class FacilityBloodInventoryTests(unittest.TestCase):
         )
         self.assertEqual(wrong_facility.status_code, 403)
 
+    def test_only_admins_can_read_or_update_blood_group_thresholds(self):
+        anonymous_read = self.client.get("/api/v1/admin/blood-stock-thresholds")
+        anonymous_update = self.client.put(
+            "/api/v1/admin/blood-stock-thresholds/A%2B",
+            json={"threshold": 7},
+        )
+        self.assertEqual(anonymous_read.status_code, 401)
+        self.assertEqual(anonymous_update.status_code, 401)
+
+        hospital_read = self.client.get(
+            "/api/v1/admin/blood-stock-thresholds",
+            cookies=self.hospital_cookies,
+        )
+        hospital_update = self.client.put(
+            "/api/v1/admin/blood-stock-thresholds/A%2B",
+            json={"threshold": 7},
+            cookies=self.hospital_cookies,
+        )
+        self.assertEqual(hospital_read.status_code, 403)
+        self.assertEqual(hospital_update.status_code, 403)
+
+        thresholds = self.client.get(
+            "/api/v1/admin/blood-stock-thresholds",
+            cookies=self.admin_cookies,
+        )
+        self.assertEqual(thresholds.status_code, 200)
+        self.assertEqual(set(thresholds.json()["thresholds"]), set(BLOOD_GROUPS))
+
+    def test_admin_dashboard_shows_threshold_controls_and_facility_alerts(self):
+        anonymous = self.client.get("/admin/dashboard", follow_redirects=False)
+        self.assertEqual(anonymous.status_code, 303)
+
+        admin = self.client.get("/admin/dashboard", cookies=self.admin_cookies)
+        self.assertEqual(admin.status_code, 200)
+        self.assertIn("Low Blood Stock Alerts &amp; Reorder Triggers", admin.text)
+        self.assertIn('data-save-stock-threshold="A+"', admin.text)
+        self.assertIn('id="adminStockAlertsTableBody"', admin.text)
+
     def test_admin_can_view_aggregated_facility_alerts(self):
         facility_phone = "+8801999990099"
         with closing(sqlite3.connect(DATABASE_PATH)) as connection:
@@ -361,11 +422,12 @@ class FacilityBloodInventoryTests(unittest.TestCase):
             self.assertEqual(admin_response.status_code, 200)
             data = admin_response.json()
             self.assertEqual(data["status"], "success")
+            self.assertEqual(data["thresholds"]["O-"], 5)
             facility = next(
                 item for item in data["facilities"]
                 if item["facility_name"] == "Test Hospital"
             )
-            self.assertEqual(facility["threshold"], 5)
+            self.assertEqual(facility["thresholds"]["O-"], 5)
             self.assertEqual(facility["active_count"], 8)
 
             seeker_response = self.client.get(
@@ -385,10 +447,10 @@ class FacilityBloodInventoryTests(unittest.TestCase):
     def test_low_stock_threshold_is_validated(self):
         for invalid_threshold in (-1, 51, 1.5, "5"):
             with self.subTest(threshold=invalid_threshold):
-                response = self.client.post(
-                    "/api/v1/hospital/settings",
-                    json={"low_stock_threshold": invalid_threshold},
-                    cookies=self.hospital_cookies,
+                response = self.client.put(
+                    "/api/v1/admin/blood-stock-thresholds/A%2B",
+                    json={"threshold": invalid_threshold},
+                    cookies=self.admin_cookies,
                 )
                 self.assertEqual(response.status_code, 422)
 
