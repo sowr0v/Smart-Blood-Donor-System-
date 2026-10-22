@@ -54,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (cleanId === 'section-donor-directory') loadDonorDirectory();
     if (cleanId === 'section-donor-credentials') loadPublicDonorProfiles();
+    if (cleanId === 'section-direct-contact') loadDirectContactDonors();
 
     if (history.pushState) {
       history.pushState(null, null, `#${cleanId}`);
@@ -370,6 +371,107 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function loadDirectContactDonors() {
+    const donorGrid = document.getElementById('directContactDonors');
+    const status = document.getElementById('directContactStatus');
+    if (!donorGrid || !status) return;
+
+    status.textContent = 'Loading available donors...';
+    status.setAttribute('aria-busy', 'true');
+    donorGrid.replaceChildren();
+    try {
+      const response = await fetch('/api/v1/seeker/donors?radius_km=30');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        const detail = Array.isArray(data.detail)
+          ? data.detail.map(item => item.msg).join(' ')
+          : data.detail;
+        throw new Error(detail || 'Could not load donors for direct contact.');
+      }
+
+      const donors = Array.isArray(data.donors) ? data.donors : [];
+      if (!donors.length) {
+        status.textContent = 'No donor profiles are available right now.';
+        return;
+      }
+
+      status.textContent = 'Choose an available donor to check whether they permit direct contact.';
+      donors.forEach(donor => {
+        const card = document.createElement('article');
+        card.className = 'donor-card';
+        const title = document.createElement('h3');
+        title.className = 'donor-card-name';
+        title.textContent = donor.name || 'Donor';
+        const details = document.createElement('p');
+        details.className = 'donor-card-loc';
+        details.textContent = [
+          donor.blood_group || 'Blood group not shared',
+          donor.area,
+          donor.district
+        ].filter(Boolean).join(' · ');
+        const availability = document.createElement('p');
+        availability.textContent = donor.is_available ? 'Available' : 'Not currently available';
+        const contactStatus = document.createElement('p');
+        contactStatus.setAttribute('role', 'status');
+        const actions = document.createElement('div');
+        actions.className = 'direct-contact-actions';
+        const contactButton = document.createElement('button');
+        contactButton.type = 'button';
+        contactButton.className = 'btn-card-action primary';
+        contactButton.textContent = 'Check contact options';
+        contactButton.disabled = !donor.is_available;
+        contactButton.addEventListener('click', async () => {
+          contactButton.disabled = true;
+          contactStatus.textContent = 'Checking donor consent...';
+          actions.replaceChildren();
+          try {
+            const contactResponse = await fetch(
+              `/api/v1/seeker/donors/${encodeURIComponent(donor.id)}/contact`,
+              { method: 'POST' }
+            );
+            const contactData = await contactResponse.json();
+            if (!contactResponse.ok || contactData.status !== 'success') {
+              const detail = Array.isArray(contactData.detail)
+                ? contactData.detail.map(item => item.msg).join(' ')
+                : contactData.detail;
+              throw new Error(detail || 'Direct contact is not available for this donor.');
+            }
+
+            const contact = contactData.donor;
+            const phone = String(contact.phone || '');
+            const whatsappPhone = phone.replace(/\D/g, '');
+            if (!phone || !whatsappPhone) {
+              throw new Error('The donor contact number is not valid for direct contact.');
+            }
+            const callLink = document.createElement('a');
+            callLink.className = 'btn-card-action primary';
+            callLink.href = `tel:${phone}`;
+            callLink.textContent = `Call ${phone}`;
+            const whatsappLink = document.createElement('a');
+            whatsappLink.className = 'btn-card-action';
+            whatsappLink.href = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent('Hello, I found your donor profile and would like to discuss a blood donation.')}`;
+            whatsappLink.target = '_blank';
+            whatsappLink.rel = 'noopener noreferrer';
+            whatsappLink.textContent = 'Message on WhatsApp';
+            actions.append(callLink, whatsappLink);
+            contactStatus.textContent = 'This donor has opted in to direct contact. Choose a contact method:';
+            contactButton.textContent = 'Refresh contact permission';
+          } catch (error) {
+            contactStatus.textContent = error.message || 'Could not check donor contact permission.';
+          } finally {
+            contactButton.disabled = false;
+          }
+        });
+        card.append(title, details, availability, contactButton, contactStatus, actions);
+        donorGrid.append(card);
+      });
+    } catch (error) {
+      status.textContent = error.message || 'Donors could not be loaded. Please try again.';
+    } finally {
+      status.removeAttribute('aria-busy');
+    }
+  }
+
   document.getElementById('dirBloodFilter')?.addEventListener('change', loadDonorDirectory);
   document.getElementById('dirAvailableOnly')?.addEventListener('change', loadDonorDirectory);
   document.getElementById('dirSearch')?.addEventListener('input', () => {
@@ -513,6 +615,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>
             <div style="font-weight: 600; font-size: 0.88rem;">${escapeHtml(hospitalName)}</div>
             <div style="font-size: 0.76rem; color: var(--text-secondary);">${escapeHtml(areaName)} • ${escapeHtml(units)} Bag(s)</div>
+            ${req.needed_date ? `<div style="font-size: 0.76rem; color: var(--text-secondary);">Needed: ${escapeHtml(req.needed_date)}</div>` : ''}
           </td>
           <td>${statusBadge}</td>
           <td>
@@ -912,7 +1015,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 hospital: apiReq.hospital_name,
                 area: apiReq.area || apiReq.district || 'Dhaka',
                 units: apiReq.units || 1,
-                needed_date: 'Immediate',
+                needed_date: apiReq.needed_at
+                  ? new Date(apiReq.needed_at).toLocaleString()
+                  : (apiReq.is_emergency ? 'Immediate' : 'Not specified'),
                 status: apiReq.is_emergency ? (apiReq.status || 'Emergency') : (apiReq.status || 'Active'),
                 is_emergency: apiReq.is_emergency ? 1 : 0,
                 responses_count: 0,
@@ -927,6 +1032,62 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       console.warn('Seeker requests API fetch skipped:', err);
     }
+  }
+
+  const standardRequestForm = document.getElementById('standardRequestForm');
+  if (standardRequestForm) {
+    const neededAtInput = document.getElementById('standardNeededAt');
+    if (neededAtInput) {
+      const now = new Date();
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+      neededAtInput.min = now.toISOString().slice(0, 16);
+    }
+
+    standardRequestForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!standardRequestForm.reportValidity()) return;
+
+      const submitButton = document.getElementById('submitStandardRequest');
+      const feedback = document.getElementById('standardRequestFeedback');
+      const payload = Object.fromEntries(new FormData(standardRequestForm).entries());
+      payload.units = Number(payload.units);
+      submitButton.disabled = true;
+      submitButton.textContent = 'Creating request...';
+      feedback.hidden = true;
+
+      try {
+        const response = await fetch('/api/v1/seeker/requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          const detail = Array.isArray(data.detail)
+            ? data.detail.map(item => item.msg).join(' ')
+            : data.detail;
+          throw new Error(detail || data.message || 'Could not create the blood request.');
+        }
+
+        await loadSeekerRequestsFromApi();
+        feedback.textContent = `Blood request #${data.request.id} created successfully and is active in My Posted Blood Requests.`;
+        feedback.hidden = false;
+        standardRequestForm.reset();
+        if (neededAtInput) {
+          const now = new Date();
+          now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+          neededAtInput.min = now.toISOString().slice(0, 16);
+        }
+        showToast(`Blood request #${data.request.id} created.`);
+      } catch (error) {
+        feedback.textContent = error.message || 'The blood request could not be submitted. Please try again.';
+        feedback.hidden = false;
+        showToast(feedback.textContent, 'error');
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Create Blood Request';
+      }
+    });
   }
 
   const emergencyRequestForm = document.getElementById('emergencyRequestForm');
