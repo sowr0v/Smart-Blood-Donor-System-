@@ -94,11 +94,11 @@ class FacilityBloodInventoryTests(unittest.TestCase):
                 [item["blood_group"] for item in inventory], list(BLOOD_GROUPS)
             )
             self.assertTrue(all(item["quantity"] == 0 for item in inventory))
-
-        for cookies, threshold in (
-            (self.hospital_cookies, 5),
-            (self.bank_cookies, 8),
+        for cookies in (
+            self.hospital_cookies,
+            self.bank_cookies,
         ):
+        
             dashboard = self.client.get(
                 "/hospital/dashboard", cookies=cookies
             )
