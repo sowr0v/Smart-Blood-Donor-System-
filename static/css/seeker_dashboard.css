@@ -1054,48 +1054,240 @@
 }
 
 /* Donor Directory Grid */
+.directory-card {
+  padding: 24px;
+}
+
+.directory-heading,
+.directory-results-heading,
+.directory-donor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.directory-heading h2 {
+  margin: 4px 0 6px;
+}
+
+.directory-privacy-badge {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border: 1px solid #b7d8ce;
+  border-radius: 6px;
+  color: #166534;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .directory-filters-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-  background: var(--bg-card);
-  padding: 16px 20px;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
+  gap: 14px;
+  margin: 20px 0 12px;
+  padding: 14px 0;
+  border-block: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
-.search-input-wrap {
+.directory-location-filter {
   flex: 1;
-  min-width: 240px;
-  position: relative;
+  min-width: min(100%, 230px);
+  display: grid;
+  gap: 6px;
 }
 
-.search-input-wrap input {
+.directory-location-filter input,
+.directory-filters-bar select {
+  min-height: 40px;
   width: 100%;
-  padding: 10px 14px 10px 38px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 0.9rem;
 }
 
-.search-input-wrap svg {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  width: 18px;
-  height: 18px;
+.directory-filters-bar > label:not(.directory-location-filter) {
+  display: grid;
+  gap: 6px;
+  min-width: 130px;
+}
+
+.directory-radius-filter {
+  min-width: 175px !important;
+}
+
+.directory-radius-filter > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.directory-radius-filter output {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.directory-radius-filter input {
+  width: 100%;
+  accent-color: #0f766e;
+}
+
+.directory-filters-bar .directory-availability-filter {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  gap: 8px !important;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.directory-availability-filter input {
+  width: 17px;
+  height: 17px;
+  accent-color: #0f766e;
+}
+
+.directory-clear-button {
+  align-self: end;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.directory-clear-button:hover {
+  border-color: #0f766e;
+}
+
+.directory-results-heading {
+  margin: 12px 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.directory-results-heading p {
+  min-height: 20px;
+  margin: 0;
+}
+
+.directory-results-heading > span {
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 16px;
+  background: #e8f3ef;
+  color: #166534;
+  text-align: center;
+  font-weight: 700;
 }
 
 .donor-directory-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+}
+
+.directory-donor-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.directory-blood-group {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #ffe4e6;
+  color: #be123c;
+  font-weight: 800;
+}
+
+.directory-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.directory-status::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.directory-status.available,
+.directory-verification {
+  color: #166534;
+}
+
+.directory-status.unavailable {
+  color: #9a3412;
+}
+
+.directory-donor-location {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.directory-donor-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.directory-verification {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.directory-privacy-note {
+  margin: 14px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 560px) {
+  .directory-card {
+    padding: 16px;
+  }
+
+  .directory-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .directory-filters-bar > label,
+  .directory-filters-bar .directory-radius-filter {
+    width: 100%;
+  }
+
+  .directory-filters-bar .directory-availability-filter {
+    width: auto;
+    align-self: center;
+  }
 }
 
 .donor-card {
