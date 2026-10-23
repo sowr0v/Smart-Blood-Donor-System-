@@ -1,5 +1,4 @@
 import base64
-import asyncio
 import hashlib
 import hmac
 import json
@@ -13,7 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, closing
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -599,6 +598,11 @@ def initialize_auth_database():
                     is_available INTEGER NOT NULL DEFAULT 1,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
+                );
+                CREATE TABLE IF NOT EXISTS donor_settings (
+                    phone TEXT PRIMARY KEY,
+                    settings_json TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS facility_settings (
                     phone TEXT PRIMARY KEY,
@@ -1258,7 +1262,7 @@ def _register_user_record(
 
 @app.post("/api/v1/auth/register")
 async def api_register(payload: UserRegisterRequest, response: Response):
-    user, destination, _ = _register_user_record(
+    user, _, _ = _register_user_record(
         phone_raw=payload.phone,
         password=payload.password,
         role=payload.role,
@@ -1283,7 +1287,6 @@ async def api_register(payload: UserRegisterRequest, response: Response):
 
 @app.post("/auth/register")
 async def form_register(
-    request: Request,
     phone: str = Form(...),
     password: str = Form(...),
     role: str = Form("seeker"),
@@ -1297,7 +1300,7 @@ async def form_register(
     manager_number: str = Form(""),
 ):
     actual_name = name or org_name or ("Blood Seeker" if role == "seeker" else "Blood Donor")
-    user, destination, _ = _register_user_record(
+    _register_user_record(
         phone_raw=phone,
         password=password,
         role=role,
@@ -1916,7 +1919,7 @@ async def admin_dashboard(request: Request):
 
 
 @app.get("/logout")
-async def logout(request: Request):
+async def logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("access_token", path="/")
     response.delete_cookie(SESSION_COOKIE, path="/")
@@ -2063,10 +2066,33 @@ class DonorSettingsPreferences(BaseModel):
 
 @app.post("/api/v1/donor/settings")
 async def update_donor_settings(payload: DonorSettingsPreferences, request: Request):
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to update settings.")
+    if user.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can update donor settings.")
+
+    phone = user.get("phone")
+    if not phone:
+        raise HTTPException(status_code=401, detail="Authenticated donor account has no phone number.")
+
+    settings = payload.model_dump()
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_settings (phone, settings_json, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(phone) DO UPDATE SET
+                       settings_json = excluded.settings_json,
+                       updated_at = excluded.updated_at""",
+                (phone, json.dumps(settings), int(time.time())),
+            )
+
     return {
         "status": "success",
         "message": "Donor preferences and portal settings updated successfully.",
-        "settings": payload.model_dump(),
+        "settings": settings,
     }
 
 
@@ -2582,9 +2608,17 @@ def _chat_thread_dict(row: sqlite3.Row, user: dict) -> dict:
             (row["id"], user["phone"]),
         ).fetchone()[0]
     thread_id = _chat_thread_id_for_role(row["id"], user["role"])
+    peer_role = peer.get("role")
+    if peer_role in {"hospital", "bank", "blood_bank"}:
+        category = "hospital"
+    elif peer_role == "seeker":
+        category = "seeker"
+    else:
+        category = "support"
     return {
         "id": thread_id,
         "name": peer.get("name") or "Chat participant",
+        "category": category,
         "blood_group": peer.get("blood_group", ""),
         "last_message": last_message["text"] if last_message else "",
         "last_time": last_message["sent_at"] if last_message else row["created_at"],
@@ -2658,6 +2692,13 @@ def _chat_list_threads(user: dict, category: str | None = None, unread_only: boo
             (user["phone"], user["phone"]),
         ).fetchall()
     threads = [_chat_thread_dict(row, user) for row in rows]
+    selected_category = (category or "all").strip().lower()
+    if selected_category not in {"all", "hospital", "seeker", "support"}:
+        raise HTTPException(status_code=422, detail="Choose a valid chat category.")
+    if selected_category != "all":
+        threads = [
+            thread for thread in threads if thread["category"] == selected_category
+        ]
     if unread_only:
         threads = [thread for thread in threads if thread["unread_count"] > 0]
     unread = sum(thread["unread_count"] for thread in threads)

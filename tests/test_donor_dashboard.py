@@ -80,6 +80,108 @@ class DonorDashboardTests(unittest.TestCase):
         thread_ids = [t["id"] for t in data["threads"]]
         self.assertIn("thread-nabil", thread_ids)
 
+    def test_donor_chat_threads_filter_by_category(self):
+        import sqlite3
+        from main import AUTH_DATABASE_PATH, DATABASE_PATH, initialize_auth_database, initialize_urgent_database
+
+        donor_phone = "+8801712345678"
+        hospital_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        support_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        hospital_thread_id = f"test-hospital-{uuid.uuid4().hex}"
+        support_thread_id = f"test-support-{uuid.uuid4().hex}"
+        initialize_auth_database()
+        initialize_urgent_database()
+
+        with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+            connection.executemany(
+                """INSERT INTO auth_users
+                   (phone, password_hash, created_at, updated_at, role, name)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    (hospital_phone, "test", 0, 0, "hospital", "Test Hospital"),
+                    (support_phone, "test", 0, 0, "support", "Test Support"),
+                ],
+            )
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            connection.executemany(
+                """INSERT INTO chat_threads (id, donor_phone, seeker_phone, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                [
+                    (hospital_thread_id, donor_phone, hospital_phone, "2026-01-01T00:00:00+00:00"),
+                    (support_thread_id, donor_phone, support_phone, "2026-01-01T00:00:00+00:00"),
+                ],
+            )
+
+        try:
+            response = self.client.get(
+                "/api/v1/donor/chat/threads?category=hospital",
+                cookies={"access_token": _generate_jwt(donor_phone, "donor")},
+            )
+            self.assertEqual(response.status_code, 200)
+            threads = response.json()["threads"]
+            self.assertEqual([thread["id"] for thread in threads], [hospital_thread_id])
+            self.assertEqual(threads[0]["category"], "hospital")
+        finally:
+            with sqlite3.connect(DATABASE_PATH) as connection:
+                connection.executemany(
+                    "DELETE FROM chat_messages WHERE thread_id = ?",
+                    [(hospital_thread_id,), (support_thread_id,)],
+                )
+                connection.executemany(
+                    "DELETE FROM chat_threads WHERE id = ?",
+                    [(hospital_thread_id,), (support_thread_id,)],
+                )
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.executemany(
+                    "DELETE FROM auth_users WHERE phone = ?",
+                    [(hospital_phone,), (support_phone,)],
+                )
+
+    def test_donor_settings_are_authenticated_and_persisted(self):
+        import json
+        import sqlite3
+        from main import AUTH_DATABASE_PATH
+
+        donor_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        donor_cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        settings = {"radius_km": 35, "sms_alerts": False}
+
+        anonymous = self.client.post("/api/v1/donor/settings", json=settings)
+        self.assertEqual(anonymous.status_code, 401)
+
+        seeker = self.client.post(
+            "/api/v1/donor/settings",
+            json=settings,
+            cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+        )
+        self.assertEqual(seeker.status_code, 403)
+
+        try:
+            saved = self.client.post(
+                "/api/v1/donor/settings",
+                json=settings,
+                cookies=donor_cookies,
+            )
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(saved.json()["settings"]["radius_km"], 35)
+            self.assertFalse(saved.json()["settings"]["sms_alerts"])
+
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                row = connection.execute(
+                    "SELECT settings_json FROM donor_settings WHERE phone = ?",
+                    (donor_phone,),
+                ).fetchone()
+            self.assertIsNotNone(row)
+            stored_settings = json.loads(row[0])
+            self.assertEqual(stored_settings["radius_km"], 35)
+            self.assertFalse(stored_settings["sms_alerts"])
+        finally:
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.execute(
+                    "DELETE FROM donor_settings WHERE phone = ?",
+                    (donor_phone,),
+                )
+
     def test_donor_chat_messages_api(self):
         token = _generate_jwt("+8801712345678", "donor")
         response = self.client.get(

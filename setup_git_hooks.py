@@ -1,6 +1,5 @@
 import subprocess
 import sys
-import os
 
 def main():
     print("Setting up Git hooks...")
@@ -15,3 +14,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
