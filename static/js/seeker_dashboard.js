@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showToast = showToast;
 
   // Activate Section
-  function activateSection(targetId) {
+  function activateSection(targetId, scrollTargetId) {
     if (!targetId) return;
     const cleanId = targetId.replace('#', '');
     const targetSection = document.getElementById(cleanId);
@@ -34,12 +34,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     navItems.forEach(item => {
       const target = item.getAttribute('data-target') || item.getAttribute('href');
-      if (target && target.replace('#', '') === cleanId) {
+      if (target && target.replace('#', '') === cleanId && !item.hasAttribute('data-scroll-target')) {
         item.classList.add('active');
       } else {
         item.classList.remove('active');
       }
     });
+
+    if (scrollTargetId) {
+      const shortcut = Array.from(navItems).find(
+        item => item.getAttribute('data-scroll-target') === scrollTargetId
+      );
+      if (shortcut) shortcut.classList.add('active');
+    }
 
     if (mobileSidebar && mobileSidebar.classList.contains('mobile-open')) {
       mobileSidebar.classList.remove('mobile-open');
@@ -62,7 +69,14 @@ document.addEventListener('DOMContentLoaded', () => {
       location.hash = `#${cleanId}`;
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (scrollTargetId) {
+      window.requestAnimationFrame(() => {
+        const scrollTarget = document.getElementById(scrollTargetId);
+        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
   window.activateSection = activateSection;
 
@@ -71,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const target = btn.getAttribute('data-target') || btn.getAttribute('href');
-      activateSection(target);
+      activateSection(target, btn.getAttribute('data-scroll-target'));
     });
   });
 
@@ -1063,6 +1077,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function loadSeekerLowStockAlerts() {
+    const status = document.getElementById('seekerLowStockAlertsStatus');
+    const list = document.getElementById('seekerLowStockAlertsList');
+    if (!status || !list) return;
+
+    try {
+      const response = await fetch('/api/v1/seeker/inventory/alerts');
+      if (response.status === 401) {
+        status.textContent = 'Sign in to check alerts for your active blood requests.';
+        return;
+      }
+      if (!response.ok) throw new Error('Low-stock alert request failed');
+
+      const data = await response.json();
+      if (data.status !== 'success' || !Array.isArray(data.alerts)) {
+        throw new Error('Low-stock alert response was invalid');
+      }
+
+      list.replaceChildren();
+      if (data.alerts.length === 0) {
+        status.textContent = data.active_request_count
+          ? 'No active request currently matches a reported low-stock blood group.'
+          : 'Create an active blood request to receive matching low-stock alerts here.';
+        return;
+      }
+
+      status.textContent = 'Low stock has been reported for the blood group(s) below. Confirm availability directly before making arrangements:';
+      data.alerts.forEach(alert => {
+        const item = document.createElement('li');
+        const requestLabel = alert.request_count === 1 ? 'active request' : 'active requests';
+        item.textContent = `${alert.blood_group}: matches ${alert.request_count} ${requestLabel}.`;
+        list.appendChild(item);
+      });
+    } catch (error) {
+      console.error('Could not load seeker low-stock alerts:', error);
+      status.textContent = 'Low-stock alerts could not be loaded. Please refresh the dashboard.';
+    }
+  }
+
   const standardRequestForm = document.getElementById('standardRequestForm');
   if (standardRequestForm) {
     const neededAtInput = document.getElementById('standardNeededAt');
@@ -1099,6 +1152,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await loadSeekerRequestsFromApi();
+        await loadSeekerLowStockAlerts();
         feedback.textContent = `Blood request #${data.request.id} created successfully and is active in My Posted Blood Requests.`;
         feedback.hidden = false;
         standardRequestForm.reset();
@@ -1149,6 +1203,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await loadSeekerRequestsFromApi();
+        await loadSeekerLowStockAlerts();
         const notification = data.notifications || {};
         let notificationMessage = '';
         if (notification.status === 'not_configured') {
@@ -1410,6 +1465,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateMetrics();
   renderSeekerRequestsTable('all');
   loadSeekerRequestsFromApi();
+  loadSeekerLowStockAlerts();
   loadSeekerSettingsFromApi();
 
   // Initialize view from URL hash if provided

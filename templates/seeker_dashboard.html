@@ -101,6 +101,13 @@
           </svg>
           <span class="nav-item-title">Blood Seeker Personal Dashboard</span>
         </button>
+        <button type="button" class="seeker-nav-item" data-target="section-seeker-dashboard" data-scroll-target="seekerLowStockAlerts" id="nav-item-low-stock-alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+            <path d="M10 21h4"/>
+          </svg>
+          <span class="nav-item-title">Low-Stock Alerts for My Requests</span>
+        </button>
 
         <div class="sidebar-section-title" style="margin-top: 8px;">Request Creation</div>
 
@@ -221,6 +228,15 @@
             </button>
           </div>
         </div>
+
+        <section class="seeker-low-stock-alerts" id="seekerLowStockAlerts" aria-labelledby="seekerLowStockAlertsTitle" aria-live="polite">
+          <div class="seeker-low-stock-alerts-icon" aria-hidden="true">🩸</div>
+          <div class="seeker-low-stock-alerts-content">
+            <h2 id="seekerLowStockAlertsTitle">Low-stock alerts for your active requests</h2>
+            <p id="seekerLowStockAlertsStatus">Checking stock alerts for your active requests…</p>
+            <ul id="seekerLowStockAlertsList"></ul>
+          </div>
+        </section>
 
         <!-- 4 Metric Cards -->
         <div class="metrics-grid-4">
