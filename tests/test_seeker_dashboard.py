@@ -307,13 +307,46 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_seeker_donors_search_and_filter(self):
-        response = self.client.get("/api/v1/seeker/donors?blood_group=A+&radius_km=10")
+        response = self.client.get("/api/v1/seeker/donors?blood_group=A%2B&radius_km=10")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
         for donor in data["donors"]:
             self.assertEqual(donor["blood_group"], "A+")
             self.assertLessEqual(donor["distance_km"], 10)
+            self.assertNotIn("phone", donor)
+            self.assertNotIn("screening", donor)
+
+    def test_seeker_donor_directory_location_and_availability_filters(self):
+        response = self.client.get(
+            "/api/v1/seeker/donors?blood_group=O-&radius_km=10&available_only=true&location=Farmgate"
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["count"], 1)
+        donor = data["donors"][0]
+        self.assertEqual(donor["blood_group"], "O-")
+        self.assertEqual(donor["area"], "Farmgate")
+        self.assertTrue(donor["is_available"])
+        self.assertEqual(donor["location_precision"], "approximate")
+
+    def test_seeker_donor_directory_does_not_search_hidden_names(self):
+        donor = {
+            "id": "private-donor",
+            "name": "Secret Donor",
+            "share_name": False,
+            "public_identifier": "Donor 99",
+            "blood_group": "A+",
+            "area": "Mirpur",
+            "district": "Dhaka",
+            "distance_km": 5.0,
+            "is_available": True,
+        }
+        with patch("main.SEEKER_MOCK_DONORS", [donor]):
+            response = self.client.get("/api/v1/seeker/donors?query=Secret+Donor")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 0)
 
     def test_seeker_donor_list_and_detail_obscure_restricted_coordinates(self):
         list_response = self.client.get("/api/v1/seeker/donors?blood_group=A%2B")
