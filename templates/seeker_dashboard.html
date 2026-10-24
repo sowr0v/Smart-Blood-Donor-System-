@@ -592,7 +592,22 @@
       </section>
 
       <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
-      <section class="dashboard-content-section" id="section-direct-contact"></section>
+      <section class="dashboard-content-section" id="section-direct-contact" aria-labelledby="direct-contact-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 12px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">📞</span>
+            <div>
+              <h2 id="direct-contact-title">Direct Donor Contact</h2>
+              <div class="card-subtitle">Call or message available donors who have explicitly enabled direct contact.</div>
+            </div>
+          </div>
+          <p class="donor-profile-privacy">
+            Donor phone numbers are private by default. A number is requested only when you choose a donor and is returned only when that donor has opted in and is available.
+          </p>
+          <p id="directContactStatus" role="status" aria-live="polite">Loading available donors...</p>
+          <div id="directContactDonors" class="donor-directory-grid" aria-live="polite"></div>
+        </div>
+      </section>
 
       <!-- ================= 8. REAL-TIME IN-APP 1-ON-1 CHAT ================= -->
       <section class="dashboard-content-section" id="section-seeker-chat" aria-labelledby="seeker-chat-title">

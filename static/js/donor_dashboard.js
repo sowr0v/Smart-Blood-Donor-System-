@@ -1330,6 +1330,49 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkChips = document.querySelectorAll('#donationTypesWrap .check-chip');
   const btnUpdatePassword = document.getElementById('btnUpdatePassword');
   const btnRevokeSessions = document.getElementById('btnRevokeSessions');
+  const allowSeekerContact = document.getElementById('settingAllowSeekerContact');
+
+  if (allowSeekerContact) {
+    fetch('/api/v1/donor/direct-contact-preference')
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(data.detail || 'Could not load direct-contact preference.');
+        }
+        allowSeekerContact.checked = data.share_direct_contact === true;
+      })
+      .catch(error => {
+        allowSeekerContact.disabled = true;
+        showToast(error.message || 'Could not load direct-contact preference.', 'error');
+      });
+
+    allowSeekerContact.addEventListener('change', async () => {
+      const requestedValue = allowSeekerContact.checked;
+      allowSeekerContact.disabled = true;
+      try {
+        const response = await fetch('/api/v1/donor/direct-contact-preference', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ share_direct_contact: requestedValue })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(data.detail || 'Could not update direct-contact preference.');
+        }
+        allowSeekerContact.checked = data.share_direct_contact === true;
+        showToast(
+          allowSeekerContact.checked
+            ? 'Seekers can now request your number for calls or WhatsApp.'
+            : 'Direct contact is disabled; your number remains private.'
+        );
+      } catch (error) {
+        allowSeekerContact.checked = !requestedValue;
+        showToast(error.message || 'Could not update direct-contact preference.', 'error');
+      } finally {
+        allowSeekerContact.disabled = false;
+      }
+    });
+  }
 
   // Sync radius value display
   if (radiusRangeInput && radiusValueDisplay) {
