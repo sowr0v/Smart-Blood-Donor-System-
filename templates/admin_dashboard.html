@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Admin Console - User Management & Role Control" }}</title>
+  <meta name="description" content="Centralized administrative portal for user account management, role-based access control (RBAC), and security audit tracking.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin_dashboard.css">
+</head>
+<body>
+  <!-- Global Top Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Admin Console</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <span class="badge-role role-admin" style="font-size: 0.8rem; padding: 5px 12px;">Admin Mode</span>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Drawer for global nav -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+      <div class="mobile-auth-actions">
+        <a href="/logout" class="btn btn-outline btn-full">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Admin App Shell -->
+  <div class="admin-dashboard-wrapper">
+    <!-- LEFT SIDEBAR -->
+    <aside class="admin-sidebar" id="adminSidebar" aria-label="Admin Navigation Sidebar">
+      <!-- Admin Profile Quick Card -->
+      <div class="admin-profile-card-mini">
+        <div class="admin-avatar-circle">
+          {{ user.name[0] if user and user.name else "A" }}
+        </div>
+        <div class="admin-meta-info">
+          <div class="admin-name-text">
+            <span>{{ user.name if user and user.name else "System Admin" }}</span>
+          </div>
+          <div class="admin-badge-sub">
+            <span class="pulse-dot"></span>
+            <span>Root Administrator</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="admin-sidebar-nav">
+        <div class="sidebar-section-title">Platform Governance</div>
+
+        <!-- 1. User Management & Role Control -->
+        <button type="button" class="admin-nav-item active" data-target="section-user-management" id="nav-item-users">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>User &amp; Role Control</span>
+        </button>
+
+        <!-- 2. Security Audit Logs -->
+        <button type="button" class="admin-nav-item" data-target="section-audit-logs" id="nav-item-audit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <polyline points="9 12 11 14 15 10"></polyline>
+          </svg>
+          <span>Security Audit Trail</span>
+        </button>
+
+        <div class="sidebar-section-title" style="margin-top: 14px;">Quick Navigation</div>
+        <a href="/hospital/dashboard" class="admin-nav-item" style="text-decoration: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+          <span>Hospital Portal</span>
+        </a>
+        <a href="/donor/dashboard" class="admin-nav-item" style="text-decoration: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+          <span>Donor Portal</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="admin-main-content">
+      <!-- SECTION 1: USER MANAGEMENT & ROLE CONTROL -->
+      <section class="admin-section active" id="section-user-management">
+        <div class="admin-page-header">
+          <div>
+            <h1>User Management &amp; Role Control</h1>
+            <p>Administer registered user accounts, assign roles with Role-Based Access Control (RBAC), and manage operational status.</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button type="button" class="btn-admin-outline" id="btnRefreshUsers">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+              Refresh
+            </button>
+            <button type="button" class="btn-admin-primary" id="btnOpenCreateUser">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Create New User
+            </button>
+          </div>
+        </div>
+
+        <!-- Metrics Overview -->
+        <div class="admin-metrics-grid">
+          <div class="admin-metric-card">
+            <div class="metric-icon-box total">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <div class="metric-data">
+              <strong id="metricTotalUsers">-</strong>
+              <span>Total Accounts</span>
+            </div>
+          </div>
+
+          <div class="admin-metric-card">
+            <div class="metric-icon-box active">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+            </div>
+            <div class="metric-data">
+              <strong id="metricActiveUsers">-</strong>
+              <span>Active Accounts</span>
+            </div>
+          </div>
+
+          <div class="admin-metric-card">
+            <div class="metric-icon-box suspended">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+              </svg>
+            </div>
+            <div class="metric-data">
+              <strong id="metricSuspendedUsers">-</strong>
+              <span>Suspended Accounts</span>
+            </div>
+          </div>
+
+          <div class="admin-metric-card">
+            <div class="metric-icon-box admins">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </div>
+            <div class="metric-data">
+              <strong id="metricAdminCount">-</strong>
+              <span>System Admins</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="admin-card">
+          <div class="admin-toolbar">
+            <div class="admin-search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="adminUserSearch" class="admin-search-input" placeholder="Search by name, phone number, role, or institution..." />
+            </div>
+
+            <div class="admin-filter-group">
+              <select id="adminRoleFilter" class="admin-select" aria-label="Filter by assigned role">
+                <option value="all">All Roles</option>
+                <option value="donor">Donors</option>
+                <option value="seeker">Seekers</option>
+                <option value="hospital">Hospitals</option>
+                <option value="bank">Blood Banks</option>
+                <option value="admin">Administrators</option>
+              </select>
+
+              <select id="adminStatusFilter" class="admin-select" aria-label="Filter by account status">
+                <option value="all">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="admin-table-container">
+            <table class="admin-table" aria-label="Users Table">
+              <thead>
+                <tr>
+                  <th>User &amp; Contact</th>
+                  <th>Assigned Role</th>
+                  <th>Account Status</th>
+                  <th>Blood Group</th>
+                  <th>Organization / City</th>
+                  <th>Governance Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUserTableBody">
+                <!-- Rows dynamically injected via admin_dashboard.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: AUDIT LOGS -->
+      <section class="admin-section" id="section-audit-logs">
+        <div class="admin-page-header">
+          <div>
+            <h1>Security &amp; Administrative Audit Trail</h1>
+            <p>Chronological immutable record of role modifications, status alterations, and user onboarding.</p>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <div class="admin-table-container">
+            <table class="admin-table" aria-label="Audit Logs Table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Administrator</th>
+                  <th>Action</th>
+                  <th>Target User</th>
+                  <th>Action Details &amp; Reason</th>
+                </tr>
+              </thead>
+              <tbody id="adminAuditTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: USER DETAILS & SPECIFIC AUDIT -->
+  <div class="admin-modal-backdrop" id="userDetailsModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>User Account Dossier</h3>
+        <button type="button" class="btn-close-modal" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="user-profile-preview">
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Full Name</span>
+          <span class="user-profile-preview-val" id="detailUserName">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Phone Number</span>
+          <span class="user-profile-preview-val" id="detailUserPhone">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">System Role</span>
+          <span class="user-profile-preview-val" id="detailUserRole">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Account Status</span>
+          <span class="user-profile-preview-val" id="detailUserStatus">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Blood Group</span>
+          <span class="user-profile-preview-val" id="detailUserBlood">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Institution</span>
+          <span class="user-profile-preview-val" id="detailUserOrg">-</span>
+        </div>
+        <div class="user-profile-preview-row">
+          <span class="user-profile-preview-label">Address / District</span>
+          <span class="user-profile-preview-val" id="detailUserAddress">-</span>
+        </div>
+      </div>
+
+      <h4 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 10px; color: var(--admin-text-main);">
+        Administrative Audit Trail for User
+      </h4>
+      <div id="detailUserAuditList" style="max-height: 200px; overflow-y: auto; padding-right: 4px;">
+        <!-- Log items -->
+      </div>
+
+      <div style="margin-top: 24px; text-align: right;">
+        <button type="button" class="btn-admin-outline btn-close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT ROLE -->
+  <div class="admin-modal-backdrop" id="editRoleModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Assign User Role (RBAC)</h3>
+        <button type="button" class="btn-close-modal" aria-label="Close dialog">&times;</button>
+      </div>
+      <form id="editRoleForm">
+        <input type="hidden" id="editRolePhone" />
+        <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--admin-text-muted);">
+          Updating privileges for: <strong id="editRoleTargetPhoneDisplay" style="color: var(--admin-text-main);"></strong>
+        </p>
+
+        <div class="form-group">
+          <label for="editRoleSelect">Target Role</label>
+          <select id="editRoleSelect" class="form-control" required>
+            <option value="donor">Blood Donor (Standard donor privileges)</option>
+            <option value="seeker">Blood Seeker (Can post requests &amp; outreach)</option>
+            <option value="hospital">Hospital Staff (Institution inventory &amp; requests)</option>
+            <option value="bank">Blood Bank (Licensed blood center authority)</option>
+            <option value="admin">System Administrator (Full access)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="editRoleReason">Audit Reason for Change</label>
+          <input type="text" id="editRoleReason" class="form-control" placeholder="e.g., Hospital verification confirmed by health ministry" required />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+          <button type="button" class="btn-admin-outline btn-close-modal">Cancel</button>
+          <button type="submit" class="btn-admin-primary">Confirm Role Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: EDIT STATUS -->
+  <div class="admin-modal-backdrop" id="editStatusModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Manage Account Status</h3>
+        <button type="button" class="btn-close-modal" aria-label="Close dialog">&times;</button>
+      </div>
+      <form id="editStatusForm">
+        <input type="hidden" id="editStatusPhone" />
+        <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--admin-text-muted);">
+          Modifying operational status for: <strong id="editStatusTargetPhoneDisplay" style="color: var(--admin-text-main);"></strong>
+        </p>
+
+        <div class="form-group">
+          <label for="editStatusSelect">Account Status</label>
+          <select id="editStatusSelect" class="form-control" required>
+            <option value="active">Active (Full platform access)</option>
+            <option value="suspended">Suspended (Blocked from logging in)</option>
+            <option value="inactive">Inactive (Dormant account)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="editStatusReason">Audit Reason for Status Change</label>
+          <input type="text" id="editStatusReason" class="form-control" placeholder="e.g., Temporary suspension pending phone verification" required />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+          <button type="button" class="btn-admin-outline btn-close-modal">Cancel</button>
+          <button type="submit" class="btn-admin-primary">Update Status</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE USER -->
+  <div class="admin-modal-backdrop" id="createUserModal">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <h3>Onboard New User Account</h3>
+        <button type="button" class="btn-close-modal" aria-label="Close dialog">&times;</button>
+      </div>
+      <form id="createUserForm">
+        <div class="form-group">
+          <label for="createName">Full Name</label>
+          <input type="text" id="createName" class="form-control" placeholder="e.g., Dr. Farhan Ahmed" required />
+        </div>
+
+        <div class="form-group">
+          <label for="createPhone">Bangladesh Mobile Number</label>
+          <input type="text" id="createPhone" class="form-control" placeholder="e.g., 01799887766 or +8801799887766" required />
+        </div>
+
+        <div class="form-group">
+          <label for="createRole">Assigned Role</label>
+          <select id="createRole" class="form-control" required>
+            <option value="donor">Blood Donor</option>
+            <option value="seeker">Blood Seeker</option>
+            <option value="hospital">Hospital Staff</option>
+            <option value="bank">Blood Bank Staff</option>
+            <option value="admin">System Administrator</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="createBloodGroup">Blood Group</label>
+          <select id="createBloodGroup" class="form-control">
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="createStatus">Initial Account Status</label>
+          <select id="createStatus" class="form-control">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="createPassword">Initial Password</label>
+          <input type="password" id="createPassword" class="form-control" value="Secret123456" required />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px;">
+          <button type="button" class="btn-admin-outline btn-close-modal">Cancel</button>
+          <button type="submit" class="btn-admin-primary">Create User</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="admin-toast-container" id="adminToastContainer"></div>
+
+  <script src="/static/js/admin_dashboard.js"></script>
+</body>
+</html>

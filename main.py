@@ -304,11 +304,11 @@ ROLE_DASHBOARDS = {
     "admin": "/admin/dashboard",
 }
 USERS = {
-    "+8801712345678": {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"},
-    "+8801723456789": {"password": "match123", "role": "seeker", "name": "Nabil Hasan"},
-    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam"},
-    "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed"},
-    "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin"},
+    "+8801712345678": {"password": "secret123", "role": "donor", "name": "Ayesha Rahman", "status": "active", "phone": "+8801712345678"},
+    "+8801723456789": {"password": "match123", "role": "seeker", "name": "Nabil Hasan", "status": "active", "phone": "+8801723456789"},
+    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam", "status": "active", "phone": "+8801734567890"},
+    "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed", "status": "active", "phone": "+8801734567891"},
+    "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin", "status": "active", "phone": "+8801745678901"},
 }
 CHAT_DEMO_ACCOUNTS = {
     "+8801712345678": "donor",
@@ -662,6 +662,20 @@ def initialize_auth_database():
                 connection.execute("ALTER TABLE auth_users ADD COLUMN manager_name TEXT DEFAULT ''")
             if "address" not in auth_user_columns:
                 connection.execute("ALTER TABLE auth_users ADD COLUMN address TEXT DEFAULT ''")
+            if "status" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN status TEXT DEFAULT 'active'")
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS admin_audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    admin_phone TEXT NOT NULL,
+                    target_phone TEXT NOT NULL,
+                    action TEXT NOT NULL,
+                    details TEXT NOT NULL,
+                    created_at INTEGER NOT NULL
+                )
+                """
+            )
 
 
 def _connection():
@@ -683,6 +697,7 @@ def _get_user_by_phone(phone: str) -> dict | None:
         if row:
             role = row["role"] or "donor"
             user_data = {
+                "id": row["id"],
                 "password": "",
                 "password_hash": row["password_hash"],
                 "role": role,
@@ -692,6 +707,8 @@ def _get_user_by_phone(phone: str) -> dict | None:
                 "govt_reg": row["govt_reg"] if "govt_reg" in row.keys() else "",
                 "manager_name": row["manager_name"] if "manager_name" in row.keys() else "",
                 "address": row["address"] if "address" in row.keys() else "",
+                "status": (row["status"] if "status" in row.keys() else "") or "active",
+                "phone": phone,
             }
             USERS[phone] = user_data
             return user_data
@@ -803,10 +820,12 @@ def login(payload: LoginRequest, request: Request, response: Response):
     phone = normalize_phone(payload.phone)
     with closing(_connection()) as connection:
         user = connection.execute(
-            "SELECT id, password_hash FROM auth_users WHERE phone = ?", (phone,)
+            "SELECT id, password_hash, status FROM auth_users WHERE phone = ?", (phone,)
         ).fetchone()
         if not user or not verify_password(payload.password, user["password_hash"]):
             raise HTTPException(status_code=401, detail="Phone number or password is incorrect.")
+        if "status" in user.keys() and user["status"] in {"suspended", "inactive", "disabled"}:
+            raise HTTPException(status_code=403, detail="Account has been suspended or deactivated.")
         token = secrets.token_urlsafe(32)
         now = int(time.time())
         with connection:
@@ -1416,6 +1435,13 @@ async def login_submit(
                 next_url=_safe_local_path(next_url) or "",
             )
 
+    if user.get("status") in {"suspended", "inactive", "disabled"}:
+        return await _render_login_page(
+            request, error="Your account has been suspended or deactivated. Contact system administrator.",
+            admin_console=is_admin_console,
+            next_url=_safe_local_path(next_url) or "",
+        )
+
     # Any random 4+ digit OTP is accepted for SMS OTP verification gateway
     is_valid_otp = bool(clean_otp and len(clean_otp) >= 4)
     valid_password = False
@@ -1462,7 +1488,8 @@ async def api_otp_login(payload: OtpLoginRequest, response: Response):
     user = _get_user_by_phone(normalized_phone) or _get_user_by_phone(raw_phone)
     if not user:
         user = {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"}
-        USERS[normalized_phone] = user
+    if user.get("status") in {"suspended", "inactive", "disabled"}:
+        raise HTTPException(status_code=403, detail="Account has been suspended or deactivated.")
 
     token = _generate_jwt(normalized_phone, user["role"])
     destination = ROLE_DASHBOARDS.get(user["role"], "/seeker/dashboard" if user["role"] == "seeker" else "/donor/dashboard")
@@ -1859,13 +1886,533 @@ async def hospital_dashboard(request: Request):
     return response
 
 
+def _require_admin(request: Request) -> dict:
+    """Validate that the requesting user is authenticated and possesses the 'admin' role."""
+    user = _get_current_user(request)
+    if not user:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        if token and token.get("sub"):
+            phone = token.get("sub")
+            user = _get_user_by_phone(phone)
+    if not user or (user.get("role") or "").lower() != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Administrative privileges required. Access denied."
+        )
+    return user
+
+
+def _log_admin_action(admin_phone: str, target_phone: str, action: str, details: str):
+    """Record administrative actions in the admin_audit_logs table."""
+    initialize_auth_database()
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO admin_audit_logs (admin_phone, target_phone, action, details, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (admin_phone, target_phone, action, details, now),
+            )
+
+
+class AdminRoleUpdateRequest(BaseModel):
+    role: str
+    reason: str = ""
+
+
+class AdminStatusUpdateRequest(BaseModel):
+    status: str
+    reason: str = ""
+
+
+class AdminCreateUserRequest(BaseModel):
+    phone: str
+    name: str
+    role: str = "donor"
+    blood_group: str = "A+"
+    status: str = "active"
+    password: str = "Secret123456"
+
+
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
+    user = _get_current_user(request)
+    if not user:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        if token and token.get("sub"):
+            phone = token.get("sub")
+            user = _get_user_by_phone(phone)
+    
+    # If not logged in as admin, redirect to login with admin console flag
+    if not user or (user.get("role") or "").lower() != "admin":
+        # Check if demo or test environment
+        if request.query_params.get("demo") == "1":
+            phone = "+8801745678901"
+            user = USERS.get(phone, {"name": "System Admin", "role": "admin", "phone": phone, "status": "active"})
+        else:
+            return RedirectResponse(url="/login?admin_console=true&next=/admin/dashboard", status_code=303)
+
     return templates.TemplateResponse(
         request=request,
-        name="dashboard.html",
-        context={"request": request, "role": "Admin", "title": "Admin Console"},
+        name="admin_dashboard.html",
+        context={
+            "request": request,
+            "user": user,
+            "role": "admin",
+            "title": "Admin Console - User Management & Role Control",
+        },
     )
+
+
+@app.get("/api/v1/admin/users")
+async def admin_list_users(
+    request: Request,
+    query: str = "",
+    role: str = "",
+    status: str = "",
+):
+    admin = _require_admin(request)
+    initialize_auth_database()
+
+    # Consolidate users from database and in-memory defaults
+    users_dict = {}
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """
+            SELECT id, phone, role, name, blood_group, org_name, govt_reg,
+                   manager_name, address, status, created_at, updated_at
+            FROM auth_users
+            ORDER BY id DESC
+            """
+        ).fetchall()
+        for r in rows:
+            users_dict[r["phone"]] = {
+                "id": r["id"],
+                "phone": r["phone"],
+                "role": (r["role"] or "donor").lower(),
+                "name": r["name"] or ("Blood Seeker" if r["role"] == "seeker" else "Blood Donor"),
+                "blood_group": r["blood_group"] or "A+",
+                "org_name": r["org_name"] or "",
+                "govt_reg": r["govt_reg"] or "",
+                "manager_name": r["manager_name"] or "",
+                "address": r["address"] or "",
+                "status": (r["status"] or "active").lower(),
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+            }
+
+    # Add default demo accounts if not present in DB
+    for p, u in USERS.items():
+        if p not in users_dict:
+            users_dict[p] = {
+                "id": None,
+                "phone": p,
+                "role": (u.get("role") or "donor").lower(),
+                "name": u.get("name") or "User",
+                "blood_group": u.get("blood_group") or "A+",
+                "org_name": u.get("org_name") or "",
+                "govt_reg": u.get("govt_reg") or "",
+                "manager_name": u.get("manager_name") or "",
+                "address": u.get("address") or "",
+                "status": (u.get("status") or "active").lower(),
+                "created_at": int(time.time()),
+                "updated_at": int(time.time()),
+            }
+
+    users_list = list(users_dict.values())
+
+    # Filtering
+    q = query.strip().lower()
+    if q:
+        users_list = [
+            u for u in users_list
+            if q in u["name"].lower()
+            or q in u["phone"].lower()
+            or q in u["role"].lower()
+            or q in u["blood_group"].lower()
+            or q in u["org_name"].lower()
+            or q in u["address"].lower()
+        ]
+
+    r_filter = role.strip().lower()
+    if r_filter and r_filter != "all":
+        users_list = [u for u in users_list if u["role"] == r_filter]
+
+    s_filter = status.strip().lower()
+    if s_filter and s_filter != "all":
+        users_list = [u for u in users_list if u["status"] == s_filter]
+
+    # Calculate statistics
+    total_users = len(users_dict)
+    active_users = sum(1 for u in users_dict.values() if u["status"] == "active")
+    suspended_users = sum(1 for u in users_dict.values() if u["status"] in {"suspended", "inactive", "disabled"})
+    admin_count = sum(1 for u in users_dict.values() if u["role"] == "admin")
+    donor_count = sum(1 for u in users_dict.values() if u["role"] == "donor")
+    seeker_count = sum(1 for u in users_dict.values() if u["role"] == "seeker")
+    institutional_count = sum(1 for u in users_dict.values() if u["role"] in {"hospital", "bank", "blood_bank"})
+
+    return {
+        "status": "success",
+        "users": users_list,
+        "total": len(users_list),
+        "metrics": {
+            "total_users": total_users,
+            "active_users": active_users,
+            "suspended_users": suspended_users,
+            "admin_count": admin_count,
+            "donor_count": donor_count,
+            "seeker_count": seeker_count,
+            "institutional_count": institutional_count,
+        },
+    }
+
+
+@app.get("/api/v1/admin/users/{phone:path}")
+async def admin_get_user(phone: str, request: Request):
+    _require_admin(request)
+    raw_phone = phone.strip()
+    try:
+        norm_phone = normalize_phone(raw_phone)
+    except Exception:
+        norm_phone = raw_phone
+
+    user = _get_user_by_phone(norm_phone) or _get_user_by_phone(raw_phone)
+    if not user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    donor_profile = _get_donor_profile(norm_phone) if user.get("role") == "donor" else None
+
+    # Fetch audit history for this specific user
+    audit_history = []
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """
+            SELECT id, admin_phone, action, details, created_at
+            FROM admin_audit_logs
+            WHERE target_phone = ? OR target_phone = ?
+            ORDER BY created_at DESC
+            LIMIT 20
+            """,
+            (norm_phone, raw_phone),
+        ).fetchall()
+        for r in rows:
+            audit_history.append({
+                "id": r["id"],
+                "admin_phone": r["admin_phone"],
+                "action": r["action"],
+                "details": r["details"],
+                "created_at": r["created_at"],
+            })
+
+    return {
+        "status": "success",
+        "user": {
+            "phone": norm_phone,
+            "name": user.get("name", "User"),
+            "role": (user.get("role") or "donor").lower(),
+            "status": (user.get("status") or "active").lower(),
+            "blood_group": user.get("blood_group", "A+"),
+            "org_name": user.get("org_name", ""),
+            "govt_reg": user.get("govt_reg", ""),
+            "manager_name": user.get("manager_name", ""),
+            "address": user.get("address", ""),
+            "donor_profile": donor_profile,
+        },
+        "audit_history": audit_history,
+    }
+
+
+@app.put("/api/v1/admin/users/{phone:path}/role")
+async def admin_update_user_role(
+    phone: str,
+    payload: AdminRoleUpdateRequest,
+    request: Request,
+):
+    admin = _require_admin(request)
+    raw_phone = phone.strip()
+    try:
+        norm_phone = normalize_phone(raw_phone)
+    except Exception:
+        norm_phone = raw_phone
+
+    new_role = payload.role.strip().lower()
+    allowed_roles = {"admin", "hospital", "bank", "donor", "seeker"}
+    if new_role not in allowed_roles:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid role '{payload.role}'. Must be one of: {', '.join(sorted(allowed_roles))}"
+        )
+
+    # Protect: do not demote self if only one admin or prevent accidental lockout
+    if norm_phone == admin.get("phone") and new_role != "admin":
+        raise HTTPException(
+            status_code=400,
+            detail="Administrators cannot demote their own account role."
+        )
+
+    target_user = _get_user_by_phone(norm_phone) or _get_user_by_phone(raw_phone)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    old_role = (target_user.get("role") or "donor").lower()
+    if old_role == new_role:
+        return {"status": "success", "message": f"Role is already {new_role}."}
+
+    now = int(time.time())
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            # Check if row exists in auth_users
+            row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (norm_phone,)).fetchone()
+            if row:
+                connection.execute(
+                    "UPDATE auth_users SET role = ?, updated_at = ? WHERE phone = ?",
+                    (new_role, now, norm_phone),
+                )
+            else:
+                pw_hash = target_user.get("password_hash") or hash_password(target_user.get("password") or "secret123")
+                connection.execute(
+                    """
+                    INSERT INTO auth_users (phone, password_hash, role, name, blood_group, org_name, govt_reg, manager_name, address, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        norm_phone,
+                        pw_hash,
+                        new_role,
+                        target_user.get("name", "User"),
+                        target_user.get("blood_group", "A+"),
+                        target_user.get("org_name", ""),
+                        target_user.get("govt_reg", ""),
+                        target_user.get("manager_name", ""),
+                        target_user.get("address", ""),
+                        target_user.get("status", "active"),
+                        now,
+                        now,
+                    ),
+                )
+
+    # Update in-memory USERS cache
+    if norm_phone in USERS:
+        USERS[norm_phone]["role"] = new_role
+    if raw_phone in USERS:
+        USERS[raw_phone]["role"] = new_role
+
+    # Audit log
+    details = f"Role modified from '{old_role}' to '{new_role}'. Reason: {payload.reason or 'Admin update'}"
+    _log_admin_action(
+        admin_phone=admin.get("phone", "+8801745678901"),
+        target_phone=norm_phone,
+        action="ROLE_MODIFIED",
+        details=details,
+    )
+
+    return {
+        "status": "success",
+        "message": f"Role successfully updated to '{new_role}'.",
+        "user": {
+            "phone": norm_phone,
+            "role": new_role,
+            "previous_role": old_role,
+        },
+    }
+
+
+@app.put("/api/v1/admin/users/{phone:path}/status")
+async def admin_update_user_status(
+    phone: str,
+    payload: AdminStatusUpdateRequest,
+    request: Request,
+):
+    admin = _require_admin(request)
+    raw_phone = phone.strip()
+    try:
+        norm_phone = normalize_phone(raw_phone)
+    except Exception:
+        norm_phone = raw_phone
+
+    new_status = payload.status.strip().lower()
+    allowed_statuses = {"active", "suspended", "inactive"}
+    if new_status not in allowed_statuses:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status '{payload.status}'. Must be one of: active, suspended, inactive."
+        )
+
+    # Prevent suspending oneself
+    if norm_phone == admin.get("phone") and new_status in {"suspended", "inactive"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Administrators cannot suspend their own account."
+        )
+
+    target_user = _get_user_by_phone(norm_phone) or _get_user_by_phone(raw_phone)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User account not found.")
+
+    old_status = (target_user.get("status") or "active").lower()
+    if old_status == new_status:
+        return {"status": "success", "message": f"Account status is already {new_status}."}
+
+    now = int(time.time())
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (norm_phone,)).fetchone()
+            if row:
+                connection.execute(
+                    "UPDATE auth_users SET status = ?, updated_at = ? WHERE phone = ?",
+                    (new_status, now, norm_phone),
+                )
+            else:
+                pw_hash = target_user.get("password_hash") or hash_password(target_user.get("password") or "secret123")
+                connection.execute(
+                    """
+                    INSERT INTO auth_users (phone, password_hash, role, name, blood_group, org_name, govt_reg, manager_name, address, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        norm_phone,
+                        pw_hash,
+                        target_user.get("role", "donor"),
+                        target_user.get("name", "User"),
+                        target_user.get("blood_group", "A+"),
+                        target_user.get("org_name", ""),
+                        target_user.get("govt_reg", ""),
+                        target_user.get("manager_name", ""),
+                        target_user.get("address", ""),
+                        new_status,
+                        now,
+                        now,
+                    ),
+                )
+
+    # Update in-memory USERS cache
+    if norm_phone in USERS:
+        USERS[norm_phone]["status"] = new_status
+    if raw_phone in USERS:
+        USERS[raw_phone]["status"] = new_status
+
+    # Audit log
+    details = f"Account status changed from '{old_status}' to '{new_status}'. Reason: {payload.reason or 'Admin update'}"
+    _log_admin_action(
+        admin_phone=admin.get("phone", "+8801745678901"),
+        target_phone=norm_phone,
+        action="STATUS_CHANGED",
+        details=details,
+    )
+
+    return {
+        "status": "success",
+        "message": f"Account status successfully changed to '{new_status}'.",
+        "user": {
+            "phone": norm_phone,
+            "status": new_status,
+            "previous_status": old_status,
+        },
+    }
+
+
+@app.post("/api/v1/admin/users")
+async def admin_create_user(
+    payload: AdminCreateUserRequest,
+    request: Request,
+):
+    admin = _require_admin(request)
+    raw_phone = payload.phone.strip()
+    try:
+        norm_phone = normalize_phone(raw_phone)
+    except Exception:
+        norm_phone = raw_phone
+
+    role = payload.role.strip().lower()
+    if role not in {"admin", "hospital", "bank", "donor", "seeker"}:
+        raise HTTPException(status_code=422, detail="Invalid role specified.")
+
+    status = payload.status.strip().lower()
+    if status not in {"active", "suspended", "inactive"}:
+        status = "active"
+
+    initialize_auth_database()
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        existing = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (norm_phone,)).fetchone()
+        if existing or norm_phone in USERS:
+            raise HTTPException(status_code=409, detail="A user with this phone number already exists.")
+
+        pw_hash = hash_password(payload.password)
+        with connection:
+            connection.execute(
+                """
+                INSERT INTO auth_users (phone, password_hash, role, name, blood_group, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (norm_phone, pw_hash, role, payload.name.strip(), payload.blood_group, status, now, now),
+            )
+
+    USERS[norm_phone] = {
+        "phone": norm_phone,
+        "name": payload.name.strip(),
+        "role": role,
+        "status": status,
+        "blood_group": payload.blood_group,
+        "password_hash": pw_hash,
+    }
+
+    _log_admin_action(
+        admin_phone=admin.get("phone", "+8801745678901"),
+        target_phone=norm_phone,
+        action="USER_CREATED",
+        details=f"Created user '{payload.name}' with role '{role}' and status '{status}'",
+    )
+
+    return {
+        "status": "success",
+        "message": f"User {norm_phone} successfully registered.",
+        "user": {
+            "phone": norm_phone,
+            "name": payload.name.strip(),
+            "role": role,
+            "status": status,
+        },
+    }
+
+
+@app.get("/api/v1/admin/audit-logs")
+async def admin_get_audit_logs(
+    request: Request,
+    limit: int = 50,
+):
+    _require_admin(request)
+    initialize_auth_database()
+    logs = []
+    with closing(_connection()) as connection:
+        rows = connection.execute(
+            """
+            SELECT id, admin_phone, target_phone, action, details, created_at
+            FROM admin_audit_logs
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (min(limit, 200),),
+        ).fetchall()
+        for r in rows:
+            logs.append({
+                "id": r["id"],
+                "admin_phone": r["admin_phone"],
+                "target_phone": r["target_phone"],
+                "action": r["action"],
+                "details": r["details"],
+                "created_at": r["created_at"],
+            })
+
+    return {
+        "status": "success",
+        "logs": logs,
+        "total": len(logs),
+    }
 
 
 @app.get("/logout")
@@ -2655,9 +3202,10 @@ def _chat_available_donors() -> list[dict]:
                WHERE users.role = 'donor' AND COALESCE(profiles.is_available, 1) = 1"""
         ).fetchall()
 
+    mock_donor_ids_by_phone = {d["phone"]: d["id"] for d in SEEKER_MOCK_DONORS if d.get("id")}
     donors_by_phone = {
         row["phone"]: {
-            "id": _chat_donor_identifier(row["phone"]),
+            "id": mock_donor_ids_by_phone.get(row["phone"]) or _chat_donor_identifier(row["phone"]),
             "name": row["name"],
             "blood_group": row["blood_group"],
             "district": row["district"],
