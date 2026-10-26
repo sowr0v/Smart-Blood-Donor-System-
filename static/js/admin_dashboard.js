@@ -45,6 +45,74 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (targetId === 'section-audit-logs') {
         fetchAuditLogs();
+      } else if (targetId === 'section-stock-thresholds') {
+        loadAdminStockAlerts();
+      }
+    });
+  });
+
+  // Facility stock alert functions
+  const stockTableBody = document.getElementById("adminStockAlertsTableBody");
+  const stockSummary = document.getElementById("adminStockAlertSummary");
+  const stockStatus = document.getElementById("bloodStockAdminStatus");
+
+  async function loadAdminStockAlerts() {
+    if (!stockTableBody) return;
+    try {
+      const response = await fetch("/api/v1/admin/facility/inventory/alerts", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || result.status !== "success") {
+        throw new Error(result.detail || "Could not load facility stock alerts.");
+      }
+      stockTableBody.innerHTML = '';
+      const activeAlerts = (result.facilities || []).flatMap((facility) =>
+        (facility.alerts || [])
+          .filter((alert) => alert.status === "active")
+          .map((alert) => ({ facility: facility.facility_name, ...alert }))
+      );
+      if (stockSummary) {
+        stockSummary.textContent = `${result.active_count} active low stock alert(s) across ${result.facility_count} facility account(s).`;
+      }
+      if (activeAlerts.length === 0) {
+        stockTableBody.innerHTML = '<tr><td colspan="5" style="padding: 14px; text-align: center; color: var(--admin-text-muted);">No facilities are currently at or below the minimum stock threshold.</td></tr>';
+        return;
+      }
+      activeAlerts.forEach((item) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${escapeHtml(item.facility)}</td>
+          <td><strong style="color: #E11D48;">${escapeHtml(item.blood_group)}</strong></td>
+          <td>${item.quantity} units</td>
+          <td>${item.threshold} units</td>
+          <td><span class="badge-status status-suspended"><span class="status-dot-indicator"></span>Low Stock</span></td>
+        `;
+        stockTableBody.appendChild(row);
+      });
+    } catch (err) {
+      if (stockSummary) stockSummary.textContent = err.message;
+    }
+  }
+
+  document.querySelectorAll("[data-save-stock-threshold]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const group = button.getAttribute("data-save-stock-threshold");
+      const input = document.querySelector(`[data-stock-threshold="${group}"]`);
+      if (!input) return;
+      const threshold = parseInt(input.value, 10);
+      try {
+        const response = await fetch(`/api/v1/admin/blood-stock-thresholds/${encodeURIComponent(group)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ threshold }),
+        });
+        const result = await response.json();
+        if (!response.ok || result.status !== "success") {
+          throw new Error(result.detail || "Could not update threshold.");
+        }
+        showToast(`Minimum stock threshold for ${group} updated to ${threshold} units.`, 'success');
+        loadAdminStockAlerts();
+      } catch (err) {
+        showToast(err.message, 'error');
       }
     });
   });

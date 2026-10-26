@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import asyncio
 import hashlib
 import hmac
 import json
@@ -15,7 +14,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, closing
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -154,6 +153,21 @@ def initialize_urgent_database():
                 );
                 CREATE INDEX IF NOT EXISTS idx_facility_inventory_audit_recent
                     ON facility_inventory_audit(facility_phone, changed_at DESC, id DESC);
+                CREATE TABLE IF NOT EXISTS facility_inventory_alerts (
+                    id INTEGER PRIMARY KEY,
+                    facility_phone TEXT NOT NULL,
+                    blood_group TEXT NOT NULL,
+                    threshold INTEGER NOT NULL,
+                    quantity INTEGER NOT NULL,
+                    status TEXT NOT NULL CHECK (status IN ('active', 'resolved')),
+                    triggered_at TEXT NOT NULL,
+                    resolved_at TEXT
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_facility_inventory_alert_active
+                    ON facility_inventory_alerts(facility_phone, blood_group)
+                    WHERE status = 'active';
+                CREATE INDEX IF NOT EXISTS idx_facility_inventory_alert_recent
+                    ON facility_inventory_alerts(facility_phone, triggered_at DESC, id DESC);
                 """
             )
             connection.execute(
@@ -267,6 +281,138 @@ def _update_facility_inventory(
         "updated_at": changed_at if previous_quantity != quantity else current["updated_at"],
         "changed": previous_quantity != quantity,
     }
+
+
+def _sync_facility_inventory_alerts(
+    facility_phone: str, thresholds: dict[str, int]
+) -> list[dict]:
+    initialize_urgent_database()
+    now = datetime.now(timezone.utc).isoformat()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.executemany(
+                """INSERT OR IGNORE INTO facility_blood_inventory
+                   (facility_phone, blood_group, quantity)
+                   VALUES (?, ?, 0)""",
+                [(facility_phone, group) for group in BLOOD_GROUPS],
+            )
+            inventory = connection.execute(
+                """SELECT blood_group, quantity
+                   FROM facility_blood_inventory
+                   WHERE facility_phone = ?""",
+                (facility_phone,),
+            ).fetchall()
+            for item in inventory:
+                threshold = thresholds[item["blood_group"]]
+                active_alert = connection.execute(
+                    """SELECT id FROM facility_inventory_alerts
+                       WHERE facility_phone = ? AND blood_group = ? AND status = 'active'""",
+                    (facility_phone, item["blood_group"]),
+                ).fetchone()
+                if item["quantity"] <= threshold:
+                    if active_alert:
+                        connection.execute(
+                            """UPDATE facility_inventory_alerts
+                               SET threshold = ?, quantity = ?
+                               WHERE id = ?""",
+                            (threshold, item["quantity"], active_alert["id"]),
+                        )
+                    else:
+                        connection.execute(
+                            """INSERT INTO facility_inventory_alerts (
+                                   facility_phone, blood_group, threshold, quantity,
+                                   status, triggered_at
+                               ) VALUES (?, ?, ?, ?, 'active', ?)""",
+                            (
+                                facility_phone,
+                                item["blood_group"],
+                                threshold,
+                                item["quantity"],
+                                now,
+                            ),
+                        )
+                elif active_alert:
+                    connection.execute(
+                        """UPDATE facility_inventory_alerts
+                           SET threshold = ?, quantity = ?, status = 'resolved', resolved_at = ?
+                           WHERE id = ?""",
+                        (threshold, item["quantity"], now, active_alert["id"]),
+                    )
+
+        rows = connection.execute(
+            """SELECT id, blood_group, threshold, quantity, status, triggered_at, resolved_at
+               FROM facility_inventory_alerts
+               WHERE facility_phone = ?
+               ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END,
+                        triggered_at DESC, id DESC
+               LIMIT 24""",
+            (facility_phone,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def _get_blood_stock_thresholds() -> dict[str, int]:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            "SELECT blood_group, threshold FROM blood_stock_thresholds"
+        ).fetchall()
+    return {row["blood_group"]: row["threshold"] for row in rows}
+
+
+def _save_blood_stock_threshold(blood_group: str, threshold: int) -> None:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO blood_stock_thresholds (blood_group, threshold, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(blood_group) DO UPDATE SET
+                       threshold = excluded.threshold,
+                       updated_at = excluded.updated_at""",
+                (blood_group, threshold, int(time.time())),
+            )
+
+
+def _require_admin(request: Request) -> dict:
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in as an administrator to manage blood stock thresholds.",
+        )
+    if token.get("role") != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only administrators can manage blood stock thresholds.",
+        )
+    return token
+
+
+def _get_facility_inventory_users() -> list[tuple[str, dict]]:
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        inventory_phones = {
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
+            ).fetchall()
+        }
+    with closing(_connection()) as connection:
+        settings_phones = {
+            row[0]
+            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
+        }
+
+    facility_users = []
+    for phone in sorted(inventory_phones | settings_phones):
+        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+        if str(user.get("role", "")).lower() in {"hospital", "bank", "blood_bank"}:
+            facility_users.append((phone, user))
+    return facility_users
 
 
 def _require_facility_inventory_user(request: Request) -> dict:
@@ -598,9 +744,15 @@ def initialize_auth_database():
                     allergies TEXT,
                     fitness_status TEXT NOT NULL DEFAULT 'Eligible',
                     preferred_donation_types TEXT NOT NULL DEFAULT 'Whole Blood',
+                    share_direct_contact INTEGER NOT NULL DEFAULT 0,
                     is_available INTEGER NOT NULL DEFAULT 1,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
+                );
+                CREATE TABLE IF NOT EXISTS donor_settings (
+                    phone TEXT PRIMARY KEY,
+                    settings_json TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS facility_settings (
                     phone TEXT PRIMARY KEY,
@@ -634,7 +786,17 @@ def initialize_auth_database():
                     maintenance_mode INTEGER DEFAULT 0,
                     updated_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS blood_stock_thresholds (
+                    blood_group TEXT PRIMARY KEY,
+                    threshold INTEGER NOT NULL CHECK (threshold >= 0 AND threshold <= 50),
+                    updated_at INTEGER NOT NULL
+                );
                 """
+            )
+            connection.executemany(
+                """INSERT OR IGNORE INTO blood_stock_thresholds
+                   (blood_group, threshold, updated_at) VALUES (?, 5, ?)""",
+                [(group, int(time.time())) for group in BLOOD_GROUPS],
             )
             donor_profile_columns = {
                 row[1]
@@ -643,6 +805,10 @@ def initialize_auth_database():
             if "is_available" not in donor_profile_columns:
                 connection.execute(
                     "ALTER TABLE donor_profiles ADD COLUMN is_available INTEGER NOT NULL DEFAULT 1"
+                )
+            if "share_direct_contact" not in donor_profile_columns:
+                connection.execute(
+                    "ALTER TABLE donor_profiles ADD COLUMN share_direct_contact INTEGER NOT NULL DEFAULT 0"
                 )
             auth_user_columns = {
                 row[1]
@@ -1275,7 +1441,7 @@ def _register_user_record(
 
 @app.post("/api/v1/auth/register")
 async def api_register(payload: UserRegisterRequest, response: Response):
-    user, destination, _ = _register_user_record(
+    user, _, _ = _register_user_record(
         phone_raw=payload.phone,
         password=payload.password,
         role=payload.role,
@@ -1300,7 +1466,6 @@ async def api_register(payload: UserRegisterRequest, response: Response):
 
 @app.post("/auth/register")
 async def form_register(
-    request: Request,
     phone: str = Form(...),
     password: str = Form(...),
     role: str = Form("seeker"),
@@ -1314,7 +1479,7 @@ async def form_register(
     manager_number: str = Form(""),
 ):
     actual_name = name or org_name or ("Blood Seeker" if role == "seeker" else "Blood Donor")
-    user, destination, _ = _register_user_record(
+    _register_user_record(
         phone_raw=phone,
         password=password,
         role=role,
@@ -1536,6 +1701,7 @@ def _default_donor_profile(phone: str) -> dict:
         "allergies": "Penicillin",
         "fitness_status": "Eligible",
         "preferred_donation_types": "Whole Blood",
+        "share_direct_contact": False,
         "is_available": True,
         "updated_at": int(time.time()),
     }
@@ -1548,7 +1714,7 @@ def _get_donor_profile(phone: str) -> dict:
             """SELECT phone, name, email, date_of_birth, gender, blood_group,
                       district, area, address, last_donation, medical_conditions,
                       medications, allergies, fitness_status, preferred_donation_types,
-                      is_available, updated_at
+                      share_direct_contact, is_available, updated_at
                FROM donor_profiles WHERE phone = ?""",
             (phone,),
         ).fetchone()
@@ -1561,8 +1727,9 @@ def _get_donor_profile(phone: str) -> dict:
                 """INSERT INTO donor_profiles (
                        phone, name, email, date_of_birth, gender, blood_group, district,
                        area, address, last_donation, medical_conditions, medications,
-                       allergies, fitness_status, preferred_donation_types, is_available, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       allergies, fitness_status, preferred_donation_types,
+                       share_direct_contact, is_available, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 tuple(profile.values()),
             )
         return profile
@@ -1586,6 +1753,10 @@ class DonorProfileUpdate(BaseModel):
     preferred_donation_types: str = "Whole Blood"
 
 
+class DonorDirectContactPreference(BaseModel):
+    share_direct_contact: bool
+
+
 VALID_BLOOD_GROUPS = set(BLOOD_GROUPS)
 
 
@@ -1598,6 +1769,45 @@ async def get_donor_profile(request: Request):
     if not phone:
         raise HTTPException(status_code=401, detail="Sign in required to access donor profile.")
     return {"status": "success", "profile": _get_donor_profile(phone)}
+
+
+@app.get("/api/v1/donor/direct-contact-preference")
+async def get_donor_direct_contact_preference(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to manage contact preferences.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can manage contact preferences.")
+
+    profile = _get_donor_profile(token["sub"])
+    return {
+        "status": "success",
+        "share_direct_contact": bool(profile["share_direct_contact"]),
+    }
+
+
+@app.put("/api/v1/donor/direct-contact-preference")
+async def update_donor_direct_contact_preference(
+    payload: DonorDirectContactPreference,
+    request: Request,
+):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to manage contact preferences.")
+    if token.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can manage contact preferences.")
+    phone = token["sub"]
+    _get_donor_profile(phone)
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                "UPDATE donor_profiles SET share_direct_contact = ?, updated_at = ? WHERE phone = ?",
+                (int(payload.share_direct_contact), int(time.time()), phone),
+            )
+    return {
+        "status": "success",
+        "share_direct_contact": payload.share_direct_contact,
+    }
 
 
 @app.post("/api/v1/donor/profile")
@@ -1845,13 +2055,24 @@ async def hospital_dashboard(request: Request):
     can_manage_inventory = user_role in {"hospital", "bank", "blood_bank"}
     inventory = _get_facility_inventory(phone) if can_manage_inventory and phone else []
     inventory_total_units = sum(item["quantity"] for item in inventory)
-    inventory_low_stock_groups = sum(item["quantity"] < 2 for item in inventory)
     inventory_last_sync = max(
         (item["updated_at"] for item in inventory if item["updated_at"]),
         default="",
     )
 
     facility_settings = _get_facility_settings(phone, user_role, user.get("name") if user else "")
+    inventory_thresholds = _get_blood_stock_thresholds()
+    low_stock_blood_groups = [
+        item["blood_group"]
+        for item in inventory
+        if item["quantity"] <= inventory_thresholds[item["blood_group"]]
+    ]
+    inventory_low_stock_groups = len(low_stock_blood_groups)
+    inventory_alerts = (
+        _sync_facility_inventory_alerts(phone, inventory_thresholds)
+        if can_manage_inventory and phone
+        else []
+    )
     if facility_settings and facility_settings.get("facility_name") and user:
         user = {**user, "name": facility_settings["facility_name"]}
 
@@ -1868,7 +2089,10 @@ async def hospital_dashboard(request: Request):
             "inventory": inventory,
             "inventory_total_units": inventory_total_units,
             "inventory_low_stock_groups": inventory_low_stock_groups,
+            "low_stock_blood_groups": low_stock_blood_groups,
             "inventory_last_sync": inventory_last_sync,
+            "inventory_thresholds": inventory_thresholds,
+            "inventory_alerts": inventory_alerts,
             "can_manage_inventory": can_manage_inventory,
         },
     )
@@ -1888,18 +2112,22 @@ async def hospital_dashboard(request: Request):
 
 def _require_admin(request: Request) -> dict:
     """Validate that the requesting user is authenticated and possesses the 'admin' role."""
+    token = _decode_jwt(request.cookies.get("access_token", ""))
     user = _get_current_user(request)
-    if not user:
-        token = _decode_jwt(request.cookies.get("access_token", ""))
-        if token and token.get("sub"):
-            phone = token.get("sub")
-            user = _get_user_by_phone(phone)
-    if not user or (user.get("role") or "").lower() != "admin":
+    if not user and token and token.get("sub"):
+        user = _get_user_by_phone(token.get("sub"))
+    if not user and not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Sign in as an administrator to access administrative controls."
+        )
+    role = ((user.get("role") if user else "") or (token.get("role") if token else "") or "").lower()
+    if role != "admin":
         raise HTTPException(
             status_code=403,
             detail="Administrative privileges required. Access denied."
         )
-    return user
+    return user or {"phone": token.get("sub"), "role": "admin"}
 
 
 def _log_admin_action(admin_phone: str, target_phone: str, action: str, details: str):
@@ -1962,6 +2190,8 @@ async def admin_dashboard(request: Request):
             "user": user,
             "role": "admin",
             "title": "Admin Console - User Management & Role Control",
+            "blood_groups": BLOOD_GROUPS,
+            "stock_thresholds": _get_blood_stock_thresholds(),
         },
     )
 
@@ -2416,7 +2646,7 @@ async def admin_get_audit_logs(
 
 
 @app.get("/logout")
-async def logout(request: Request):
+async def logout():
     response = RedirectResponse(url="/login", status_code=303)
     response.delete_cookie("access_token", path="/")
     response.delete_cookie(SESSION_COOKIE, path="/")
@@ -2563,10 +2793,33 @@ class DonorSettingsPreferences(BaseModel):
 
 @app.post("/api/v1/donor/settings")
 async def update_donor_settings(payload: DonorSettingsPreferences, request: Request):
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in as a donor to update settings.")
+    if user.get("role") != "donor":
+        raise HTTPException(status_code=403, detail="Only donors can update donor settings.")
+
+    phone = user.get("phone")
+    if not phone:
+        raise HTTPException(status_code=401, detail="Authenticated donor account has no phone number.")
+
+    settings = payload.model_dump()
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO donor_settings (phone, settings_json, updated_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(phone) DO UPDATE SET
+                       settings_json = excluded.settings_json,
+                       updated_at = excluded.updated_at""",
+                (phone, json.dumps(settings), int(time.time())),
+            )
+
     return {
         "status": "success",
         "message": "Donor preferences and portal settings updated successfully.",
-        "settings": payload.model_dump(),
+        "settings": settings,
     }
 
 
@@ -3082,9 +3335,17 @@ def _chat_thread_dict(row: sqlite3.Row, user: dict) -> dict:
             (row["id"], user["phone"]),
         ).fetchone()[0]
     thread_id = _chat_thread_id_for_role(row["id"], user["role"])
+    peer_role = peer.get("role")
+    if peer_role in {"hospital", "bank", "blood_bank"}:
+        category = "hospital"
+    elif peer_role == "seeker":
+        category = "seeker"
+    else:
+        category = "support"
     return {
         "id": thread_id,
         "name": peer.get("name") or "Chat participant",
+        "category": category,
         "blood_group": peer.get("blood_group", ""),
         "last_message": last_message["text"] if last_message else "",
         "last_time": last_message["sent_at"] if last_message else row["created_at"],
@@ -3158,6 +3419,13 @@ def _chat_list_threads(user: dict, category: str | None = None, unread_only: boo
             (user["phone"], user["phone"]),
         ).fetchall()
     threads = [_chat_thread_dict(row, user) for row in rows]
+    selected_category = (category or "all").strip().lower()
+    if selected_category not in {"all", "hospital", "seeker", "support"}:
+        raise HTTPException(status_code=422, detail="Choose a valid chat category.")
+    if selected_category != "all":
+        threads = [
+            thread for thread in threads if thread["category"] == selected_category
+        ]
     if unread_only:
         threads = [thread for thread in threads if thread["unread_count"] > 0]
     unread = sum(thread["unread_count"] for thread in threads)
@@ -3538,7 +3806,7 @@ class FacilitySettingsPayload(BaseModel):
     ultra_freezer_active: bool = True
     nat_screening: bool = True
     continuous_shift: bool = True
-    low_stock_threshold: int = 5
+    low_stock_threshold: int = Field(default=5, strict=True, ge=0, le=50)
     auto_sos_dispatch: bool = True
     inter_facility_network: bool = True
     audio_siren: bool = True
@@ -3598,6 +3866,10 @@ class InstitutionalBloodAllocationPayload(BaseModel):
     batch_number: Optional[str] = Field(default="")
     allocated_by: Optional[str] = Field(default="Lead Medical Officer")
     notes: Optional[str] = Field(default="")
+
+
+class AdminBloodStockThresholdPayload(BaseModel):
+    threshold: int = Field(strict=True, ge=0, le=50)
 
 
 SEEKER_CONTACT_LOGS = [
@@ -4140,6 +4412,70 @@ async def get_seeker_requests(request: Request):
     return {"status": "success", "count": len(requests_list), "requests": requests_list}
 
 
+@app.get("/api/v1/seeker/inventory/alerts")
+async def get_seeker_inventory_alerts(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token or token.get("role") != "seeker":
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to view low-stock alerts.")
+
+    seeker_phone = token["sub"]
+    now = datetime.now(timezone.utc).isoformat()
+    initialize_urgent_database()
+    with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE blood_requests SET status = 'Expired'
+                   WHERE status = 'Active' AND expires_at <= ? AND owner_phone = ?""",
+                (now, seeker_phone),
+            )
+        rows = connection.execute(
+            """SELECT blood_group, COUNT(*) AS request_count
+               FROM blood_requests
+               WHERE owner_phone = ? AND status = 'Active'
+               GROUP BY blood_group""",
+            (seeker_phone,),
+        ).fetchall()
+        request_counts = {row[0]: row[1] for row in rows}
+        inventory_phones = {
+            row[0]
+            for row in connection.execute(
+                "SELECT DISTINCT facility_phone FROM facility_blood_inventory"
+            ).fetchall()
+        }
+
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        settings_phones = {
+            row[0]
+            for row in connection.execute("SELECT phone FROM facility_settings").fetchall()
+        }
+
+    thresholds = _get_blood_stock_thresholds()
+    low_stock_groups = set()
+    for phone in inventory_phones | settings_phones:
+        user = _get_user_by_phone(phone) or USERS.get(phone, {})
+        role = str(user.get("role", "")).lower()
+        if role not in {"hospital", "bank", "blood_bank"}:
+            continue
+        alerts = _sync_facility_inventory_alerts(phone, thresholds)
+        low_stock_groups.update(
+            alert["blood_group"]
+            for alert in alerts
+            if alert["status"] == "active"
+        )
+
+    alerts = [
+        {"blood_group": blood_group, "request_count": request_counts[blood_group]}
+        for blood_group in BLOOD_GROUPS
+        if blood_group in request_counts and blood_group in low_stock_groups
+    ]
+    return {
+        "status": "success",
+        "alerts": alerts,
+        "active_request_count": sum(request_counts.values()),
+    }
+
+
 @app.post("/api/v1/seeker/requests")
 async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
@@ -4471,6 +4807,37 @@ async def get_seeker_donor_detail(donor_id: str):
     return {"status": "success", "donor": _public_seeker_donor(donor)}
 
 
+@app.post("/api/v1/seeker/donors/{donor_id}/contact")
+async def get_permitted_seeker_donor_contact(donor_id: str, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as a blood seeker to contact donors.")
+    if token.get("role") != "seeker":
+        raise HTTPException(status_code=403, detail="Only blood seekers can use direct donor contact.")
+
+    donor = next((item for item in SEEKER_MOCK_DONORS if item["id"] == donor_id), None)
+    if donor is None:
+        raise HTTPException(status_code=404, detail="Donor profile not found.")
+    if not donor.get("is_available"):
+        raise HTTPException(status_code=403, detail="This donor is not currently available.")
+
+    profile = _get_donor_profile(donor["phone"])
+    if not profile["is_available"]:
+        raise HTTPException(status_code=403, detail="This donor is not currently available.")
+    if not profile["share_direct_contact"]:
+        raise HTTPException(status_code=403, detail="This donor has not enabled direct contact.")
+
+    return {
+        "status": "success",
+        "donor": {
+            "id": donor["id"],
+            "name": _public_seeker_donor(donor)["name"],
+            "blood_group": donor["blood_group"],
+            "phone": profile["phone"],
+        },
+    }
+
+
 @app.post("/api/v1/seeker/contact/log")
 async def log_seeker_contact(payload: SeekerContactLogPayload):
     log_entry = {
@@ -4730,6 +5097,90 @@ async def get_facility_inventory(request: Request):
     return {"status": "success", "inventory": inventory}
 
 
+@app.get("/api/v1/facility/inventory/alerts")
+async def get_facility_inventory_alerts(request: Request):
+    user = _require_facility_inventory_user(request)
+    thresholds = _get_blood_stock_thresholds()
+    alerts = _sync_facility_inventory_alerts(user["phone"], thresholds)
+    active_groups = [
+        alert["blood_group"]
+        for alert in alerts
+        if alert["status"] == "active"
+    ]
+    return {
+        "status": "success",
+        "thresholds": thresholds,
+        "alerts": alerts,
+        "active_count": len(active_groups),
+        "active_groups": active_groups,
+    }
+
+
+@app.get("/api/v1/admin/blood-stock-thresholds")
+async def get_admin_blood_stock_thresholds(request: Request):
+    _require_admin(request)
+    return {
+        "status": "success",
+        "thresholds": _get_blood_stock_thresholds(),
+    }
+
+
+@app.put("/api/v1/admin/blood-stock-thresholds/{blood_group}")
+async def update_admin_blood_stock_threshold(
+    blood_group: str,
+    payload: AdminBloodStockThresholdPayload,
+    request: Request,
+):
+    _require_admin(request)
+    if blood_group not in BLOOD_GROUPS:
+        raise HTTPException(status_code=422, detail="Choose a valid blood group.")
+    _save_blood_stock_threshold(blood_group, payload.threshold)
+    thresholds = _get_blood_stock_thresholds()
+    for phone, _ in _get_facility_inventory_users():
+        _sync_facility_inventory_alerts(phone, thresholds)
+    return {
+        "status": "success",
+        "blood_group": blood_group,
+        "threshold": payload.threshold,
+    }
+
+
+@app.get("/api/v1/admin/facility/inventory/alerts")
+async def get_admin_facility_inventory_alerts(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    if not token:
+        raise HTTPException(status_code=401, detail="Sign in as an administrator to view facility alerts.")
+    if token.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Only administrators can view cross-facility inventory alerts.")
+
+    thresholds = _get_blood_stock_thresholds()
+    facilities = []
+    for phone, user in _get_facility_inventory_users():
+        role = str(user.get("role", "")).lower()
+        settings = _get_facility_settings(phone, role, user.get("name", ""))
+        alerts = _sync_facility_inventory_alerts(phone, thresholds)
+        active_groups = [
+            alert["blood_group"]
+            for alert in alerts
+            if alert["status"] == "active"
+        ]
+        facilities.append({
+            "facility_name": settings["facility_name"],
+            "thresholds": thresholds,
+            "active_groups": active_groups,
+            "active_count": len(active_groups),
+            "alerts": alerts,
+        })
+
+    return {
+        "status": "success",
+        "facility_count": len(facilities),
+        "active_count": sum(facility["active_count"] for facility in facilities),
+        "thresholds": thresholds,
+        "facilities": facilities,
+    }
+
+
 @app.put("/api/v1/facility/inventory/{blood_group}")
 async def update_facility_inventory(
     blood_group: str,
@@ -4741,6 +5192,9 @@ async def update_facility_inventory(
         raise HTTPException(status_code=422, detail="Choose a valid blood group.")
     result = _update_facility_inventory(
         user["phone"], user["phone"], blood_group, payload.quantity
+    )
+    _sync_facility_inventory_alerts(
+        user["phone"], _get_blood_stock_thresholds()
     )
     return {"status": "success", "item": result}
 
@@ -5171,14 +5625,13 @@ async def get_hospital_settings(request: Request):
 @app.post("/api/v1/hospital/settings")
 @app.post("/api/v1/facility/settings")
 async def save_hospital_settings(payload: FacilitySettingsPayload, request: Request):
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = payload.phone.strip()
-    if not phone and token:
-        phone = token.get("sub", "")
-    if not phone:
-        phone = "+8801734567890"
+    user = _require_facility_inventory_user(request)
+    phone = user["phone"]
+    if payload.phone.strip() and payload.phone.strip() != phone:
+        raise HTTPException(status_code=403, detail="You can only update your own facility settings.")
 
     saved = _save_facility_settings(phone, payload.model_dump())
+    _sync_facility_inventory_alerts(phone, _get_blood_stock_thresholds())
     return {
         "status": "success",
         "message": "Facility profile and portal settings saved successfully",
