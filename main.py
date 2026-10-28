@@ -439,6 +439,16 @@ def initialize_auth_database():
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (phone)
                 );
+                CREATE TABLE IF NOT EXISTS donor_privacy_settings (
+                    phone TEXT PRIMARY KEY,
+                    allow_hospital_calls INTEGER NOT NULL DEFAULT 1,
+                    mask_public_phone INTEGER NOT NULL DEFAULT 1,
+                    public_directory INTEGER NOT NULL DEFAULT 1,
+                    show_badges INTEGER NOT NULL DEFAULT 1,
+                    share_direct_contact INTEGER NOT NULL DEFAULT 0,
+                    phone_visibility TEXT NOT NULL DEFAULT 'hospital_only',
+                    updated_at INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS facility_settings (
                     phone TEXT PRIMARY KEY,
                     facility_name TEXT NOT NULL,
@@ -2222,6 +2232,15 @@ async def respond_to_blood_request(request_id: str, payload: RespondBloodRequest
     }
 
 
+class DonorPrivacySettingsPayload(BaseModel):
+    allow_hospital_calls: bool = True
+    mask_public_phone: bool = True
+    public_directory: bool = True
+    show_badges: bool = True
+    share_direct_contact: bool = False
+    phone_visibility: str = "hospital_only"
+
+
 class DonorSettingsPreferences(BaseModel):
     sms_alerts: bool = True
     inapp_notifications: bool = True
@@ -2231,17 +2250,195 @@ class DonorSettingsPreferences(BaseModel):
     donation_types: list[str] = ["Whole Blood"]
     preferred_zones: list[str] = ["Dhanmondi / Panthapath"]
     phone_visibility: str = "hospital_only"
+    allow_hospital_calls: bool = True
+    mask_public_phone: bool = True
     public_directory: bool = True
     show_badges: bool = True
+    share_direct_contact: bool = False
     two_factor_auth: bool = True
+
+
+def _get_donor_privacy_settings(phone: str) -> dict:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT allow_hospital_calls, mask_public_phone, public_directory,
+                      show_badges, share_direct_contact, phone_visibility, updated_at
+               FROM donor_privacy_settings WHERE phone = ?""",
+            (phone,),
+        ).fetchone()
+        if row is not None:
+            return {
+                "phone": phone,
+                "allow_hospital_calls": bool(row["allow_hospital_calls"]),
+                "mask_public_phone": bool(row["mask_public_phone"]),
+                "public_directory": bool(row["public_directory"]),
+                "show_badges": bool(row["show_badges"]),
+                "share_direct_contact": bool(row["share_direct_contact"]),
+                "phone_visibility": row["phone_visibility"] or "hospital_only",
+                "updated_at": row["updated_at"],
+            }
+        now = int(time.time())
+        default_settings = {
+            "phone": phone,
+            "allow_hospital_calls": True,
+            "mask_public_phone": True,
+            "public_directory": True,
+            "show_badges": True,
+            "share_direct_contact": False,
+            "phone_visibility": "hospital_only",
+            "updated_at": now,
+        }
+        with connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO donor_privacy_settings (
+                    phone, allow_hospital_calls, mask_public_phone, public_directory,
+                    show_badges, share_direct_contact, phone_visibility, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    phone,
+                    int(default_settings["allow_hospital_calls"]),
+                    int(default_settings["mask_public_phone"]),
+                    int(default_settings["public_directory"]),
+                    int(default_settings["show_badges"]),
+                    int(default_settings["share_direct_contact"]),
+                    default_settings["phone_visibility"],
+                    now,
+                ),
+            )
+        return default_settings
+
+
+def _update_donor_privacy_settings(phone: str, payload: dict) -> dict:
+    initialize_auth_database()
+    current = _get_donor_privacy_settings(phone)
+    now = int(time.time())
+
+    allow_hospital_calls = payload.get("allow_hospital_calls", current["allow_hospital_calls"])
+    mask_public_phone = payload.get("mask_public_phone", current["mask_public_phone"])
+    public_directory = payload.get("public_directory", current["public_directory"])
+    show_badges = payload.get("show_badges", current["show_badges"])
+    share_direct_contact = payload.get("share_direct_contact", current["share_direct_contact"])
+    phone_visibility = payload.get("phone_visibility", current["phone_visibility"])
+
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO donor_privacy_settings (
+                    phone, allow_hospital_calls, mask_public_phone, public_directory,
+                    show_badges, share_direct_contact, phone_visibility, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    phone,
+                    int(bool(allow_hospital_calls)),
+                    int(bool(mask_public_phone)),
+                    int(bool(public_directory)),
+                    int(bool(show_badges)),
+                    int(bool(share_direct_contact)),
+                    str(phone_visibility),
+                    now,
+                ),
+            )
+
+    return {
+        "phone": phone,
+        "allow_hospital_calls": bool(allow_hospital_calls),
+        "mask_public_phone": bool(mask_public_phone),
+        "public_directory": bool(public_directory),
+        "show_badges": bool(show_badges),
+        "share_direct_contact": bool(share_direct_contact),
+        "phone_visibility": str(phone_visibility),
+        "updated_at": now,
+    }
+
+
+@app.get("/api/v1/donor/privacy-settings")
+async def get_donor_privacy_settings_endpoint(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    settings = _get_donor_privacy_settings(phone)
+    return {
+        "status": "success",
+        "privacy_controls": settings,
+        "settings": settings,
+    }
+
+
+@app.post("/api/v1/donor/privacy-settings")
+async def update_donor_privacy_settings_endpoint(payload: DonorPrivacySettingsPayload, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    updated = _update_donor_privacy_settings(phone, payload.model_dump())
+    return {
+        "status": "success",
+        "message": "Profile visibility & contact privacy controls updated successfully.",
+        "privacy_controls": updated,
+        "settings": updated,
+    }
+
+
+@app.get("/api/v1/donor/settings")
+async def get_donor_settings(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    privacy = _get_donor_privacy_settings(phone)
+    full_settings = {
+        "sms_alerts": True,
+        "inapp_notifications": True,
+        "gap_reminders": True,
+        "quiet_hours": False,
+        "radius_km": 15,
+        "donation_types": ["Whole Blood"],
+        "preferred_zones": ["Dhanmondi / Panthapath"],
+        "two_factor_auth": True,
+        **privacy,
+    }
+    return {
+        "status": "success",
+        "settings": full_settings,
+        "privacy_controls": privacy,
+    }
 
 
 @app.post("/api/v1/donor/settings")
 async def update_donor_settings(payload: DonorSettingsPreferences, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    privacy_data = {
+        "allow_hospital_calls": payload.allow_hospital_calls,
+        "mask_public_phone": payload.mask_public_phone,
+        "public_directory": payload.public_directory,
+        "show_badges": payload.show_badges,
+        "share_direct_contact": payload.share_direct_contact,
+        "phone_visibility": payload.phone_visibility,
+    }
+    updated_privacy = _update_donor_privacy_settings(phone, privacy_data)
+    merged = {**payload.model_dump(), **updated_privacy}
     return {
         "status": "success",
         "message": "Donor preferences and portal settings updated successfully.",
-        "settings": payload.model_dump(),
+        "settings": merged,
+        "privacy_controls": updated_privacy,
     }
 
 

@@ -1114,16 +1114,19 @@
             </div>
           </div>
 
-          <!-- CARD 3: Privacy & Contact Visibility Controls -->
-          <div class="donor-card">
+          <!-- CARD 3: Profile Visibility & Contact Privacy Controls -->
+          <div class="donor-card" id="card-privacy-controls">
             <div class="card-header-flex" style="margin-bottom: 16px;">
               <div class="card-title-combo">
                 <span style="font-size: 1.3rem;">🛡️</span>
                 <div>
-                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Privacy & Contact Visibility</h3>
-                  <div class="card-subtitle">Control who sees your personal phone number and status</div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="privacyControlsHeading">Profile Visibility &amp; Contact Privacy Controls</h3>
+                  <div class="card-subtitle">Control who sees your personal phone number, badges, and discoverability in blood searches</div>
                 </div>
               </div>
+              <button type="button" class="btn-donor-outline" id="btnSavePrivacyControls" style="font-size: 0.82rem; padding: 6px 14px;">
+                Save Privacy Settings
+              </button>
             </div>
 
             <div class="settings-group-stack">
@@ -1166,13 +1169,38 @@
               <!-- Setting 4: Badges & Milestones -->
               <div class="setting-toggle-row">
                 <div class="setting-title-desc">
-                  <div class="setting-name">Public Donor Badges & Lives Saved Counter</div>
+                  <div class="setting-name">Public Donor Badges &amp; Lives Saved Counter</div>
                   <div class="setting-desc">Showcase your Gold Tier badge, 8 verified donations, and 4.9 rating on your public donor card.</div>
                 </div>
                 <label class="switch-toggle-btn" aria-label="Toggle Badges Visibility">
                   <input type="checkbox" id="settingShowBadges" checked>
                   <span class="switch-slider"></span>
                 </label>
+              </div>
+
+              <!-- Setting 5: Direct Contact Consent -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Direct Contact Consent (Speed-Dial &amp; WhatsApp)</div>
+                  <div class="setting-desc">Allow verified blood seekers with active emergency requests to initiate direct calls or WhatsApp messages.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Direct Contact Consent">
+                  <input type="checkbox" id="settingShareDirectContact">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Live Privacy & Visibility Preview Box -->
+            <div class="privacy-preview-box" id="privacyPreviewBox" style="margin-top: 18px; padding: 14px 16px; background: var(--bg-page); border: 1px dashed var(--border-color); border-radius: 10px; font-size: 0.85rem;">
+              <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <span>👁️</span> Public Privacy &amp; Visibility Live Preview
+              </div>
+              <div style="color: var(--text-secondary); line-height: 1.6;">
+                <div><strong>Directory Status:</strong> <span id="previewDirStatus" style="color: var(--success-green); font-weight: 600;">Visible to seekers</span></div>
+                <div><strong>Phone Number Display:</strong> <code id="previewPhoneDisplay">+880 1712-***678 (Masked for Privacy)</code></div>
+                <div><strong>Verified Badges:</strong> <span id="previewBadgeStatus">Gold Tier, Rating &amp; Donation Count Visible</span></div>
+                <div><strong>Direct Contact:</strong> <span id="previewContactStatus">In-App Chat Only (Protected)</span></div>
               </div>
             </div>
           </div>
