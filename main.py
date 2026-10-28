@@ -14,6 +14,13 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import asynccontextmanager, closing
+from account_privacy_service import (
+    DATA_RETENTION_POLICY_DETAILS,
+    DATA_RETENTION_POLICY_VERSION,
+    initialize_privacy_database,
+    scrub_and_delete_account,
+    verify_user_identity_credentials,
+)
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -666,6 +673,10 @@ async def _render_login_page(
         deleted_role = request.query_params.get("role", "").lower()
         if deleted_role in {"hospital", "bank", "blood_bank", "facility"}:
             success_message = "Your institutional facility account has been permanently deleted."
+        elif deleted_role == "donor":
+            success_message = "Your donor account has been permanently deleted and personal data scrubbed."
+        elif deleted_role in {"all", "user", "account"}:
+            success_message = "Your account has been permanently deleted and personal data scrubbed."
         else:
             success_message = "Your seeker account has been permanently deleted."
 
@@ -697,6 +708,13 @@ class PhoneRequest(BaseModel):
 class VerifyRecoveryRequest(BaseModel):
     phone: str
     code: str
+
+
+class AccountDeletionRequest(BaseModel):
+    password: str = Field(..., min_length=1)
+    confirm_text: str = Field(...)
+    confirm_policy: bool = Field(...)
+    reason: Optional[str] = ""
 
 
 class ResetPasswordRequest(BaseModel):
@@ -848,6 +866,7 @@ def initialize_auth_database():
                 connection.execute("ALTER TABLE auth_users ADD COLUMN manager_name TEXT DEFAULT ''")
             if "address" not in auth_user_columns:
                 connection.execute("ALTER TABLE auth_users ADD COLUMN address TEXT DEFAULT ''")
+    initialize_privacy_database()
 
 
 def _connection():
@@ -1242,7 +1261,11 @@ def reset_password(payload: ResetPasswordRequest, response: Response, request: R
 
 
 def _get_current_user(request: Request) -> dict | None:
-    token = _decode_jwt(request.cookies.get("access_token", ""))
+    token_str = request.cookies.get("access_token", "")
+    auth_header = request.headers.get("Authorization", "")
+    if not token_str and auth_header.startswith("Bearer "):
+        token_str = auth_header[7:].strip()
+    token = _decode_jwt(token_str)
     if token and token.get("sub"):
         phone = token.get("sub")
         token_role = token.get("role", "donor")
@@ -1391,6 +1414,194 @@ async def serve_privacy(request: Request):
             "user": _get_current_user(request),
         },
     )
+
+
+@app.get("/account/delete", response_class=HTMLResponse)
+@app.get("/account-deletion", response_class=HTMLResponse)
+@app.get("/settings/delete-account", response_class=HTMLResponse)
+async def serve_account_deletion_page(request: Request):
+    user = _get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login?next=/account/delete", status_code=303)
+
+    role = user.get("role", "donor")
+    dashboard_url = ROLE_DASHBOARDS.get(role, "/seeker/dashboard" if role == "seeker" else "/donor/dashboard")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="account_deletion.html",
+        context={
+            "request": request,
+            "user": user,
+            "dashboard_url": dashboard_url,
+            "policy_version": DATA_RETENTION_POLICY_VERSION,
+            "policy_details": DATA_RETENTION_POLICY_DETAILS,
+            "current_year": datetime.now(timezone.utc).year,
+        },
+    )
+
+
+@app.get("/account/deleted", response_class=HTMLResponse)
+async def serve_account_deleted_confirmation(request: Request, response: Response):
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(key="session", path="/")
+    return templates.TemplateResponse(
+        request=request,
+        name="account_deleted.html",
+        context={
+            "request": request,
+            "policy_version": DATA_RETENTION_POLICY_VERSION,
+            "current_year": datetime.now(timezone.utc).year,
+        },
+    )
+
+
+@app.post("/account/delete")
+async def handle_account_deletion_form(
+    request: Request,
+    response: Response,
+    password: str = Form(...),
+    confirm_text: str = Form(...),
+    confirm_policy: Optional[str] = Form(None),
+    reason: Optional[str] = Form(""),
+):
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        return RedirectResponse(url="/login?next=/account/delete", status_code=303)
+
+    phone = user["phone"]
+    role = user.get("role", "donor")
+    dashboard_url = ROLE_DASHBOARDS.get(role, "/seeker/dashboard" if role == "seeker" else "/donor/dashboard")
+
+    # 1. Verify User Identity
+    if not verify_user_identity_credentials(phone, password, USERS):
+        return templates.TemplateResponse(
+            request=request,
+            name="account_deletion.html",
+            context={
+                "request": request,
+                "user": user,
+                "dashboard_url": dashboard_url,
+                "policy_version": DATA_RETENTION_POLICY_VERSION,
+                "policy_details": DATA_RETENTION_POLICY_DETAILS,
+                "error": "Identity verification failed: Incorrect password provided.",
+                "current_year": datetime.now(timezone.utc).year,
+            },
+            status_code=400,
+        )
+
+    # 2. Confirmation Keyword Verification
+    if confirm_text.strip() != "DELETE":
+        return templates.TemplateResponse(
+            request=request,
+            name="account_deletion.html",
+            context={
+                "request": request,
+                "user": user,
+                "dashboard_url": dashboard_url,
+                "policy_version": DATA_RETENTION_POLICY_VERSION,
+                "policy_details": DATA_RETENTION_POLICY_DETAILS,
+                "error": "Confirmation failed: You must type DELETE in all capital letters.",
+                "current_year": datetime.now(timezone.utc).year,
+            },
+            status_code=400,
+        )
+
+    # 3. Policy Acknowledgment
+    if not confirm_policy:
+        return templates.TemplateResponse(
+            request=request,
+            name="account_deletion.html",
+            context={
+                "request": request,
+                "user": user,
+                "dashboard_url": dashboard_url,
+                "policy_version": DATA_RETENTION_POLICY_VERSION,
+                "policy_details": DATA_RETENTION_POLICY_DETAILS,
+                "error": "You must acknowledge the Data Retention Policy to proceed with account deletion.",
+                "current_year": datetime.now(timezone.utc).year,
+            },
+            status_code=400,
+        )
+
+    # 4. Execute permanent deletion & data privacy scrubbing
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    scrub_and_delete_account(
+        phone=phone,
+        role=role,
+        reason=reason or "",
+        ip_address=client_ip,
+        users_cache=USERS,
+        facility_cache=FACILITY_SETTINGS,
+        seeker_cache=SEEKER_SETTINGS,
+    )
+
+    # 5. Terminate active sessions & redirect to confirmation
+    resp = RedirectResponse(url="/account/deleted", status_code=303)
+    resp.delete_cookie(key="access_token", path="/")
+    resp.delete_cookie(key=SESSION_COOKIE, path="/")
+    resp.delete_cookie(key="session", path="/")
+    return resp
+
+
+@app.post("/api/v1/account/delete")
+async def api_permanent_account_deletion(
+    request: Request,
+    response: Response,
+    payload: AccountDeletionRequest,
+):
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        raise HTTPException(status_code=401, detail="Authentication required to delete account.")
+
+    phone = user["phone"]
+    role = user.get("role", "donor")
+
+    # 1. Verify User Identity
+    if not verify_user_identity_credentials(phone, payload.password, USERS):
+        raise HTTPException(
+            status_code=400,
+            detail="Identity verification failed: Incorrect password provided. Please verify your credentials to confirm permanent deletion.",
+        )
+
+    # 2. Confirmation Keyword
+    if payload.confirm_text.strip() != "DELETE":
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmation keyword mismatch: You must type DELETE in all uppercase letters.",
+        )
+
+    # 3. Policy Acknowledgment
+    if not payload.confirm_policy:
+        raise HTTPException(
+            status_code=400,
+            detail="You must acknowledge the Data Retention Policy to proceed with account deletion.",
+        )
+
+    # 4. Execute permanent deletion & data privacy scrubbing
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    summary = scrub_and_delete_account(
+        phone=phone,
+        role=role,
+        reason=payload.reason or "",
+        ip_address=client_ip,
+        users_cache=USERS,
+        facility_cache=FACILITY_SETTINGS,
+        seeker_cache=SEEKER_SETTINGS,
+    )
+
+    # 5. Clear authentication cookies
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(key="session", path="/")
+
+    return {
+        "status": "success",
+        "message": "Account permanently deleted and eligible personal data scrubbed in accordance with the Data Retention Policy.",
+        "redirect_url": "/account/deleted",
+        "summary": summary,
+    }
 
 
 @app.get("/auth/register", response_class=HTMLResponse)
@@ -4969,45 +5180,26 @@ async def delete_seeker_account(request: Request, response: Response):
     if not phone:
         phone = request.query_params.get("phone", "+8801723456789")
 
-    # 1. Remove from database auth_users and sessions
-    initialize_auth_database()
-    with closing(_connection()) as connection:
-        with connection:
-            user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
-            if user_row:
-                user_id = user_row["id"]
-                connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
-                connection.execute("DELETE FROM password_reset_challenges WHERE user_id = ?", (user_id,))
-                connection.execute("DELETE FROM auth_users WHERE id = ?", (user_id,))
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    summary = scrub_and_delete_account(
+        phone=phone,
+        role="seeker",
+        reason=request.query_params.get("reason", "Seeker requested permanent account deletion"),
+        ip_address=client_ip,
+        users_cache=USERS,
+        facility_cache=FACILITY_SETTINGS,
+        seeker_cache=SEEKER_SETTINGS,
+    )
 
-    # 2. Clean blood_requests and notifications for this seeker phone
-    try:
-        initialize_urgent_database()
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            with u_conn:
-                req_rows = u_conn.execute("SELECT id FROM blood_requests WHERE contact_phone = ?", (phone,)).fetchall()
-                for r in req_rows:
-                    req_id = r[0]
-                    u_conn.execute("DELETE FROM donor_request_responses WHERE request_id = ?", (req_id,))
-                    u_conn.execute("DELETE FROM seeker_notifications WHERE request_id = ?", (req_id,))
-                u_conn.execute("DELETE FROM blood_requests WHERE contact_phone = ?", (phone,))
-    except Exception as exc:
-        logger.warning(f"Error cleaning seeker blood requests on delete: {exc}")
-
-    # 3. Clean in-memory user caches
-    if phone in USERS:
-        del USERS[phone]
-    if phone in SEEKER_SETTINGS:
-        del SEEKER_SETTINGS[phone]
-
-    # 4. Clear authentication cookies
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(key="session", path="/")
 
     return {
         "status": "success",
         "message": "Seeker account has been permanently deleted.",
         "redirect_url": "/login?account_deleted=1",
+        "summary": summary,
     }
 
 
@@ -5637,6 +5829,44 @@ async def reset_hospital_settings(request: Request):
     }
 
 
+@app.delete("/api/v1/donor/account")
+async def delete_donor_account(request: Request, response: Response):
+    user = _get_current_user(request)
+    phone = user.get("phone") if user and user.get("role") == "donor" else None
+
+    if not phone:
+        token = _decode_jwt(request.cookies.get("access_token", ""))
+        phone = token.get("sub") if token and token.get("role") == "donor" else None
+
+    if not phone and (request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1"):
+        phone = "+8801712345678"
+
+    if not phone:
+        phone = request.query_params.get("phone", "+8801712345678")
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    summary = scrub_and_delete_account(
+        phone=phone,
+        role="donor",
+        reason=request.query_params.get("reason", "Donor requested account deletion"),
+        ip_address=client_ip,
+        users_cache=USERS,
+        facility_cache=FACILITY_SETTINGS,
+        seeker_cache=SEEKER_SETTINGS,
+    )
+
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(key="session", path="/")
+
+    return {
+        "status": "success",
+        "message": "Donor account has been permanently deleted and personal data scrubbed.",
+        "redirect_url": "/account/deleted",
+        "summary": summary,
+    }
+
+
 @app.delete("/api/v1/hospital/account")
 @app.delete("/api/v1/facility/account")
 async def delete_hospital_account(request: Request, response: Response):
@@ -5653,32 +5883,26 @@ async def delete_hospital_account(request: Request, response: Response):
     if not phone:
         phone = request.query_params.get("phone", "+8801734567890")
 
-    # 1. Remove from database auth_users, auth_sessions, and facility_settings
-    initialize_auth_database()
-    with closing(_connection()) as connection:
-        with connection:
-            user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
-            if user_row:
-                user_id = user_row["id"]
-                connection.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
-                connection.execute("DELETE FROM password_reset_challenges WHERE user_id = ?", (user_id,))
-                connection.execute("DELETE FROM auth_users WHERE id = ?", (user_id,))
-            connection.execute("DELETE FROM facility_settings WHERE phone = ?", (phone,))
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    summary = scrub_and_delete_account(
+        phone=phone,
+        role="hospital",
+        reason=request.query_params.get("reason", "Hospital requested account deletion"),
+        ip_address=client_ip,
+        users_cache=USERS,
+        facility_cache=FACILITY_SETTINGS,
+        seeker_cache=SEEKER_SETTINGS,
+    )
 
-    # 2. Clean in-memory user caches
-    if phone in USERS:
-        del USERS[phone]
-    if phone in FACILITY_SETTINGS:
-        del FACILITY_SETTINGS[phone]
-
-    # 3. Clear authentication cookies
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(key="session", path="/")
 
     return {
         "status": "success",
         "message": "Institutional facility account has been permanently deleted.",
         "redirect_url": "/login?account_deleted=1&role=hospital",
+        "summary": summary,
     }
 
 

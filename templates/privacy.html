@@ -31,7 +31,7 @@
         </ul>
       </nav>
 
-            <div class="nav-auth-actions">
+      <div class="nav-auth-actions">
         {% set current_u = user or logged_in_user %}
         {% if current_u %}
           <a href="{{ '/seeker/dashboard' if current_u.role == 'seeker' else '/donor/dashboard' }}" class="btn btn-outline">Dashboard</a>
@@ -63,6 +63,22 @@
 
           <h2>4. Security</h2>
           <p>We take security seriously and use industry-standard encryption for passwords and sensitive data to protect your information.</p>
+
+          <h2>5. Data Retention Policy &amp; Permanent Account Deletion</h2>
+          <p>You have the absolute right to permanently delete your account and request erasure or anonymization of eligible personal data at any time under our Data Retention Policy (v2026.1):</p>
+          <ul style="margin: 12px 0 16px 24px; line-height: 1.6;">
+            <li><strong>Eligible Personal Data:</strong> Upon account deletion, all personal identifiers (name, phone number, email address, GPS location, medical history, National ID KYC documents, push subscriptions, and active login sessions) are immediately and permanently erased.</li>
+            <li><strong>Clinical Transfusion Records:</strong> For public health compliance and transfusion safety lookback (DGHS / WHO guidelines), unit donation timestamps and blood groups are retained in an anonymous format decoupled from your identity using a one-way cryptographic pseudonym (<code>ANON-DONOR-XXXX</code>).</li>
+            <li><strong>Session Revocation:</strong> Active sessions across all browsers and devices are immediately terminated upon confirmed deletion.</li>
+          </ul>
+          <p>
+            You can initiate permanent account deletion and data scrubbing directly through the dedicated account deletion portal:
+          </p>
+          <div style="margin-top: 18px;">
+            <a href="/account/delete" class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: #BE123C; border-color: #FECDD3; background: #FFF1F2;">
+              <span>🛡️</span> Manage Permanent Account Deletion &amp; Data Privacy Scrubbing
+            </a>
+          </div>
         </div>
       </section>
     </div>

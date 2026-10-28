@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Permanent Account Deletion &amp; Data Privacy Scrubbing — Smart Blood Donor Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .deletion-shell {
+      max-width: 880px;
+      margin: 32px auto 60px;
+      padding: 0 20px;
+    }
+
+    .back-nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin-bottom: 24px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid var(--border-color);
+      transition: all 0.2s ease;
+    }
+    .back-nav-link:hover {
+      color: var(--primary-red);
+      background: #FFFFFF;
+      border-color: #FDA4AF;
+      transform: translateX(-2px);
+    }
+
+    .deletion-hero-card {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 1px solid #FECDD3;
+      padding: 32px;
+      box-shadow: 0 10px 30px rgba(225, 29, 72, 0.06);
+      margin-bottom: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+    .deletion-hero-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #E11D48, #BE123C, #881337);
+    }
+
+    .deletion-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: #FFF1F2;
+      color: #BE123C;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      border: 1px solid #FFE4E6;
+    }
+
+    .deletion-hero-title {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 10px;
+      line-height: 1.25;
+    }
+
+    .deletion-hero-subtitle {
+      font-size: 1.05rem;
+      color: #475569;
+      line-height: 1.6;
+      max-width: 760px;
+    }
+
+    .user-profile-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: #F8FAFC;
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+    }
+    .user-profile-info {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .user-avatar-circle {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #FFE4E6, #FECDD3);
+      color: #BE123C;
+      font-size: 1.2rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Policy Breakdown Grid */
+    .policy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .policy-card {
+      background: #FFFFFF;
+      border-radius: 16px;
+      padding: 24px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+    }
+    .policy-card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #F1F5F9;
+    }
+    .policy-card-icon {
+      font-size: 1.4rem;
+    }
+    .policy-card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0F172A;
+      margin: 0;
+    }
+
+    .policy-item-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .policy-item-list li {
+      font-size: 0.88rem;
+      color: #334155;
+      line-height: 1.5;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .policy-bullet {
+      color: #E11D48;
+      font-weight: 800;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    /* Form Card */
+    .form-card {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 2px solid #FCA5A5;
+      padding: 32px;
+      box-shadow: 0 12px 36px rgba(225, 29, 72, 0.08);
+    }
+    .form-card-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #991B1B;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .form-card-desc {
+      font-size: 0.92rem;
+      color: #64748B;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .form-step-group {
+      margin-bottom: 24px;
+    }
+    .form-step-label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 8px;
+    }
+    .form-step-hint {
+      font-size: 0.82rem;
+      color: #64748B;
+      margin-top: 6px;
+    }
+
+    .input-field-custom {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border-color);
+      font-size: 1rem;
+      color: #0F172A;
+      background: #F8FAFC;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+    .input-field-custom:focus {
+      outline: none;
+      border-color: #E11D48;
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
+    }
+
+    .checkbox-confirm-wrap {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 12px;
+      background: #FFF1F2;
+      border: 1px solid #FECDD3;
+      cursor: pointer;
+    }
+    .checkbox-confirm-wrap input[type="checkbox"] {
+      width: 20px;
+      height: 20px;
+      margin-top: 2px;
+      accent-color: #E11D48;
+      cursor: pointer;
+    }
+    .checkbox-confirm-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #881337;
+      line-height: 1.5;
+      cursor: pointer;
+    }
+
+    .alert-banner {
+      padding: 14px 18px;
+      border-radius: 10px;
+      margin-bottom: 22px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .alert-banner-danger {
+      background: #FEF2F2;
+      color: #991B1B;
+      border: 1px solid #FCA5A5;
+    }
+
+    .form-actions-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid #F1F5F9;
+      flex-wrap: wrap;
+    }
+
+    .btn-cancel-deletion {
+      padding: 13px 24px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border-color);
+      background: #FFFFFF;
+      color: #475569;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-cancel-deletion:hover {
+      background: #F1F5F9;
+      color: #0F172A;
+    }
+
+    .btn-confirm-permanent-delete {
+      padding: 13px 28px;
+      border-radius: 10px;
+      border: none;
+      background: #DC2626;
+      color: #FFFFFF;
+      font-weight: 800;
+      font-size: 0.98rem;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-confirm-permanent-delete:disabled {
+      background: #94A3B8;
+      cursor: not-allowed;
+      box-shadow: none;
+      opacity: 0.65;
+    }
+    .btn-confirm-permanent-delete:not(:disabled):hover {
+      background: #B91C1C;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(185, 28, 28, 0.45);
+    }
+  </style>
+</head>
+<body>
+  <!-- Global Navigation Header -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/privacy" class="nav-link">Privacy Policy</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="{{ dashboard_url }}" class="btn btn-outline">Dashboard</a>
+        <a href="/logout" class="btn btn-primary">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <div class="deletion-shell">
+      
+      <!-- Back Navigation -->
+      <a href="{{ dashboard_url }}" class="back-nav-link" id="linkBackToDashboard">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        Back to Dashboard
+      </a>
+
+      <!-- Hero Header Card -->
+      <div class="deletion-hero-card">
+        <div class="deletion-badge-pill">
+          <span>🛡️</span> Data Privacy &amp; Retention Policy v{{ policy_version }}
+        </div>
+        <h1 class="deletion-hero-title">Permanent Account Deletion &amp; Data Privacy Scrubbing</h1>
+        <p class="deletion-hero-subtitle">
+          Permanently delete your user account and initiate the immediate removal or anonymization of eligible personal data according to the system's data-retention policy.
+        </p>
+
+        <!-- Current User Profile Identification -->
+        <div class="user-profile-strip">
+          <div class="user-profile-info">
+            <div class="user-avatar-circle">
+              {{ (user.name[0] if user.name else user.phone[-2:] if user.phone else 'U') | upper }}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: #0F172A; font-size: 1.05rem;" id="displayUserName">
+                {{ user.name or 'Registered User' }}
+              </div>
+              <div style="font-size: 0.86rem; color: #64748B;" id="displayUserPhone">
+                {{ user.phone }} · <strong style="color: #BE123C; text-transform: capitalize;">{{ user.role or 'User' }} Account</strong>
+              </div>
+            </div>
+          </div>
+          <span style="font-size: 0.82rem; background: #FFE4E6; color: #991B1B; font-weight: 700; padding: 6px 12px; border-radius: 8px;">
+            Target for Permanent Erasure
+          </span>
+        </div>
+      </div>
+
+      <!-- Policy Breakdown Accordion / Grid -->
+      <div class="policy-grid">
+        <!-- Card 1: Eligible Personal Data (Immediate Erasure) -->
+        <div class="policy-card">
+          <div class="policy-card-header">
+            <span class="policy-card-icon">🗑️</span>
+            <h2 class="policy-card-title">1. What Will Be Erased Immediately</h2>
+          </div>
+          <ul class="policy-item-list">
+            <li>
+              <span class="policy-bullet">✕</span>
+              <span><strong>Account Credentials:</strong> Password hashes, reset challenges, and active session tokens are wiped permanently.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">✕</span>
+              <span><strong>Personal Identity (PII):</strong> Name, phone number, email address, home address, and GPS coordinates are purged.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">✕</span>
+              <span><strong>Health &amp; Medical Notes:</strong> Known medical conditions, medications, allergies, and eligibility notes are erased.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">✕</span>
+              <span><strong>KYC Verification:</strong> National ID (NID) numbers and uploaded document images are scrubbed from servers.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">✕</span>
+              <span><strong>Push &amp; Notifications:</strong> Browser push subscriptions, device tokens, and in-app message alerts are deleted.</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Card 2: Legal & Clinical Records (Data Retention Policy) -->
+        <div class="policy-card">
+          <div class="policy-card-header">
+            <span class="policy-card-icon">📋</span>
+            <h2 class="policy-card-title">2. Regulatory &amp; Clinical Retention</h2>
+          </div>
+          <ul class="policy-item-list">
+            <li>
+              <span class="policy-bullet">⚖️</span>
+              <span><strong>Donation Safety Traceability:</strong> Pursuant to DGHS transfusion rules, donation records (date, unit, blood type) are preserved anonymously using a one-way cryptographic pseudonym (<code>ANON-DONOR-XXXX</code>), with all phone numbers stripped.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">🛑</span>
+              <span><strong>Active Requests:</strong> Any open blood requests posted by you are immediately cancelled. Patient names and contact numbers are redacted to protect privacy.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">💬</span>
+              <span><strong>Direct Messaging:</strong> Chat message text is overwritten with an account scrub tombstone to protect recipient thread continuity without storing your words.</span>
+            </li>
+            <li>
+              <span class="policy-bullet">🔒</span>
+              <span><strong>Deletion Receipt:</strong> A non-reversible SHA-256 hash receipt is recorded for legal verification under Data Protection regulations.</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Main Action Deletion Form -->
+      <div class="form-card" id="accountDeletionContainer">
+        <h2 class="form-card-title">
+          <span>⚠️</span> Identity Verification &amp; Confirmation
+        </h2>
+        <p class="form-card-desc">
+          Account deletion is a permanent, irreversible action. To protect account security, you must verify your identity before deletion can proceed.
+        </p>
+
+        <!-- Dynamic Error Banner -->
+        <div id="deletionErrorMessage" class="alert-banner alert-banner-danger" style="display: none;" role="alert">
+          <span style="font-size: 1.2rem;">⚠️</span>
+          <span id="deletionErrorText">Identity verification failed. Please try again.</span>
+        </div>
+
+        <form id="accountDeletionForm" method="POST" action="/account/delete" novalidate>
+          <input type="hidden" name="phone" value="{{ user.phone }}">
+
+          <!-- Step 1: User Identity Verification -->
+          <div class="form-step-group">
+            <label for="deletionPassword" class="form-step-label">
+              1. Verify Your Identity: Enter Account Password <span style="color: #E11D48;">*</span>
+            </label>
+            <div style="position: relative;">
+              <input
+                type="password"
+                id="deletionPassword"
+                name="password"
+                class="input-field-custom"
+                placeholder="Enter your current password"
+                required
+                autocomplete="current-password"
+              >
+            </div>
+            <div class="form-step-hint">
+              We require your password to verify that you are the legitimate owner of this account.
+            </div>
+          </div>
+
+          <!-- Step 2: Confirmation Keyword -->
+          <div class="form-step-group">
+            <label for="deletionConfirmText" class="form-step-label">
+              2. Explicit Confirmation: Type <strong style="color: #BE123C; letter-spacing: 1px;">DELETE</strong> Below <span style="color: #E11D48;">*</span>
+            </label>
+            <input
+              type="text"
+              id="deletionConfirmText"
+              name="confirm_text"
+              class="input-field-custom"
+              placeholder="DELETE"
+              required
+              autocomplete="off"
+            >
+            <div class="form-step-hint">
+              Please enter DELETE in all uppercase letters to confirm that you understand this action cannot be undone.
+            </div>
+          </div>
+
+          <!-- Step 3: Policy Acknowledgment -->
+          <div class="form-step-group">
+            <label class="checkbox-confirm-wrap" for="deletionConfirmPolicy">
+              <input
+                type="checkbox"
+                id="deletionConfirmPolicy"
+                name="confirm_policy"
+                value="1"
+                required
+              >
+              <span class="checkbox-confirm-label">
+                I understand that this action is permanent and irreversible. My account will be deleted, active sessions will be terminated, eligible personal data scrubbed, and required clinical records anonymized under the Data Retention Policy (v{{ policy_version }}).
+              </span>
+            </label>
+          </div>
+
+          <!-- Step 4: Optional Feedback Reason -->
+          <div class="form-step-group">
+            <label for="deletionReason" class="form-step-label">
+              3. Reason for Leaving (Optional)
+            </label>
+            <select id="deletionReason" name="reason" class="input-field-custom">
+              <option value="">Select a reason (optional)...</option>
+              <option value="No longer need blood donation/matching services">No longer need blood donation or request services</option>
+              <option value="Privacy and data protection concerns">Privacy and personal data protection concerns</option>
+              <option value="Creating a new or different account">Creating a new account</option>
+              <option value="Relocated outside active service area">Relocated outside the platform's service area</option>
+              <option value="Temporary hiatus / not donating currently">Taking a break from donations</option>
+              <option value="Other">Other reason</option>
+            </select>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="form-actions-row">
+            <a href="{{ dashboard_url }}" class="btn-cancel-deletion" id="btnCancelDeletion">
+              Cancel &amp; Keep Account
+            </a>
+            <button
+              type="submit"
+              id="btnSubmitPermanentDeletion"
+              class="btn-confirm-permanent-delete"
+              disabled
+            >
+              <span id="btnDeleteSpinner" style="display: none;">⏳</span>
+              <span id="btnDeleteText">Verify Identity &amp; Permanently Delete Account</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  {% include "partials/public_footer.html" %}
+
+  <script>
+    (function() {
+      const passwordInput = document.getElementById("deletionPassword");
+      const confirmTextInput = document.getElementById("deletionConfirmText");
+      const confirmPolicyCheckbox = document.getElementById("deletionConfirmPolicy");
+      const submitBtn = document.getElementById("btnSubmitPermanentDeletion");
+      const deletionForm = document.getElementById("accountDeletionForm");
+      const errorBanner = document.getElementById("deletionErrorMessage");
+      const errorText = document.getElementById("deletionErrorText");
+      const spinner = document.getElementById("btnDeleteSpinner");
+      const btnText = document.getElementById("btnDeleteText");
+
+      function updateSubmitButtonState() {
+        const hasPassword = (passwordInput.value.trim().length > 0);
+        const hasKeyword = (confirmTextInput.value.trim() === "DELETE");
+        const hasPolicy = confirmPolicyCheckbox.checked;
+
+        submitBtn.disabled = !(hasPassword && hasKeyword && hasPolicy);
+      }
+
+      passwordInput.addEventListener("input", updateSubmitButtonState);
+      confirmTextInput.addEventListener("input", updateSubmitButtonState);
+      confirmPolicyCheckbox.addEventListener("change", updateSubmitButtonState);
+
+      deletionForm.addEventListener("submit", async function(e) {
+        e.preventDefault();
+
+        // Extra client validation
+        if (passwordInput.value.trim().length === 0) {
+          showError("Please enter your current account password to verify your identity.");
+          passwordInput.focus();
+          return;
+        }
+
+        if (confirmTextInput.value.trim() !== "DELETE") {
+          showError("Please type DELETE in all uppercase letters to confirm permanent deletion.");
+          confirmTextInput.focus();
+          return;
+        }
+
+        if (!confirmPolicyCheckbox.checked) {
+          showError("You must acknowledge the Data Retention Policy to proceed with deletion.");
+          confirmPolicyCheckbox.focus();
+          return;
+        }
+
+        hideError();
+        submitBtn.disabled = true;
+        if (spinner) spinner.style.display = "inline-block";
+        if (btnText) btnText.textContent = "Verifying Identity & Scrubbing Data...";
+
+        const payload = {
+          password: passwordInput.value,
+          confirm_text: confirmTextInput.value.trim(),
+          confirm_policy: confirmPolicyCheckbox.checked,
+          reason: document.getElementById("deletionReason").value || ""
+        };
+
+        try {
+          const response = await fetch("/api/v1/account/delete", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.status === "success") {
+            // Successful deletion: redirect to confirmation screen
+            window.location.href = data.redirect_url || "/account/deleted";
+          } else {
+            showError(data.detail || data.message || "Identity verification failed. Please verify your password.");
+            submitBtn.disabled = false;
+            if (spinner) spinner.style.display = "none";
+            if (btnText) btnText.textContent = "Verify Identity & Permanently Delete Account";
+          }
+        } catch (err) {
+          // Fallback to standard form submission if AJAX fails
+          deletionForm.submit();
+        }
+      });
+
+      function showError(msg) {
+        if (errorText) errorText.textContent = msg;
+        if (errorBanner) errorBanner.style.display = "flex";
+      }
+
+      function hideError() {
+        if (errorBanner) errorBanner.style.display = "none";
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Deleted &amp; Data Scrubbed — Smart Blood Donor Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .confirmation-shell {
+      max-width: 680px;
+      margin: 60px auto 80px;
+      padding: 0 20px;
+    }
+
+    .confirmation-card {
+      background: #FFFFFF;
+      border-radius: 24px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+      padding: 48px 40px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .confirmation-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #10B981, #059669);
+    }
+
+    .success-icon-wrap {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #ECFDF5;
+      color: #059669;
+      font-size: 2.2rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+    }
+
+    .confirmation-title {
+      font-size: 1.85rem;
+      font-weight: 800;
+      color: #0F172A;
+      margin-bottom: 12px;
+    }
+
+    .confirmation-subtitle {
+      font-size: 1.05rem;
+      color: #475569;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .audit-receipt-box {
+      background: #F8FAFC;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      padding: 24px;
+      text-align: left;
+      margin-bottom: 32px;
+    }
+    .audit-receipt-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #64748B;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .scrub-item-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.92rem;
+      color: #1E293B;
+      margin-bottom: 12px;
+    }
+    .scrub-item-row:last-child {
+      margin-bottom: 0;
+    }
+    .scrub-check-icon {
+      color: #10B981;
+      font-weight: 800;
+      font-size: 1rem;
+    }
+
+    .confirmation-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <!-- Global Navigation Header -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/privacy" class="nav-link">Privacy Policy</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        <a href="/login" class="btn btn-outline">Sign In</a>
+        <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <div class="confirmation-shell">
+      <div class="confirmation-card">
+        <div class="success-icon-wrap">
+          ✓
+        </div>
+        <h1 class="confirmation-title">Account Deleted &amp; Data Scrubbed</h1>
+        <p class="confirmation-subtitle">
+          Your account has been permanently deleted and all eligible personal data has been erased in accordance with the System Data Retention Policy.
+        </p>
+
+        <!-- Compliance & Scrubbing Audit Receipt -->
+        <div class="audit-receipt-box">
+          <div class="audit-receipt-title">
+            <span>🛡️ Erasure &amp; Retention Report</span>
+            <span style="font-weight: 600; color: #10B981;">Policy v{{ policy_version }}</span>
+          </div>
+
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>Identity &amp; Credentials:</strong> Passwords, session tokens, and profile data deleted.</span>
+          </div>
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>Sessions Terminated:</strong> Active login sessions on all devices have been revoked.</span>
+          </div>
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>Push &amp; Notifications:</strong> Push subscriptions and device identifiers purged.</span>
+          </div>
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>KYC Documents:</strong> Identity verification files and NID records scrubbed.</span>
+          </div>
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>Clinical Traceability:</strong> Donation history decoupled and pseudonymized for transfusion safety lookbacks.</span>
+          </div>
+          <div class="scrub-item-row">
+            <span class="scrub-check-icon">✓</span>
+            <span><strong>Compliance Receipt:</strong> Non-reversible SHA-256 audit log recorded.</span>
+          </div>
+        </div>
+
+        <!-- Next Actions -->
+        <div class="confirmation-actions">
+          <a href="/" class="btn btn-primary" style="padding: 12px 24px;">Return to Homepage</a>
+          <a href="/login" class="btn btn-outline" style="padding: 12px 24px;">Sign In to Different Account</a>
+          <a href="/privacy" style="display: block; width: 100%; margin-top: 14px; font-size: 0.88rem; color: #64748B; text-decoration: underline;">
+            Read Full Data Retention &amp; Privacy Policy
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  {% include "partials/public_footer.html" %}
+</body>
+</html>

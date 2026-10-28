@@ -1425,9 +1425,14 @@
                     </p>
                   </div>
                 </div>
-                <button type="button" class="btn-delete-facility-account" id="btnOpenDeleteFacilityModal" aria-haspopup="dialog">
-                  <span class="trash-icon">🗑️</span> Delete {{ role_display_name }} Account
-                </button>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <a href="/account/delete" class="btn-outline" style="text-decoration: none; font-size: 0.88rem; font-weight: 700; color: #BE123C; border: 1.5px solid #FECDD3; border-radius: 8px; padding: 10px 16px; background: #FFF1F2; display: inline-flex; align-items: center; gap: 6px;">
+                    <span>🛡️</span> Data Privacy &amp; Deletion Portal
+                  </a>
+                  <button type="button" class="btn-delete-facility-account" id="btnOpenDeleteFacilityModal" aria-haspopup="dialog">
+                    <span class="trash-icon">🗑️</span> Delete {{ role_display_name }} Account
+                  </button>
+                </div>
               </div>
             </div>
           </div>
