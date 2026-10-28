@@ -49,6 +49,7 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn('id="summaryMedicalConditions"', html)
         self.assertIn('id="summaryMedications"', html)
         self.assertIn('id="summaryAllergies"', html)
+        self.assertIn('id="settingAllowSeekerContact"', html)
 
     def test_donor_in_app_chat_rendered(self):
         token = _generate_jwt("+8801712345678", "donor")
@@ -70,45 +71,148 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn('typingIndicator', html)
 
     def test_donor_chat_threads_api(self):
-        response = self.client.get("/api/v1/donor/chat/threads")
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get(
+            "/api/v1/donor/chat/threads", cookies={"access_token": token}
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertGreaterEqual(len(data["threads"]), 4)
         thread_ids = [t["id"] for t in data["threads"]]
-        self.assertIn("thread-square", thread_ids)
-        self.assertIn("thread-dmc", thread_ids)
+        self.assertIn("thread-nabil", thread_ids)
 
-        # Test filtering by category
-        hospital_res = self.client.get("/api/v1/donor/chat/threads?category=hospital")
-        self.assertEqual(hospital_res.status_code, 200)
-        hosp_data = hospital_res.json()
-        for t in hosp_data["threads"]:
-            self.assertEqual(t["category"], "hospital")
+    def test_donor_chat_threads_filter_by_category(self):
+        import sqlite3
+        from main import AUTH_DATABASE_PATH, DATABASE_PATH, initialize_auth_database, initialize_urgent_database
+
+        donor_phone = "+8801712345678"
+        hospital_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        support_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        hospital_thread_id = f"test-hospital-{uuid.uuid4().hex}"
+        support_thread_id = f"test-support-{uuid.uuid4().hex}"
+        initialize_auth_database()
+        initialize_urgent_database()
+
+        with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+            connection.executemany(
+                """INSERT INTO auth_users
+                   (phone, password_hash, created_at, updated_at, role, name)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    (hospital_phone, "test", 0, 0, "hospital", "Test Hospital"),
+                    (support_phone, "test", 0, 0, "support", "Test Support"),
+                ],
+            )
+        with sqlite3.connect(DATABASE_PATH) as connection:
+            connection.executemany(
+                """INSERT INTO chat_threads (id, donor_phone, seeker_phone, created_at)
+                   VALUES (?, ?, ?, ?)""",
+                [
+                    (hospital_thread_id, donor_phone, hospital_phone, "2026-01-01T00:00:00+00:00"),
+                    (support_thread_id, donor_phone, support_phone, "2026-01-01T00:00:00+00:00"),
+                ],
+            )
+
+        try:
+            response = self.client.get(
+                "/api/v1/donor/chat/threads?category=hospital",
+                cookies={"access_token": _generate_jwt(donor_phone, "donor")},
+            )
+            self.assertEqual(response.status_code, 200)
+            threads = response.json()["threads"]
+            self.assertEqual([thread["id"] for thread in threads], [hospital_thread_id])
+            self.assertEqual(threads[0]["category"], "hospital")
+        finally:
+            with sqlite3.connect(DATABASE_PATH) as connection:
+                connection.executemany(
+                    "DELETE FROM chat_messages WHERE thread_id = ?",
+                    [(hospital_thread_id,), (support_thread_id,)],
+                )
+                connection.executemany(
+                    "DELETE FROM chat_threads WHERE id = ?",
+                    [(hospital_thread_id,), (support_thread_id,)],
+                )
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.executemany(
+                    "DELETE FROM auth_users WHERE phone = ?",
+                    [(hospital_phone,), (support_phone,)],
+                )
+
+    def test_donor_settings_are_authenticated_and_persisted(self):
+        import json
+        import sqlite3
+        from main import AUTH_DATABASE_PATH
+
+        donor_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        donor_cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        settings = {"radius_km": 35, "sms_alerts": False}
+
+        anonymous = self.client.post("/api/v1/donor/settings", json=settings)
+        self.assertEqual(anonymous.status_code, 401)
+
+        seeker = self.client.post(
+            "/api/v1/donor/settings",
+            json=settings,
+            cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
+        )
+        self.assertEqual(seeker.status_code, 403)
+
+        try:
+            saved = self.client.post(
+                "/api/v1/donor/settings",
+                json=settings,
+                cookies=donor_cookies,
+            )
+            self.assertEqual(saved.status_code, 200)
+            self.assertEqual(saved.json()["settings"]["radius_km"], 35)
+            self.assertFalse(saved.json()["settings"]["sms_alerts"])
+
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                row = connection.execute(
+                    "SELECT settings_json FROM donor_settings WHERE phone = ?",
+                    (donor_phone,),
+                ).fetchone()
+            self.assertIsNotNone(row)
+            stored_settings = json.loads(row[0])
+            self.assertEqual(stored_settings["radius_km"], 35)
+            self.assertFalse(stored_settings["sms_alerts"])
+        finally:
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.execute(
+                    "DELETE FROM donor_settings WHERE phone = ?",
+                    (donor_phone,),
+                )
 
     def test_donor_chat_messages_api(self):
-        response = self.client.get("/api/v1/donor/chat/thread-square/messages")
+        token = _generate_jwt("+8801712345678", "donor")
+        response = self.client.get(
+            "/api/v1/donor/chat/thread-nabil/messages",
+            cookies={"access_token": token},
+        )
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
-        self.assertEqual(data["thread_id"], "thread-square")
+        self.assertEqual(data["thread_id"], "thread-nabil")
         self.assertIsInstance(data["messages"], list)
-        self.assertGreaterEqual(len(data["messages"]), 1)
 
     def test_donor_chat_send_and_read_api(self):
+        token = _generate_jwt("+8801712345678", "donor")
         # Test sending message
         send_res = self.client.post(
-            "/api/v1/donor/chat/thread-square/send",
-            json={"text": "I am on my way to Square Hospital", "sender": "you"},
+            "/api/v1/donor/chat/thread-nabil/send",
+            json={"text": "I am on my way to Square Hospital"},
+            cookies={"access_token": token},
         )
         self.assertEqual(send_res.status_code, 200)
         send_data = send_res.json()
         self.assertEqual(send_data["status"], "success")
         self.assertEqual(send_data["sent"]["text"], "I am on my way to Square Hospital")
-        self.assertIn("reply", send_data)
 
         # Test marking thread as read
-        read_res = self.client.post("/api/v1/donor/chat/thread-square/read")
+        read_res = self.client.post(
+            "/api/v1/donor/chat/thread-nabil/read",
+            cookies={"access_token": token},
+        )
         self.assertEqual(read_res.status_code, 200)
         read_data = read_res.json()
         self.assertEqual(read_data["status"], "success")
@@ -140,6 +244,43 @@ class DonorDashboardTests(unittest.TestCase):
             cookies={"access_token": _generate_jwt("+8801723456789", "seeker")},
         )
         self.assertEqual(seeker_response.status_code, 403)
+
+    def test_direct_contact_preference_is_private_and_persisted(self):
+        import sqlite3
+        from main import AUTH_DATABASE_PATH
+
+        donor_phone = f"+88017{uuid.uuid4().int % 10**8:08d}"
+        donor_cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
+        try:
+            anonymous = self.client.get("/api/v1/donor/direct-contact-preference")
+            self.assertEqual(anonymous.status_code, 401)
+
+            initial = self.client.get(
+                "/api/v1/donor/direct-contact-preference",
+                cookies=donor_cookies,
+            )
+            self.assertEqual(initial.status_code, 200)
+            self.assertFalse(initial.json()["share_direct_contact"])
+
+            enabled = self.client.put(
+                "/api/v1/donor/direct-contact-preference",
+                json={"share_direct_contact": True},
+                cookies=donor_cookies,
+            )
+            self.assertEqual(enabled.status_code, 200)
+            self.assertTrue(enabled.json()["share_direct_contact"])
+
+            saved = self.client.get(
+                "/api/v1/donor/direct-contact-preference",
+                cookies=donor_cookies,
+            )
+            self.assertTrue(saved.json()["share_direct_contact"])
+        finally:
+            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
+                connection.execute(
+                    "DELETE FROM donor_profiles WHERE phone = ?",
+                    (donor_phone,),
+                )
 
     def test_availability_is_persisted_and_gates_matching(self):
         import sqlite3

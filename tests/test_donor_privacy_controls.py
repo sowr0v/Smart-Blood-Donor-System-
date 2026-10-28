@@ -90,12 +90,12 @@ class DonorPrivacyControlsTestCase(unittest.TestCase):
         # dn-001 corresponds to +8801712345678 (Ayesha Rahman)
         self.assertFalse(any(d["id"] == "dn-001" for d in seeker_donors))
 
-        # 3. Re-enable public directory but keep phone masked
+        # 3. Re-enable public directory but keep direct contact disabled
         enable_dir_payload = {
             "allow_hospital_calls": True,
             "mask_public_phone": True,
             "public_directory": True,
-            "show_badges": False,
+            "show_badges": True,
             "share_direct_contact": False,
             "phone_visibility": "hospital_only",
         }
@@ -108,12 +108,17 @@ class DonorPrivacyControlsTestCase(unittest.TestCase):
         seeker_donors2 = seeker_resp2.json()["donors"]
         ayesha = next((d for d in seeker_donors2 if d["id"] == "dn-001"), None)
         self.assertIsNotNone(ayesha)
-        self.assertTrue(ayesha.get("phone_masked"))
-        self.assertIn("****", ayesha["phone"])
-        self.assertTrue(ayesha.get("badges_hidden"))
 
-        # 4. Turn off masking: phone number should now be visible without masking
-        unmask_payload = {
+        # Seeker cannot access direct contact when share_direct_contact is False
+        seeker_token = _generate_jwt("+8801723456789", "seeker")
+        denied_contact = self.client.post(
+            "/api/v1/seeker/donors/dn-001/contact",
+            cookies={"access_token": seeker_token},
+        )
+        self.assertEqual(denied_contact.status_code, 403)
+
+        # 4. Enable direct contact: seeker can now retrieve contact
+        allow_contact_payload = {
             "allow_hospital_calls": True,
             "mask_public_phone": False,
             "public_directory": True,
@@ -124,15 +129,14 @@ class DonorPrivacyControlsTestCase(unittest.TestCase):
         self.client.post(
             "/api/v1/donor/privacy-settings",
             cookies={"access_token": self.donor_token},
-            json=unmask_payload,
+            json=allow_contact_payload,
         )
-        seeker_resp3 = self.client.get("/api/v1/seeker/donors")
-        seeker_donors3 = seeker_resp3.json()["donors"]
-        ayesha3 = next((d for d in seeker_donors3 if d["id"] == "dn-001"), None)
-        self.assertIsNotNone(ayesha3)
-        self.assertFalse(ayesha3.get("phone_masked"))
-        self.assertNotIn("****", ayesha3["phone"])
-        self.assertEqual(ayesha3["phone"], "+8801712345678")
+        allowed_contact = self.client.post(
+            "/api/v1/seeker/donors/dn-001/contact",
+            cookies={"access_token": seeker_token},
+        )
+        self.assertEqual(allowed_contact.status_code, 200)
+        self.assertEqual(allowed_contact.json()["donor"]["phone"], self.donor_phone)
 
     def test_donor_settings_includes_privacy(self):
         response = self.client.get(

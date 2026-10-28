@@ -682,6 +682,63 @@
   font-size: 0.84rem;
 }
 
+.seeker-low-stock-alerts {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid #FCD34D;
+  border-radius: 12px;
+  background: #FFFBEB;
+  color: #78350F;
+}
+
+.seeker-low-stock-alerts-icon {
+  font-size: 1.45rem;
+  line-height: 1.4;
+}
+
+.seeker-low-stock-alerts-content {
+  min-width: 0;
+}
+
+.seeker-low-stock-alerts h2 {
+  margin: 0 0 4px;
+  color: #92400E;
+  font-size: 0.96rem;
+}
+
+.seeker-low-stock-alerts p,
+.seeker-low-stock-alerts li {
+  margin: 0;
+  color: #78350F;
+  font-size: 0.84rem;
+}
+
+.seeker-low-stock-alerts ul {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+#emergencyRequestFeedback {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+#submitEmergencyRequest:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
 .btn-broadcast-emergency {
   background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%);
   color: #FFFFFF;
@@ -706,19 +763,220 @@
 }
 
 /* Map Section Styles */
+.nearby-map-card {
+  padding: 24px;
+}
+
+.nearby-map-header,
+.nearby-donor-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.nearby-map-header h2 {
+  margin: 4px 0 6px;
+}
+
+.nearby-map-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nearby-map-refresh svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nearby-map-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 22px 0 14px;
+  padding: 12px 14px;
+  border-block: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.nearby-map-controls select {
+  min-height: 38px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.nearby-map-controls input[type="range"] {
+  width: min(180px, 35vw);
+  accent-color: #0f766e;
+}
+
+#mapRadiusValue {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.nearby-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: #166534;
+  font-weight: 700;
+}
+
+.nearby-availability span,
+.map-legend .legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+.nearby-map-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 290px);
+  gap: 16px;
+}
+
 .map-viewport-wrapper {
   position: relative;
-  border-radius: 14px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   background: #F1F5F9;
-  min-height: 520px;
+  min-height: 460px;
 }
 
 #seekerDonorMap {
-  height: 520px;
+  height: 460px;
   width: 100%;
   z-index: 10;
+}
+
+.nearby-donor-panel {
+  min-width: 0;
+  border-left: 1px solid var(--border-color);
+  padding-left: 16px;
+}
+
+.nearby-donor-panel-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.nearby-donor-panel-heading > span {
+  min-width: 28px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: #e8f3ef;
+  color: #166534;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+#mapDonorStatus {
+  min-height: 38px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.nearby-donor-list {
+  display: grid;
+  gap: 7px;
+  max-height: 370px;
+  overflow-y: auto;
+}
+
+.nearby-donor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nearby-donor-row:hover,
+.nearby-donor-row:focus-visible {
+  border-color: #0f766e;
+  outline: 2px solid #0f766e;
+  outline-offset: 1px;
+}
+
+.nearby-donor-group {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0f766e;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.nearby-donor-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nearby-donor-details strong,
+.nearby-donor-details small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nearby-donor-details small {
+  color: var(--text-secondary);
+}
+
+.nearby-map-privacy {
+  margin: 12px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.map-donor-marker {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #0f766e;
+  box-shadow: 0 2px 10px rgba(15, 118, 110, 0.32);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.nearby-donor-icon {
+  background: transparent;
+  border: 0;
+}
+
+.nearby-map-privacy + * {
+  margin-top: 0;
 }
 
 .map-floating-filter-panel {
@@ -785,49 +1043,292 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
+@media (max-width: 900px) {
+  .nearby-map-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nearby-donor-panel {
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+    padding: 14px 0 0;
+  }
+
+  .nearby-donor-list {
+    max-height: 260px;
+  }
+}
+
+@media (max-width: 560px) {
+  .nearby-map-card {
+    padding: 16px;
+  }
+
+  .nearby-map-header {
+    align-items: flex-start;
+  }
+
+  .nearby-map-refresh {
+    padding: 8px;
+    font-size: 0;
+  }
+
+  .nearby-map-refresh svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .nearby-map-controls {
+    gap: 10px;
+  }
+
+  .nearby-availability {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .map-viewport-wrapper,
+  #seekerDonorMap {
+    min-height: 380px;
+    height: 380px;
+  }
+}
+
 /* Donor Directory Grid */
+.directory-card {
+  padding: 24px;
+}
+
+.directory-heading,
+.directory-results-heading,
+.directory-donor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.directory-heading h2 {
+  margin: 4px 0 6px;
+}
+
+.directory-privacy-badge {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border: 1px solid #b7d8ce;
+  border-radius: 6px;
+  color: #166534;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .directory-filters-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-  background: var(--bg-card);
-  padding: 16px 20px;
-  border-radius: 14px;
-  border: 1px solid var(--border-color);
+  gap: 14px;
+  margin: 20px 0 12px;
+  padding: 14px 0;
+  border-block: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
 }
 
-.search-input-wrap {
+.directory-location-filter {
   flex: 1;
-  min-width: 240px;
-  position: relative;
+  min-width: min(100%, 230px);
+  display: grid;
+  gap: 6px;
 }
 
-.search-input-wrap input {
+.directory-location-filter input,
+.directory-filters-bar select {
+  min-height: 40px;
   width: 100%;
-  padding: 10px 14px 10px 38px;
-  border-radius: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 0.9rem;
 }
 
-.search-input-wrap svg {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  width: 18px;
-  height: 18px;
+.directory-filters-bar > label:not(.directory-location-filter) {
+  display: grid;
+  gap: 6px;
+  min-width: 130px;
+}
+
+.directory-radius-filter {
+  min-width: 175px !important;
+}
+
+.directory-radius-filter > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.directory-radius-filter output {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.directory-radius-filter input {
+  width: 100%;
+  accent-color: #0f766e;
+}
+
+.directory-filters-bar .directory-availability-filter {
+  display: flex !important;
+  align-items: center;
+  align-self: end;
+  gap: 8px !important;
+  min-height: 40px;
+  cursor: pointer;
+}
+
+.directory-availability-filter input {
+  width: 17px;
+  height: 17px;
+  accent-color: #0f766e;
+}
+
+.directory-clear-button {
+  align-self: end;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.directory-clear-button:hover {
+  border-color: #0f766e;
+}
+
+.directory-results-heading {
+  margin: 12px 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.directory-results-heading p {
+  min-height: 20px;
+  margin: 0;
+}
+
+.directory-results-heading > span {
+  min-width: 30px;
+  padding: 4px 8px;
+  border-radius: 16px;
+  background: #e8f3ef;
+  color: #166534;
+  text-align: center;
+  font-weight: 700;
 }
 
 .donor-directory-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+}
+
+.directory-donor-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.directory-blood-group {
+  display: inline-grid;
+  place-items: center;
+  min-width: 42px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #ffe4e6;
+  color: #be123c;
+  font-weight: 800;
+}
+
+.directory-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.directory-status::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.directory-status.available,
+.directory-verification {
+  color: #166534;
+}
+
+.directory-status.unavailable {
+  color: #9a3412;
+}
+
+.directory-donor-location {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.directory-donor-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.directory-verification {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.directory-privacy-note {
+  margin: 14px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 560px) {
+  .directory-card {
+    padding: 16px;
+  }
+
+  .directory-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .directory-filters-bar > label,
+  .directory-filters-bar .directory-radius-filter {
+    width: 100%;
+  }
+
+  .directory-filters-bar .directory-availability-filter {
+    width: auto;
+    align-self: center;
+  }
 }
 
 .donor-card {
@@ -1029,6 +1530,177 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.donor-directory-header {
+  margin-bottom: 18px;
+}
+
+.donor-directory-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.donor-directory-filters > label,
+.donor-directory-search {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.donor-directory-filters select,
+.donor-directory-search input {
+  min-height: 40px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  margin-left: 6px;
+}
+
+.donor-directory-search input {
+  width: min(260px, 55vw);
+}
+
+.donor-directory-available {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.donor-directory-grid {
+  margin-top: 14px;
+}
+
+.donor-card {
+  gap: 14px;
+}
+
+.donor-card-name {
+  margin: 0;
+}
+
+.donor-card-loc {
+  margin-bottom: 0;
+}
+
+.donor-profile-back {
+  width: auto;
+  margin-bottom: 18px;
+}
+
+.public-donor-profile {
+  justify-content: flex-start;
+  gap: 12px;
+  background: linear-gradient(145deg, #FFF5F6 0%, #FFFFFF 78%);
+  border: 1px solid #F3B7C3;
+  box-shadow: 0 5px 18px rgba(190, 18, 60, 0.08);
+}
+
+.public-donor-profile .credentials-hero-panel {
+  background: linear-gradient(120deg, #FFE1E7 0%, #FFF0F2 100%);
+  border-color: #F2A8B7;
+  padding: 18px;
+  margin: 0;
+}
+
+.public-donor-profile .credentials-large-avatar {
+  width: 56px;
+  height: 56px;
+  font-size: 1.35rem;
+}
+
+.public-donor-profile .credentials-hero-left {
+  min-width: 0;
+}
+
+.public-donor-profile .card-subtitle {
+  margin-bottom: 0;
+}
+
+.public-profile-credentials {
+  display: grid;
+  gap: 8px;
+  padding: 4px 2px 2px;
+}
+
+.public-profile-credentials p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  padding: 9px 12px;
+  border-left: 3px solid var(--primary-red);
+  border-radius: 5px;
+  background: #FFF0F2;
+}
+
+.donor-public-profile-card #donorProfileStatus {
+  color: var(--primary-dark);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.donor-profile-blood-group {
+  align-self: center;
+  font-size: 1rem;
+  padding: 8px 14px;
+  background: var(--primary-dark);
+  color: #FFFFFF;
+}
+
+.donor-public-profile-card {
+  background: linear-gradient(145deg, #FFF1F3 0%, var(--bg-card) 72%);
+  border-color: #F3B7C3;
+}
+
+[data-theme="dark"] .donor-public-profile-card {
+  background: linear-gradient(145deg, #35171E 0%, var(--bg-card) 72%);
+  border-color: #63303A;
+}
+
+[data-theme="dark"] .public-donor-profile {
+  background: linear-gradient(145deg, #2B171B 0%, var(--bg-card) 80%);
+  border-color: #63303A;
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.22);
+}
+
+[data-theme="dark"] .public-donor-profile .credentials-hero-panel {
+  background: linear-gradient(120deg, #49212B 0%, #321B21 100%);
+  border-color: #713543;
+}
+
+[data-theme="dark"] .public-profile-credentials p {
+  background: #351B21;
+}
+
+.donor-profile-summary {
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.donor-profile-summary h3,
+.donor-profile-summary p {
+  margin: 0;
+}
+
+.donor-profile-summary p {
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.donor-profile-privacy {
+  border-top: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 20px 0 0;
+  padding-top: 16px;
 }
 
 /* Direct Contact Hub */
@@ -1396,6 +2068,298 @@
 
 .btn-chat-send:hover {
   background: var(--primary-dark);
+}
+
+.seeker-chat-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.seeker-chat-heading,
+.seeker-chat-toolbar,
+.seeker-chat-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.seeker-chat-heading,
+.seeker-chat-toolbar {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.seeker-chat-heading h2 {
+  margin: 0 0 5px;
+}
+
+.seeker-chat-heading p,
+.seeker-chat-feedback {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.seeker-chat-connection {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.seeker-chat-connection[data-state="online"] {
+  color: #059669;
+}
+
+.seeker-chat-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  min-height: 520px;
+  height: min(68vh, 700px);
+}
+
+.seeker-chat-sidebar {
+  min-width: 0;
+  border-right: 1px solid var(--border-color);
+  overflow: auto;
+}
+
+.seeker-chat-list-heading {
+  min-height: 54px;
+  padding: 12px 16px;
+}
+
+.seeker-chat-unread {
+  border-radius: 20px;
+  padding: 2px 8px;
+  background: var(--primary-red);
+  color: #fff;
+  font-size: 0.76rem;
+}
+
+.seeker-chat-start {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.seeker-chat-start label {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.seeker-chat-start select,
+.seeker-chat-start button {
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.seeker-chat-start button {
+  border-color: var(--primary-red);
+  background: var(--primary-red);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.seeker-chat-start button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.seeker-chat-thread {
+  display: block;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.seeker-chat-thread:hover,
+.seeker-chat-thread[aria-current="true"] {
+  background: var(--bg-page);
+}
+
+.seeker-chat-thread-title,
+.seeker-chat-thread-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seeker-chat-thread-title {
+  font-weight: 700;
+}
+
+.seeker-chat-thread-preview {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.seeker-chat-thread-count {
+  float: right;
+  color: var(--primary-red);
+  font-weight: 700;
+}
+
+.seeker-chat-conversation {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.seeker-chat-toolbar {
+  min-height: 64px;
+}
+
+.seeker-chat-toolbar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+#seekerChatRestriction {
+  color: var(--primary-red);
+  font-size: 0.78rem;
+}
+
+.seeker-chat-safety-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.seeker-chat-safety-actions select,
+.seeker-chat-safety-actions button,
+.seeker-chat-compose button {
+  min-height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.seeker-chat-safety-actions button,
+.seeker-chat-compose button {
+  cursor: pointer;
+}
+
+.seeker-chat-safety-actions button:disabled,
+.seeker-chat-compose button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.seeker-chat-messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  overflow: auto;
+  background: var(--bg-page);
+}
+
+.seeker-chat-bubble {
+  max-width: min(78%, 620px);
+  padding: 10px 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px 14px 14px 4px;
+  background: var(--bg-card);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.seeker-chat-bubble.is-own {
+  align-self: flex-end;
+  border-color: var(--primary-red);
+  border-radius: 14px 14px 4px 14px;
+  background: var(--primary-red);
+  color: #fff;
+}
+
+.seeker-chat-bubble time {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+.seeker-chat-empty {
+  margin: auto;
+  padding: 18px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.seeker-chat-compose {
+  display: flex;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.seeker-chat-compose input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  padding: 10px 14px;
+  background: var(--bg-page);
+  color: var(--text-primary);
+}
+
+.seeker-chat-compose button {
+  border-color: var(--primary-red);
+  background: var(--primary-red);
+  color: #fff;
+  font-weight: 700;
+}
+
+.seeker-chat-feedback {
+  min-height: 1.4em;
+  padding: 0 16px 10px;
+}
+
+@media (max-width: 720px) {
+  .seeker-chat-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 0;
+  }
+
+  .seeker-chat-sidebar {
+    max-height: 180px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .seeker-chat-conversation {
+    min-height: 430px;
+  }
+
+  .seeker-chat-toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .seeker-chat-safety-actions {
+    flex-wrap: wrap;
+  }
 }
 
 /* Settings Form Styles */
@@ -1818,8 +2782,3 @@ input:checked + .switch-slider:before {
   border-color: rgba(225, 29, 72, 0.35);
   color: #FDA4AF;
 }
-
-
-
-
-

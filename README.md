@@ -86,6 +86,18 @@ Password recovery uses the SQLite database at `auth.db` by default; set `SBDS_AU
 
 Passwords are stored as PBKDF2 hashes. New passwords must have at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. A successful reset updates `auth_users` and deletes every persisted session for that account. The existing registration page is still a UI-only stub; an account-registration/authentication provider must provision `auth_users` with an E.164 Bangladesh phone number and a password hash before login or recovery is available.
 
+### Emergency Blood Requests
+
+Seekers can create emergency requests from the seeker dashboard. Required blood group, patient, facility, location, unit count, urgency, and contact details are validated and saved in `urgent_requests.db`; new fields are migrated in place for existing databases. Requests remain active and visible in the seeker's request list for status tracking. The emergency endpoint requires a seeker session.
+
+Matching available donor profiles are selected using the system's blood-group compatibility rules. If `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER` are configured, the platform sends those donors an SMS; the API reports delivery counts and failures. Without gateway credentials it records the request but reports SMS as not configured, rather than claiming alerts were delivered. Push delivery is not currently integrated.
+
+### Facility Blood Inventory
+
+Hospital and blood bank dashboards display facility-specific quantities for all eight ABO/Rh blood groups. Authenticated hospital and blood bank users can update a quantity with `PUT /api/v1/facility/inventory/{blood_group}` using `{"quantity": 0}` or another non-negative whole number; `GET /api/v1/facility/inventory` returns the current matrix. Other roles cannot read or modify facility inventory. Stock and its change audit trail are stored in `urgent_requests.db` (or the configured `SBDS_DATABASE_PATH`); unchanged quantities do not create duplicate audit records.
+
+Administrators define a minimum stock threshold from 0 to 50 units separately for each blood group in the Admin Console. `GET /api/v1/admin/blood-stock-thresholds` returns the configured thresholds, and `PUT /api/v1/admin/blood-stock-thresholds/{blood_group}` updates one threshold with `{"threshold": 5}`; both endpoints require an administrator session. Stock changes and threshold updates automatically reconcile active alerts, which appear with each blood group's status and threshold on facility dashboards. Alerts resolve when stock rises above the corresponding minimum. `GET /api/v1/facility/inventory/alerts` returns the signed-in facility's alert history and current status. Administrators can monitor aggregated facility alerts through `GET /api/v1/admin/facility/inventory/alerts`; only authenticated administrators can access that cross-facility view. Authenticated seekers can use `GET /api/v1/seeker/inventory/alerts` to see a privacy-safe notice only when an active request's blood group is low at one or more facilities; the response does not disclose facility identities or stock quantities.
+
 ### Authentication Flow
 
 ```text
@@ -365,7 +377,7 @@ The platform provides multiple communication methods between blood seekers and d
 * WhatsApp
 * Emergency Notifications
 
-Communication permissions can be controlled from the user's privacy settings.
+Donor-seeker conversations are stored in `urgent_requests.db` and delivered live over authenticated WebSockets. Each conversation has one donor and one seeker participant; REST and WebSocket access is checked against that membership. The chat screens show timestamps and unread counts, and participants can report a conversation or restrict further messages from the other participant. The seeker chat sidebar loads available, active donor accounts and lets seekers start a conversation there without leaving the chat screen. Message delivery uses the chat API directly, so it remains available while live WebSocket updates reconnect.
 
 ---
 

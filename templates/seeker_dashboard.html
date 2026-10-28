@@ -101,6 +101,13 @@
           </svg>
           <span class="nav-item-title">Blood Seeker Personal Dashboard</span>
         </button>
+        <button type="button" class="seeker-nav-item" data-target="section-seeker-dashboard" data-scroll-target="seekerLowStockAlerts" id="nav-item-low-stock-alerts">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>
+            <path d="M10 21h4"/>
+          </svg>
+          <span class="nav-item-title">Low-Stock Alerts for My Requests</span>
+        </button>
 
         <div class="sidebar-section-title" style="margin-top: 8px;">Request Creation</div>
 
@@ -222,6 +229,15 @@
           </div>
         </div>
 
+        <section class="seeker-low-stock-alerts" id="seekerLowStockAlerts" aria-labelledby="seekerLowStockAlertsTitle" aria-live="polite">
+          <div class="seeker-low-stock-alerts-icon" aria-hidden="true">🩸</div>
+          <div class="seeker-low-stock-alerts-content">
+            <h2 id="seekerLowStockAlertsTitle">Low-stock alerts for your active requests</h2>
+            <p id="seekerLowStockAlertsStatus">Checking stock alerts for your active requests…</p>
+            <ul id="seekerLowStockAlertsList"></ul>
+          </div>
+        </section>
+
         <!-- 4 Metric Cards -->
         <div class="metrics-grid-4">
           <article class="metric-stat-box">
@@ -340,25 +356,333 @@
       </section>
 
       <!-- ================= 2. CREATE STANDARD BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-standard-request"></section>
+      <section class="dashboard-content-section" id="section-standard-request" aria-labelledby="standard-request-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🩸</span>
+            <div>
+              <h2 id="standard-request-title">Create Standard Blood Request</h2>
+              <div class="card-subtitle">Share the blood requirement and care-facility details so suitable donors can respond.</div>
+            </div>
+          </div>
+
+          <form id="standardRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="standardPatientName">Patient name</label>
+                <input id="standardPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardBloodGroup">Blood group</label>
+                <select id="standardBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="standardHospital">Hospital or care facility</label>
+                <input id="standardHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardUnits">Units needed</label>
+                <input id="standardUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardDistrict">District</label>
+                <input id="standardDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardArea">Area / neighborhood</label>
+                <input id="standardArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="standardNeededAt">When is the blood needed?</label>
+                <input id="standardNeededAt" name="needed_at" type="datetime-local" required>
+                <small class="card-subtitle">Enter Bangladesh local time.</small>
+              </div>
+              <div class="form-field-group">
+                <label for="standardContactPhone">Contact phone</label>
+                <input id="standardContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="standardReason">Additional details (optional)</label>
+              <textarea id="standardReason" name="reason" rows="3" maxlength="500" placeholder="Share useful details for responding donors"></textarea>
+            </div>
+            <p id="standardRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitStandardRequest" type="submit" class="btn btn-primary" style="margin-top: 18px;">
+              Create Blood Request
+            </button>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 3. CREATE EMERGENCY BLOOD REQUEST ================= -->
-      <section class="dashboard-content-section" id="section-emergency-request"></section>
+      <section class="dashboard-content-section" id="section-emergency-request">
+        <div class="seeker-card emergency-form-panel">
+          <div class="card-title-combo" style="margin-bottom: 18px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">🚨</span>
+            <div>
+              <h2>Create Emergency Blood Request</h2>
+              <div class="card-subtitle">Alert suitable donors for an immediate blood requirement.</div>
+            </div>
+          </div>
+
+          <div class="sos-alert-banner" role="note">
+            <span class="sos-alert-banner-icon" aria-hidden="true">⚠️</span>
+            <div class="sos-alert-banner-text">
+              <strong>Emergency request — priority donor matching</strong>
+              <span>Submit only for an urgent medical need. Matching donor alerts follow your system's notification settings.</span>
+            </div>
+          </div>
+
+          <form id="emergencyRequestForm" novalidate>
+            <div class="form-grid-2">
+              <div class="form-field-group">
+                <label for="emergencyPatientName">Patient name</label>
+                <input id="emergencyPatientName" name="patient_name" type="text" maxlength="120" autocomplete="name" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyBloodGroup">Blood group</label>
+                <select id="emergencyBloodGroup" name="blood_group" required>
+                  <option value="">Select blood group</option>
+                  <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                  <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyHospital">Hospital or care facility</label>
+                <input id="emergencyHospital" name="hospital_name" type="text" maxlength="160" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyUnits">Units needed</label>
+                <input id="emergencyUnits" name="units" type="number" min="1" max="20" value="1" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyDistrict">District</label>
+                <input id="emergencyDistrict" name="district" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyArea">Area / neighborhood</label>
+                <input id="emergencyArea" name="area" type="text" maxlength="120" value="Dhaka" required>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyUrgency">How soon is blood needed?</label>
+                <select id="emergencyUrgency" name="urgency_level" required>
+                  <option value="Code Red (Within 1 Hour)">Code Red — within 1 hour</option>
+                  <option value="Critical (Within 3 Hours)">Critical — within 3 hours</option>
+                  <option value="Urgent (Within 6 Hours)">Urgent — within 6 hours</option>
+                </select>
+              </div>
+              <div class="form-field-group">
+                <label for="emergencyContactPhone">Contact phone</label>
+                <input id="emergencyContactPhone" name="contact_phone" type="tel" maxlength="24" autocomplete="tel" value="{{ user.phone if user and user.phone else '' }}" required>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 14px;">
+              <label for="emergencyReason">Additional details (optional)</label>
+              <textarea id="emergencyReason" name="reason" rows="3" maxlength="500" placeholder="Share relevant details for responding donors"></textarea>
+            </div>
+            <p id="emergencyRequestFeedback" role="status" aria-live="polite" hidden></p>
+            <button id="submitEmergencyRequest" type="submit" class="btn-broadcast-emergency" style="margin-top: 18px;">
+              <span aria-hidden="true">🚨</span> Broadcast Emergency Request
+            </button>
+            <p class="card-subtitle" style="margin: 12px 0 0;">
+              Your request will appear in My Posted Blood Requests so you can track its active status.
+            </p>
+          </form>
+        </div>
+      </section>
 
       <!-- ================= 4. NEARBY DONORS INTERACTIVE MAP VIEW ================= -->
-      <section class="dashboard-content-section" id="section-nearby-map"></section>
+      <section class="dashboard-content-section" id="section-nearby-map" aria-labelledby="nearby-map-title">
+        <div class="seeker-card nearby-map-card">
+          <header class="nearby-map-header">
+            <div>
+              <span class="eyebrow">Available donors</span>
+              <h2 id="nearby-map-title">Nearby Donors Interactive Map View</h2>
+              <p class="card-subtitle">Explore available donors by blood group and distance.</p>
+            </div>
+            <button type="button" class="btn btn-outline nearby-map-refresh" id="nearbyMapRefresh" aria-label="Refresh nearby donors">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"/></svg>
+              Refresh
+            </button>
+          </header>
+
+          <div class="nearby-map-controls">
+            <label for="mapBloodGroupFilter">Blood group</label>
+            <select id="mapBloodGroupFilter">
+              <option value="">All groups</option>
+              <option value="A+">A+</option>
+              <option value="A-">A-</option>
+              <option value="B+">B+</option>
+              <option value="B-">B-</option>
+              <option value="AB+">AB+</option>
+              <option value="AB-">AB-</option>
+              <option value="O+">O+</option>
+              <option value="O-">O-</option>
+            </select>
+            <label for="mapRadiusSlider">Within <output id="mapRadiusValue" for="mapRadiusSlider">15 km</output></label>
+            <input type="range" id="mapRadiusSlider" min="1" max="30" value="15">
+            <span class="nearby-availability"><span aria-hidden="true"></span>Available now</span>
+          </div>
+
+          <div class="nearby-map-layout">
+            <div class="map-viewport-wrapper">
+              <div id="seekerDonorMap" role="application" aria-label="Map of nearby available blood donors"></div>
+              <div class="map-legend"><span class="legend-dot" aria-hidden="true"></span>Approximate donor area</div>
+            </div>
+            <aside class="nearby-donor-panel" aria-labelledby="nearby-donor-heading">
+              <div class="nearby-donor-panel-heading">
+                <h3 id="nearby-donor-heading">Matching donors</h3>
+                <span id="mapDonorCount">0</span>
+              </div>
+              <p id="mapDonorStatus" role="status" aria-live="polite">Open the map to find nearby donors.</p>
+              <div id="mapNearbyDonorsList" class="nearby-donor-list"></div>
+            </aside>
+          </div>
+          <p class="nearby-map-privacy">Donor locations are approximate unless a donor has explicitly chosen to share a more precise location.</p>
+        </div>
+      </section>
 
       <!-- ================= 5. DONOR DIRECTORY SEARCH & PROXIMITY FILTERING ================= -->
-      <section class="dashboard-content-section" id="section-donor-directory"></section>
+      <section class="dashboard-content-section" id="section-donor-directory" aria-labelledby="donor-directory-title">
+        <div class="seeker-card directory-card">
+          <header class="directory-heading">
+            <div>
+              <span class="eyebrow">Donor discovery</span>
+              <h2 id="donor-directory-title">Donor Directory Search &amp; Proximity Filtering</h2>
+              <p class="card-subtitle">Find available donors by blood group and nearby area.</p>
+            </div>
+            <span class="directory-privacy-badge">Approximate locations</span>
+          </header>
+
+          <div class="directory-filters-bar" aria-label="Filter donors">
+            <label class="directory-location-filter" for="dirLocationFilter">
+              Area or district
+              <input type="search" id="dirLocationFilter" placeholder="e.g. Dhanmondi or Dhaka" autocomplete="off">
+            </label>
+            <label for="dirBloodFilter">
+              Blood group
+              <select id="dirBloodFilter">
+                <option value="">All groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </label>
+            <label class="directory-radius-filter" for="dirRadiusSlider">
+              <span>Distance <output id="dirRadiusValue" for="dirRadiusSlider">15 km</output></span>
+              <input type="range" id="dirRadiusSlider" min="1" max="30" value="15">
+            </label>
+            <label class="directory-availability-filter" for="dirAvailFilter">
+              <input type="checkbox" id="dirAvailFilter" checked>
+              <span>Available now</span>
+            </label>
+            <button type="button" class="directory-clear-button" id="dirClearFilters">Clear filters</button>
+          </div>
+
+          <div class="directory-results-heading">
+            <p id="donorDirectoryStatus" role="status" aria-live="polite">Choose filters to search nearby donors.</p>
+            <span id="dirResultsCount" aria-label="Matching donors">0</span>
+          </div>
+          <div class="donor-directory-grid" id="donorDirectoryGrid" aria-live="polite"></div>
+          <p class="directory-privacy-note">Donor names, contact details, medical records, and exact locations are not shown in this directory.</p>
+        </div>
+      </section>
 
       <!-- ================= 6. DONOR PUBLIC PROFILE & CREDENTIALS VIEW ================= -->
-      <section class="dashboard-content-section" id="section-donor-credentials"></section>
+      <section class="dashboard-content-section" id="section-donor-credentials" aria-labelledby="donor-profile-title">
+        <div class="seeker-card donor-public-profile-card">
+          <h2 id="donor-profile-title">Donor public profile &amp; credentials</h2>
+          <p id="donorProfileStatus" role="status" aria-live="polite">Loading public donor profiles...</p>
+          <div id="donorPublicProfile" class="donor-directory-grid" aria-live="polite"></div>
+          <p class="donor-profile-privacy">Only information permitted for public viewing is shown here. Private contact, medical, and identity details are not displayed.</p>
+        </div>
+      </section>
 
       <!-- ================= 7. DIRECT CONTACT ACTION (CALL / WHATSAPP CTA) ================= -->
-      <section class="dashboard-content-section" id="section-direct-contact"></section>
+      <section class="dashboard-content-section" id="section-direct-contact" aria-labelledby="direct-contact-title">
+        <div class="seeker-card">
+          <div class="card-title-combo" style="margin-bottom: 12px;">
+            <span style="font-size: 1.5rem;" aria-hidden="true">📞</span>
+            <div>
+              <h2 id="direct-contact-title">Direct Donor Contact</h2>
+              <div class="card-subtitle">Call or message available donors who have explicitly enabled direct contact.</div>
+            </div>
+          </div>
+          <p class="donor-profile-privacy">
+            Donor phone numbers are private by default. A number is requested only when you choose a donor and is returned only when that donor has opted in and is available.
+          </p>
+          <p id="directContactStatus" role="status" aria-live="polite">Loading available donors...</p>
+          <div id="directContactDonors" class="donor-directory-grid" aria-live="polite"></div>
+        </div>
+      </section>
 
       <!-- ================= 8. REAL-TIME IN-APP 1-ON-1 CHAT ================= -->
-      <section class="dashboard-content-section" id="section-seeker-chat"></section>
+      <section class="dashboard-content-section" id="section-seeker-chat" aria-labelledby="seeker-chat-title">
+        <div class="seeker-chat-panel">
+          <header class="seeker-chat-heading">
+            <div>
+              <h2 id="seeker-chat-title">Real-Time In-App 1-on-1 Chat</h2>
+              <p>Coordinate a donation directly with a matched donor. Keep personal and medical details private.</p>
+            </div>
+            <span id="seekerChatConnection" class="seeker-chat-connection" role="status">Connecting…</span>
+          </header>
+          <div class="seeker-chat-layout">
+            <aside class="seeker-chat-sidebar" aria-label="Your donor conversations">
+              <div class="seeker-chat-list-heading">
+                <strong>Conversations</strong>
+                <span id="seekerChatUnread" class="seeker-chat-unread" hidden></span>
+              </div>
+              <div class="seeker-chat-start">
+                <label for="seekerChatDonorSelect">Start new conversation</label>
+                <select id="seekerChatDonorSelect">
+                  <option value="">Loading available donors…</option>
+                </select>
+                <button type="button" id="seekerChatStart" disabled>Start chat</button>
+              </div>
+              <div id="seekerChatThreads" class="seeker-chat-threads" aria-live="polite">
+                <p class="seeker-chat-empty">Loading conversations…</p>
+              </div>
+            </aside>
+            <div class="seeker-chat-conversation">
+              <div class="seeker-chat-toolbar">
+                <div>
+                  <strong id="seekerChatPeer">Choose a donor conversation</strong>
+                  <span id="seekerChatRestriction" role="status"></span>
+                </div>
+                <div class="seeker-chat-safety-actions">
+                  <label class="visually-hidden" for="seekerChatReportReason">Report reason</label>
+                  <select id="seekerChatReportReason" aria-label="Report reason">
+                    <option value="harassment">Harassment</option>
+                    <option value="spam">Spam</option>
+                    <option value="safety">Safety concern</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <button type="button" id="seekerChatReport" disabled>Report</button>
+                  <button type="button" id="seekerChatBlock" disabled>Restrict</button>
+                </div>
+              </div>
+              <div id="seekerChatMessages" class="seeker-chat-messages" role="log" aria-live="polite" aria-relevant="additions text">
+                <p class="seeker-chat-empty">Select an existing conversation or open chat from a donor profile.</p>
+              </div>
+              <form id="seekerChatForm" class="seeker-chat-compose">
+                <label class="visually-hidden" for="seekerChatInput">Message</label>
+                <input id="seekerChatInput" type="text" maxlength="2000" autocomplete="off" placeholder="Write a message…" disabled>
+                <button id="seekerChatSend" type="submit" disabled>Send</button>
+              </form>
+              <p id="seekerChatFeedback" class="seeker-chat-feedback" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- ================= 9. SEEKER PORTAL SETTINGS & PREFERENCES ================= -->
       <section class="dashboard-content-section" id="section-seeker-settings">

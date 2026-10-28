@@ -174,6 +174,31 @@ def initialize_admin_and_notification_database():
                 connection.execute("ALTER TABLE blood_requests ADD COLUMN units INTEGER DEFAULT 1")
             if "created_at" not in req_cols:
                 connection.execute("ALTER TABLE blood_requests ADD COLUMN created_at TEXT DEFAULT ''")
+            if "moderation_notes" not in req_cols:
+                connection.execute("ALTER TABLE blood_requests ADD COLUMN moderation_notes TEXT DEFAULT ''")
+            if "moderated_at" not in req_cols:
+                connection.execute("ALTER TABLE blood_requests ADD COLUMN moderated_at TEXT DEFAULT ''")
+            if "moderated_by" not in req_cols:
+                connection.execute("ALTER TABLE blood_requests ADD COLUMN moderated_by TEXT DEFAULT ''")
+
+            # Table for recording all moderation actions taken on blood requests (SBDS-42)
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS request_moderation_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    request_id INTEGER NOT NULL,
+                    action TEXT NOT NULL,
+                    admin_phone TEXT NOT NULL,
+                    admin_name TEXT NOT NULL,
+                    previous_status TEXT DEFAULT '',
+                    new_status TEXT DEFAULT '',
+                    notes TEXT DEFAULT '',
+                    duplicate_of_id INTEGER DEFAULT NULL,
+                    ip_address TEXT DEFAULT '127.0.0.1',
+                    created_at TEXT NOT NULL
+                );
+                """
+            )
 
             # Seed KYC Verifications if empty
             kyc_count = connection.execute("SELECT COUNT(*) FROM donor_kyc_verifications").fetchone()[0]
@@ -444,6 +469,116 @@ def dispatch_in_app_notification(
             return cursor.lastrowid
 
 
+def _extract_admin_identity(request: Request) -> tuple[str, str]:
+    """Extracts acting administrator phone and name from session token."""
+    token = request.cookies.get("access_token", "")
+    if token:
+        try:
+            import main
+            decoded = main._decode_jwt(token)
+            if decoded:
+                phone = decoded.get("sub", "")
+                user = main._get_user_by_phone(phone) if phone else None
+                if not user and phone:
+                    user = getattr(main, "USERS", {}).get(phone)
+                name = user.get("name", "System Admin") if user else "System Admin"
+                return phone or "+8801745678901", name
+        except Exception:
+            pass
+    return "+8801745678901", "System Admin"
+
+
+def log_request_moderation_action(
+    request_id: int,
+    action: str,
+    admin_phone: str,
+    admin_name: str,
+    previous_status: str = "",
+    new_status: str = "",
+    notes: str = "",
+    duplicate_of_id: Optional[int] = None,
+    ip_address: str = "127.0.0.1",
+):
+    """Records a blood request moderation action into both request_moderation_logs and admin_audit_logs."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        with closing(sqlite3.connect(DATABASE_PATH)) as conn:
+            with conn:
+                conn.execute(
+                    """
+                    INSERT INTO request_moderation_logs (
+                        request_id, action, admin_phone, admin_name,
+                        previous_status, new_status, notes, duplicate_of_id,
+                        ip_address, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        request_id, action, admin_phone, admin_name,
+                        previous_status, new_status, notes, duplicate_of_id,
+                        ip_address, now_iso,
+                    ),
+                )
+    except Exception as exc:
+        logger.warning(f"Error logging request moderation action: {exc}")
+
+    details = f"Action: {action}. Prev: '{previous_status}' -> New: '{new_status}'. Notes: {notes or 'None'}."
+    if duplicate_of_id:
+        details += f" Duplicate of #{duplicate_of_id}."
+    log_admin_action(
+        admin_phone=admin_phone,
+        admin_name=admin_name,
+        action=f"REQUEST_{action.upper()}",
+        target=f"Request #{request_id}",
+        details=details,
+        ip_address=ip_address,
+    )
+
+
+def _normalize_phone_simple(phone: Optional[str]) -> str:
+    """Normalizes Bangladeshi phone numbers for robust duplicate matching."""
+    if not phone:
+        return ""
+    cleaned = re.sub(r"[^\d+]", "", str(phone).strip())
+    if cleaned.startswith("+880"):
+        cleaned = "0" + cleaned[4:]
+    elif cleaned.startswith("880"):
+        cleaned = "0" + cleaned[3:]
+    return cleaned
+
+
+def evaluate_suspicious_content(req: dict) -> tuple[bool, list[str]]:
+    """
+    Evaluates blood request fields for inappropriate, commercial, or fraudulent patterns.
+    Returns (is_suspicious, reasons).
+    """
+    reasons = []
+    patient = (req.get("patient_name") or "").lower()
+    reason_text = (req.get("reason") or "").lower()
+    hospital = (req.get("hospital_name") or "").lower()
+    combined = f"{patient} {reason_text} {hospital}"
+
+    # Inappropriate or commercial keywords
+    spam_terms = [
+        "bkash", "nagad", "rocket", "money", "taka", "payment", "buy", "sell",
+        "price", "commercial", "cash", "fake", "scam", "urgent money", "reward"
+    ]
+    for term in spam_terms:
+        if re.search(r"\b" + re.escape(term) + r"\b", combined):
+            reasons.append(f"Inappropriate or commercial term detected: '{term}'")
+
+    units = req.get("units")
+    if units is not None:
+        try:
+            if int(units) > 10:
+                reasons.append(f"Abnormally high blood volume requested ({units} units)")
+            elif int(units) <= 0:
+                reasons.append("Invalid non-positive units requested")
+        except (ValueError, TypeError):
+            pass
+
+    return (len(reasons) > 0, reasons)
+
+
 def calculate_duplicate_risk(
     req_id: int,
     contact_phone: str,
@@ -465,6 +600,7 @@ def calculate_duplicate_risk(
     max_risk = 0.0
 
     clean_phone = (contact_phone or "").strip()
+    norm_phone = _normalize_phone_simple(clean_phone)
     clean_hosp = (hospital_name or "").strip().lower()
     clean_grp = (blood_group or "").strip().upper()
     clean_patient = (patient_name or "").strip().lower()
@@ -479,13 +615,14 @@ def calculate_duplicate_risk(
         reasons = []
 
         other_phone = (other.get("contact_phone") or "").strip()
+        other_norm_phone = _normalize_phone_simple(other_phone)
         other_hosp = (other.get("hospital_name") or "").strip().lower()
         other_grp = (other.get("blood_group") or "").strip().upper()
         other_patient = (other.get("patient_name") or "").strip().lower()
         other_area = (other.get("area") or "").strip().lower()
 
-        # Phone match
-        if clean_phone and clean_phone == other_phone:
+        # Phone match (exact or normalized)
+        if clean_phone and (clean_phone == other_phone or (norm_phone and norm_phone == other_norm_phone)):
             score += 65
             reasons.append(f"Matching contact phone ({clean_phone})")
 
@@ -528,7 +665,7 @@ def calculate_duplicate_risk(
     else:
         risk_label = "Unique / Low Risk"
 
-    return max_risk, risk_label, candidates[:3]
+    return max_risk, risk_label, candidates[:5]
 
 
 # ---------------------------------------------------------------------------
@@ -563,9 +700,14 @@ class KycSubmissionPayload(BaseModel):
     document_url: Optional[str] = ""
 
 class RequestModerationPayload(BaseModel):
-    action: str = Field(..., description="approve, flag, duplicate, close, delete")
+    action: str = Field(..., description="approve, flag, duplicate, close, delete, update_status, resolve, unflag")
     notes: Optional[str] = ""
     duplicate_of_id: Optional[int] = None
+    status: Optional[str] = None
+
+class RequestStatusUpdatePayload(BaseModel):
+    status: str = Field(..., description="Target status: Active, Closed, Fulfilled, Flagged, Pending")
+    reason: Optional[str] = ""
 
 class InventoryAlertPayload(BaseModel):
     blood_group: str
@@ -1218,15 +1360,19 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # -----------------------------------------------------------------------
     @app.get("/api/v1/admin/requests/moderation")
     async def get_requests_for_moderation(
-        status: str = Query("all", description="active, moderated, flagged, closed, all"),
-        urgency: str = Query("all", description="Critical, Urgent, Standard, all"),
+        status: str = Query("all", description="all, active, flagged, duplicate, approved, closed, pending"),
+        urgency: str = Query("all", description="all, critical, urgent, standard"),
+        duplicate_only: bool = Query(False, description="Filter only candidate duplicates"),
+        risk_level: str = Query("all", description="all, high, medium, low"),
+        search: Optional[str] = Query(None, description="Search term for patient, hospital, phone, area"),
     ):
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             u_conn.row_factory = sqlite3.Row
-            rows = u_conn.execute("SELECT * FROM blood_requests ORDER BY id DESC LIMIT 50").fetchall()
+            rows = u_conn.execute("SELECT * FROM blood_requests ORDER BY id DESC").fetchall()
             raw_requests = [dict(r) for r in rows]
 
+        # Calculate duplicate risk & suspicious signals for all requests
         enriched = []
         for req in raw_requests:
             req_id = req.get("id")
@@ -1239,21 +1385,126 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             risk_score, risk_label, duplicate_candidates = calculate_duplicate_risk(
                 req_id, contact, hosp, bg, patient, area, raw_requests
             )
-
-            # Apply filters if requested
-            if status != "all" and req.get("moderation_status") != status and req.get("status") != status:
-                continue
+            is_suspicious, suspicious_signals = evaluate_suspicious_content(req)
 
             item = dict(req)
             item["duplicate_risk"] = risk_score
             item["duplicate_label"] = risk_label
             item["duplicate_candidates"] = duplicate_candidates
+            item["is_suspicious"] = is_suspicious
+            item["suspicious_signals"] = suspicious_signals
             enriched.append(item)
+
+        # Compute aggregate KPIs before filtering
+        total_requests = len(enriched)
+        flagged_count = sum(1 for r in enriched if (r.get("moderation_status") or "").lower() == "flagged" or r.get("is_suspicious"))
+        duplicate_count = sum(1 for r in enriched if (r.get("duplicate_risk") or 0.0) >= 35.0 or (r.get("moderation_status") or "").lower() == "duplicate")
+        high_risk_count = sum(1 for r in enriched if (r.get("duplicate_risk") or 0.0) >= 70.0)
+        approved_count = sum(1 for r in enriched if (r.get("moderation_status") or "").lower() == "approved")
+        active_count = sum(1 for r in enriched if (r.get("status") or "").lower() == "active")
+
+        stats = {
+            "total_requests": total_requests,
+            "flagged_count": flagged_count,
+            "duplicate_count": duplicate_count,
+            "high_risk_count": high_risk_count,
+            "approved_count": approved_count,
+            "active_count": active_count,
+        }
+
+        # Apply filtering
+        filtered = []
+        for item in enriched:
+            mod_status = (item.get("moderation_status") or "approved").lower()
+            req_status = (item.get("status") or "active").lower()
+
+            # Status filter
+            if status != "all":
+                target_st = status.lower()
+                if target_st == "approved" and mod_status != "approved":
+                    continue
+                elif target_st == "flagged" and mod_status != "flagged":
+                    continue
+                elif target_st == "duplicate" and mod_status != "duplicate":
+                    continue
+                elif target_st in ("active", "closed", "fulfilled") and req_status != target_st and mod_status != target_st:
+                    continue
+                elif target_st not in ("approved", "flagged", "duplicate", "active", "closed", "fulfilled") and mod_status != target_st and req_status != target_st:
+                    continue
+
+            # Urgency filter
+            if urgency != "all":
+                u_filter = urgency.lower()
+                is_emg = item.get("is_emergency") == 1
+                urg_level = (item.get("urgency_level") or "").lower()
+                if u_filter == "critical" and not (is_emg or "critical" in urg_level or "red" in urg_level):
+                    continue
+                elif u_filter == "urgent" and not ("urgent" in urg_level or (not is_emg and urg_level != "standard")):
+                    continue
+                elif u_filter == "standard" and is_emg:
+                    continue
+
+            # Duplicate only filter
+            if duplicate_only and (item.get("duplicate_risk") or 0.0) < 35.0 and mod_status != "duplicate":
+                continue
+
+            # Risk level filter
+            if risk_level != "all":
+                r_score = item.get("duplicate_risk") or 0.0
+                rl = risk_level.lower()
+                if rl == "high" and r_score < 70.0:
+                    continue
+                elif rl == "medium" and not (35.0 <= r_score < 70.0):
+                    continue
+                elif rl == "low" and r_score >= 35.0:
+                    continue
+
+            # Search text filter
+            if search:
+                s_term = search.strip().lower()
+                haystack = f"{item.get('id', '')} {item.get('patient_name', '')} {item.get('hospital_name', '')} {item.get('contact_phone', '')} {item.get('blood_group', '')} {item.get('area', '')} {item.get('district', '')} {item.get('reason', '')}".lower()
+                if s_term not in haystack:
+                    continue
+
+            filtered.append(item)
 
         return {
             "status": "success",
-            "total": len(enriched),
-            "requests": enriched,
+            "total": len(filtered),
+            "stats": stats,
+            "requests": filtered,
+        }
+
+    @app.get("/api/v1/admin/requests/moderation/stats")
+    async def get_moderation_stats():
+        initialize_admin_and_notification_database()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            rows = [dict(r) for r in u_conn.execute("SELECT * FROM blood_requests").fetchall()]
+
+        total_requests = len(rows)
+        flagged_count = sum(1 for r in rows if (r.get("moderation_status") or "").lower() == "flagged")
+        duplicate_count = sum(1 for r in rows if (r.get("moderation_status") or "").lower() == "duplicate")
+        approved_count = sum(1 for r in rows if (r.get("moderation_status") or "").lower() == "approved")
+        active_count = sum(1 for r in rows if (r.get("status") or "").lower() == "active")
+
+        high_risk_count = 0
+        for r in rows:
+            risk, _, _ = calculate_duplicate_risk(
+                r.get("id"), r.get("contact_phone", ""), r.get("hospital_name", ""),
+                r.get("blood_group", ""), r.get("patient_name", ""), r.get("area", ""), rows
+            )
+            if risk >= 70.0:
+                high_risk_count += 1
+
+        return {
+            "status": "success",
+            "total_requests": total_requests,
+            "flagged_count": flagged_count,
+            "duplicate_count": duplicate_count,
+            "high_risk_count": high_risk_count,
+            "approved_count": approved_count,
+            "active_count": active_count,
         }
 
     @app.get("/api/v1/admin/requests/{request_id}/duplicates")
@@ -1276,6 +1527,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             target.get("area", ""),
             all_reqs,
         )
+        is_suspicious, suspicious_signals = evaluate_suspicious_content(target)
 
         return {
             "status": "success",
@@ -1283,58 +1535,190 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             "duplicate_risk": risk_score,
             "risk_label": risk_label,
             "candidates": candidates,
+            "is_suspicious": is_suspicious,
+            "suspicious_signals": suspicious_signals,
         }
 
     @app.post("/api/v1/admin/requests/{request_id}/moderate")
     async def moderate_blood_request(request_id: int, payload: RequestModerationPayload, request: Request):
         initialize_admin_and_notification_database()
         action = payload.action.strip().lower()
-        if action not in {"approve", "flag", "duplicate", "close", "delete"}:
+        allowed_actions = {"approve", "flag", "duplicate", "close", "delete", "update_status", "resolve", "unflag"}
+        if action not in allowed_actions:
             raise HTTPException(status_code=422, detail="Invalid moderation action")
+
+        admin_phone, admin_name = _extract_admin_identity(request)
+        now_iso = datetime.now(timezone.utc).isoformat()
 
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
+                u_conn.row_factory = sqlite3.Row
                 req_row = u_conn.execute("SELECT * FROM blood_requests WHERE id = ?", (request_id,)).fetchone()
                 if not req_row:
                     raise HTTPException(status_code=404, detail="Request not found")
 
+                req_dict = dict(req_row)
+                prev_status = req_dict.get("status", "Active")
+                prev_mod = req_dict.get("moderation_status", "approved")
+                new_status = prev_status
+                new_mod = prev_mod
+
                 if action == "delete":
                     u_conn.execute("DELETE FROM blood_requests WHERE id = ?", (request_id,))
+                    new_status = "deleted"
+                    new_mod = "deleted"
                 elif action == "duplicate":
+                    new_status = "Closed"
+                    new_mod = "duplicate"
                     u_conn.execute(
                         """
                         UPDATE blood_requests
-                        SET moderation_status = 'duplicate', status = 'closed', duplicate_of_id = ?
+                        SET moderation_status = 'duplicate', status = 'Closed', duplicate_of_id = ?,
+                            moderated_at = ?, moderated_by = ?, moderation_notes = ?
                         WHERE id = ?
                         """,
-                        (payload.duplicate_of_id, request_id),
+                        (payload.duplicate_of_id, now_iso, admin_name, payload.notes or "Marked as duplicate", request_id),
                     )
                 elif action == "flag":
+                    new_mod = "flagged"
                     u_conn.execute(
-                        "UPDATE blood_requests SET moderation_status = 'flagged' WHERE id = ?",
-                        (request_id,),
+                        """
+                        UPDATE blood_requests
+                        SET moderation_status = 'flagged',
+                            moderated_at = ?, moderated_by = ?, moderation_notes = ?
+                        WHERE id = ?
+                        """,
+                        (now_iso, admin_name, payload.notes or "Flagged as suspicious", request_id),
+                    )
+                elif action in ("approve", "resolve", "unflag"):
+                    new_mod = "approved"
+                    new_status = "Active"
+                    u_conn.execute(
+                        """
+                        UPDATE blood_requests
+                        SET moderation_status = 'approved', status = 'Active', duplicate_of_id = NULL,
+                            moderated_at = ?, moderated_by = ?, moderation_notes = ?
+                        WHERE id = ?
+                        """,
+                        (now_iso, admin_name, payload.notes or "Approved by admin", request_id),
                     )
                 elif action == "close":
+                    new_status = "Closed"
                     u_conn.execute(
-                        "UPDATE blood_requests SET status = 'closed' WHERE id = ?",
-                        (request_id,),
+                        """
+                        UPDATE blood_requests
+                        SET status = 'Closed',
+                            moderated_at = ?, moderated_by = ?, moderation_notes = ?
+                        WHERE id = ?
+                        """,
+                        (now_iso, admin_name, payload.notes or "Closed by admin", request_id),
                     )
-                elif action == "approve":
+                elif action == "update_status":
+                    if payload.status:
+                        new_status = payload.status.capitalize()
                     u_conn.execute(
-                        "UPDATE blood_requests SET moderation_status = 'approved', status = 'active' WHERE id = ?",
-                        (request_id,),
+                        """
+                        UPDATE blood_requests
+                        SET status = ?,
+                            moderated_at = ?, moderated_by = ?, moderation_notes = ?
+                        WHERE id = ?
+                        """,
+                        (new_status, now_iso, admin_name, payload.notes or f"Status updated to {new_status}", request_id),
                     )
 
-        log_admin_action(
-            "+8801745678901",
-            "System Admin",
-            f"REQUEST_{action.upper()}",
-            f"Request #{request_id}",
-            f"Action: {action}. Notes: {payload.notes or 'None'}. Duplicate of: {payload.duplicate_of_id or 'None'}",
-            request.client.host if request.client else "127.0.0.1",
+        log_request_moderation_action(
+            request_id=request_id,
+            action=action,
+            admin_phone=admin_phone,
+            admin_name=admin_name,
+            previous_status=prev_status,
+            new_status=new_status,
+            notes=payload.notes or "",
+            duplicate_of_id=payload.duplicate_of_id,
+            ip_address=request.client.host if request.client else "127.0.0.1",
         )
 
-        return {"status": "success", "message": f"Blood request #{request_id} has been moderated ({action})"}
+        return {
+            "status": "success",
+            "message": f"Blood request #{request_id} has been moderated ({action})",
+            "action": action,
+            "request_id": request_id,
+            "new_status": new_status,
+            "moderation_status": new_mod,
+        }
+
+    @app.post("/api/v1/admin/requests/{request_id}/status")
+    async def update_blood_request_status(request_id: int, payload: RequestStatusUpdatePayload, request: Request):
+        initialize_admin_and_notification_database()
+        target_status = payload.status.strip().capitalize()
+        valid_statuses = {"Active", "Closed", "Fulfilled", "Flagged", "Pending", "Emergency"}
+        if target_status not in valid_statuses:
+            raise HTTPException(status_code=422, detail=f"Invalid status: {payload.status}. Must be one of {valid_statuses}")
+
+        admin_phone, admin_name = _extract_admin_identity(request)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            with u_conn:
+                u_conn.row_factory = sqlite3.Row
+                req_row = u_conn.execute("SELECT * FROM blood_requests WHERE id = ?", (request_id,)).fetchone()
+                if not req_row:
+                    raise HTTPException(status_code=404, detail="Request not found")
+
+                req_dict = dict(req_row)
+                prev_status = req_dict.get("status", "Active")
+                mod_status = req_dict.get("moderation_status", "approved")
+
+                if target_status == "Flagged":
+                    mod_status = "flagged"
+                elif target_status == "Active" and mod_status == "flagged":
+                    mod_status = "approved"
+
+                u_conn.execute(
+                    """
+                    UPDATE blood_requests
+                    SET status = ?, moderation_status = ?, moderated_at = ?, moderated_by = ?, moderation_notes = ?
+                    WHERE id = ?
+                    """,
+                    (target_status, mod_status, now_iso, admin_name, payload.reason or f"Status changed to {target_status}", request_id),
+                )
+
+        log_request_moderation_action(
+            request_id=request_id,
+            action="STATUS_UPDATE",
+            admin_phone=admin_phone,
+            admin_name=admin_name,
+            previous_status=prev_status,
+            new_status=target_status,
+            notes=payload.reason or "",
+            ip_address=request.client.host if request.client else "127.0.0.1",
+        )
+
+        return {
+            "status": "success",
+            "message": f"Blood request #{request_id} status updated to {target_status}",
+            "request_id": request_id,
+            "status_value": target_status,
+            "moderation_status": mod_status,
+        }
+
+    @app.get("/api/v1/admin/requests/{request_id}/history")
+    async def get_request_moderation_history(request_id: int):
+        initialize_admin_and_notification_database()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            rows = u_conn.execute(
+                "SELECT * FROM request_moderation_logs WHERE request_id = ? ORDER BY id DESC",
+                (request_id,),
+            ).fetchall()
+            logs = [dict(r) for r in rows]
+
+        return {
+            "status": "success",
+            "request_id": request_id,
+            "total": len(logs),
+            "history": logs,
+        }
 
     # -----------------------------------------------------------------------
     # SBDS-43: Platform-Wide Blood Stock Oversight & Heatmap

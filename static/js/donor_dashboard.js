@@ -553,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================
   // DONOR IN-APP CHAT MODULE (SBDS-89)
   // =========================================================
-  const chatThreads = document.querySelectorAll('.chat-thread-item');
+  let chatThreads = document.querySelectorAll('.chat-thread-item');
   const chatMessagesContainer = document.getElementById('chatMessages');
   const chatInput = document.getElementById('chatInput');
   const chatSearchInput = document.getElementById('chatSearchInput');
@@ -567,10 +567,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const chatLocationBtn = document.getElementById('chatLocationBtn');
   const chatClearBtn = document.getElementById('chatClearBtn');
   const chatShareLocationBtn = document.getElementById('chatShareLocationBtn');
+  const chatReportBtn = document.getElementById('chatReportBtn');
+  const chatBlockBtn = document.getElementById('chatBlockBtn');
+  const chatReportReason = document.getElementById('chatReportReason');
   const typingIndicator = document.getElementById('typingIndicator');
   const sidebarChatBadge = document.getElementById('sidebarChatBadge');
   const headerUnreadBadge = document.getElementById('headerUnreadBadge');
   const noThreadsNotice = document.getElementById('noThreadsNotice');
+  const chatThreadsList = document.getElementById('chatThreadsList');
+  if (chatThreadsList && noThreadsNotice) {
+    chatThreadsList.replaceChildren(noThreadsNotice);
+    noThreadsNotice.textContent = 'Loading your conversations…';
+    noThreadsNotice.style.display = 'block';
+  }
   const categoryTabs = document.querySelectorAll('#chatCategoryTabs .chat-tab-pill');
 
   // Linked Request Banner elements
@@ -580,6 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const bannerHospital = document.getElementById('bannerHospital');
   const bannerBlood = document.getElementById('bannerBlood');
   const bannerUrgency = document.getElementById('bannerUrgency');
+  if (chatMessagesContainer && typingIndicator) {
+    chatMessagesContainer.replaceChildren(typingIndicator);
+  }
 
   // Client message cache for instant switching and offline resilience
   const conversationStore = {
@@ -607,13 +619,16 @@ document.addEventListener('DOMContentLoaded', () => {
     ]
   };
 
-  let activeThreadId = 'thread-square';
+  let activeThreadId = '';
   let activeFilter = 'all';
 
   function fetchThreadMessages(threadId, forceRender = false) {
     if (!threadId) return;
     fetch(`/api/v1/donor/chat/${threadId}/messages`)
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('This conversation is not available to your account.');
+        return res.json();
+      })
       .then(data => {
         if (data && data.status === 'success' && Array.isArray(data.messages)) {
           const prevLen = (conversationStore[threadId] || []).length;
@@ -625,7 +640,7 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
       })
-      .catch(() => {});
+      .catch(error => showToast(error.message || 'Could not load this conversation.', 'error'));
   }
 
   function updateUnreadCounts() {
@@ -662,17 +677,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const currentThread = document.querySelector(`.chat-thread-item[data-thread-id="${threadId}"]`);
     const category = currentThread?.getAttribute('data-category') || 'hospital';
-    const otherLabel = category === 'seeker' ? 'Nabil Hasan (Seeker)' : (category === 'support' ? 'Support Officer' : 'Coordinator');
+    const otherLabel = currentThread?.getAttribute('data-name') || (category === 'seeker' ? 'Seeker' : 'Coordinator');
 
     messages.forEach(msg => {
       const bubble = document.createElement('div');
       const isYou = msg.sender === 'you';
       bubble.className = `chat-bubble ${isYou ? 'bubble-sent' : 'bubble-received'}`;
-      const receiptHtml = isYou ? '<span class="read-receipt">✓✓</span>' : '';
-      bubble.innerHTML = `
-        <div>${escapeHtml(msg.text)}</div>
-        <div class="chat-bubble-time">${msg.time} · ${isYou ? 'You' : otherLabel} ${receiptHtml}</div>
-      `;
+      const messageText = document.createElement('div');
+      messageText.textContent = msg.text;
+      const messageTime = document.createElement('div');
+      messageTime.className = 'chat-bubble-time';
+      messageTime.textContent = `${msg.time} · ${isYou ? 'You' : otherLabel}${isYou ? ' ✓✓' : ''}`;
+      bubble.append(messageText, messageTime);
       chatMessagesContainer.appendChild(bubble);
     });
 
@@ -701,6 +717,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const blood = thread.getAttribute('data-blood');
 
     activeThreadId = threadId;
+    const isRestricted = status === 'Messaging restricted';
+    if (chatInput) chatInput.disabled = isRestricted;
+    if (chatReportBtn) chatReportBtn.disabled = false;
+    if (chatBlockBtn) chatBlockBtn.disabled = isRestricted;
 
     if (currentChatUserTitle) currentChatUserTitle.textContent = userName;
     if (activeChatAvatar) activeChatAvatar.textContent = avatar;
@@ -759,17 +779,153 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchThreadMessages(threadId, true);
   }
 
-  // Bind thread selection
-  chatThreads.forEach(thread => {
-    thread.addEventListener('click', () => {
+  if (chatThreadsList) {
+    chatThreadsList.addEventListener('click', event => {
+      const thread = event.target.closest('.chat-thread-item');
+      if (!thread) return;
       selectThread(thread);
       showToast(`Switched conversation to ${thread.getAttribute('data-name')}`);
     });
-  });
+    chatThreadsList.addEventListener('keydown', event => {
+      if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('.chat-thread-item')) {
+        event.preventDefault();
+        selectThread(event.target);
+      }
+    });
+  }
+
+  async function loadLiveDonorThreads() {
+    if (!chatThreadsList) return;
+    try {
+      const response = await fetch('/api/v1/donor/chat/threads');
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(data.detail || 'Could not load your conversations.');
+      }
+      chatThreadsList.replaceChildren();
+      data.threads.forEach(thread => {
+        const item = document.createElement('div');
+        item.className = 'chat-thread-item';
+        item.setAttribute('role', 'button');
+        item.tabIndex = 0;
+        item.dataset.threadId = thread.id;
+        item.dataset.category = 'seeker';
+        item.dataset.name = thread.name;
+        item.dataset.avatar = (thread.name || 'S').charAt(0).toUpperCase();
+        item.dataset.status = thread.restricted ? 'Messaging restricted' : 'Private donor conversation';
+        item.dataset.phone = thread.phone || '';
+        item.dataset.request = '';
+        item.dataset.patient = '';
+        item.dataset.hospital = '';
+        item.dataset.blood = thread.blood_group || '';
+
+        const avatarWrap = document.createElement('div');
+        avatarWrap.className = 'thread-avatar-wrap';
+        const avatar = document.createElement('div');
+        avatar.className = 'thread-avatar';
+        avatar.textContent = item.dataset.avatar;
+        avatarWrap.append(avatar);
+        const content = document.createElement('div');
+        content.className = 'thread-content-wrap';
+        const titleLine = document.createElement('div');
+        titleLine.className = 'thread-title-line';
+        const title = document.createElement('span');
+        title.className = 'thread-name';
+        title.textContent = thread.name;
+        const time = document.createElement('span');
+        time.className = 'thread-time';
+        const parsedTime = new Date(thread.last_time);
+        time.textContent = Number.isNaN(parsedTime.getTime())
+          ? ''
+          : parsedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        titleLine.append(title, time);
+        const previewLine = document.createElement('div');
+        previewLine.className = 'thread-preview-line';
+        const snippet = document.createElement('span');
+        snippet.className = 'thread-preview-snippet';
+        snippet.textContent = thread.last_message || 'No messages yet';
+        previewLine.append(snippet);
+        if (thread.unread_count) {
+          const unread = document.createElement('span');
+          unread.className = 'chat-unread-count';
+          unread.textContent = String(thread.unread_count);
+          previewLine.append(unread);
+        }
+        content.append(titleLine, previewLine);
+        item.append(avatarWrap, content);
+        chatThreadsList.append(item);
+      });
+      chatThreads = chatThreadsList.querySelectorAll('.chat-thread-item');
+      updateUnreadCounts();
+      if (noThreadsNotice) noThreadsNotice.style.display = data.threads.length ? 'none' : 'block';
+      if (data.threads.length) {
+        const current = Array.from(chatThreads).find(item => item.dataset.threadId === activeThreadId);
+        selectThread(current || chatThreads[0]);
+      } else {
+        activeThreadId = '';
+        if (noThreadsNotice) noThreadsNotice.textContent = 'No donor conversations yet. Wait for a seeker to start a chat.';
+        if (chatInput) chatInput.disabled = true;
+        if (chatReportBtn) chatReportBtn.disabled = true;
+        if (chatBlockBtn) chatBlockBtn.disabled = true;
+        if (currentChatUserTitle) currentChatUserTitle.textContent = 'No donor conversations';
+        if (chatMessagesContainer) {
+          chatMessagesContainer.textContent = 'No donor conversations yet. A seeker can start a conversation from the donor directory.';
+        }
+      }
+    } catch (error) {
+      chatThreadsList.replaceChildren();
+      if (noThreadsNotice) {
+        noThreadsNotice.style.display = 'block';
+        noThreadsNotice.textContent = error.message || 'Could not load conversations.';
+      }
+      showToast(error.message || 'Could not load conversations.', 'error');
+    }
+  }
+  loadLiveDonorThreads();
+
+  async function submitDonorChatAction(action, body = {}) {
+    if (!activeThreadId) return;
+    const response = await fetch(`/api/v1/donor/chat/${encodeURIComponent(activeThreadId)}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await response.json();
+    if (!response.ok || data.status !== 'success') {
+      throw new Error(data.detail || data.message || `Could not ${action} this conversation.`);
+    }
+    return data;
+  }
+
+  if (chatReportBtn) {
+    chatReportBtn.addEventListener('click', async () => {
+      try {
+        const data = await submitDonorChatAction('report', {
+          reason: chatReportReason?.value || 'other'
+        });
+        showToast(data.message || 'Report submitted for review.');
+      } catch (error) {
+        showToast(error.message || 'Could not report this conversation.', 'error');
+      }
+    });
+  }
+
+  if (chatBlockBtn) {
+    chatBlockBtn.addEventListener('click', async () => {
+      if (!window.confirm('Restrict this participant? You will no longer be able to send messages in this conversation.')) return;
+      try {
+        await submitDonorChatAction('block');
+        await loadLiveDonorThreads();
+        showToast('Conversation restricted. Existing messages remain available.');
+      } catch (error) {
+        showToast(error.message || 'Could not restrict this conversation.', 'error');
+      }
+    });
+  }
 
   // Sending message function
   window.sendChatMessage = function(explicitText) {
-    if (!chatInput) return;
+    if (!chatInput || !activeThreadId || chatInput.disabled) return;
     const text = (explicitText !== undefined ? explicitText : chatInput.value).trim();
     if (!text) return;
 
@@ -785,10 +941,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Append to UI immediately
     const bubble = document.createElement('div');
     bubble.className = 'chat-bubble bubble-sent';
-    bubble.innerHTML = `
-      <div>${text}</div>
-      <div class="chat-bubble-time">${timeStr} · You <span class="read-receipt">✓✓</span></div>
-    `;
+    const bubbleText = document.createElement('div');
+    bubbleText.textContent = text;
+    const bubbleTime = document.createElement('div');
+    bubbleTime.className = 'chat-bubble-time';
+    bubbleTime.textContent = `${timeStr} · You`;
+    bubble.append(bubbleText, bubbleTime);
     if (typingIndicator) {
       chatMessagesContainer.insertBefore(bubble, typingIndicator);
     } else {
@@ -806,88 +964,31 @@ document.addEventListener('DOMContentLoaded', () => {
       if (timeElem) timeElem.textContent = 'Just now';
     }
 
-    // Show realistic typing indicator
-    if (typingIndicator && activeThreadId !== 'thread-nabil') {
-      const activeName = currentChatUserTitle ? currentChatUserTitle.textContent : 'Coordinator';
-      const typingText = typingIndicator.querySelector('.typing-text');
-      if (typingText) typingText.textContent = `${activeName.split(' ')[0]} is typing`;
-      typingIndicator.style.display = 'inline-flex';
-      chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-    }
-
-    // Call backend API /api/v1/donor/chat/{id}/send
-    fetch(`/api/v1/donor/chat/${activeThreadId}/send`, {
+    const sentThreadId = activeThreadId;
+    fetch(`/api/v1/donor/chat/${encodeURIComponent(sentThreadId)}/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, sender: 'you' })
     })
-      .then(res => res.json())
-      .then(data => {
-        if (activeThreadId === 'thread-nabil') {
-          // Connected live with real Seeker; real responses arrive via WebSocket / sync
-          if (typingIndicator) typingIndicator.style.display = 'none';
-          return;
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok || data.status !== 'success') {
+          throw new Error(data.detail || 'Message could not be sent.');
         }
-
-        setTimeout(() => {
-          if (typingIndicator) typingIndicator.style.display = 'none';
-
-          const replyText = data?.reply?.text || 'Coordinator: "Received your message! We have notified the medical unit."';
-          const replyTime = data?.reply?.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-          conversationStore[activeThreadId].push({ sender: 'coordinator', text: replyText, time: replyTime });
-
-          if (chatMessagesContainer) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'chat-bubble bubble-received';
-            replyBubble.innerHTML = `
-              <div>${replyText}</div>
-              <div class="chat-bubble-time">${replyTime} · Coordinator</div>
-            `;
-            if (typingIndicator) {
-              chatMessagesContainer.insertBefore(replyBubble, typingIndicator);
-            } else {
-              chatMessagesContainer.appendChild(replyBubble);
-            }
-            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-          }
-        }, 1200);
+        return data;
       })
-      .catch(() => {
-        if (activeThreadId === 'thread-nabil') {
-          if (typingIndicator) typingIndicator.style.display = 'none';
-          return;
-        }
-        // Fallback simulation for offline testing
-        setTimeout(() => {
-          if (typingIndicator) typingIndicator.style.display = 'none';
-          let replyText = 'Received your message! Coordinator has been notified.';
-          if (activeThreadId === 'thread-square') {
-            replyText = 'Coordinator Dr. Farhan: "Received! Transfusion unit is waiting. See you shortly!"';
-          } else if (activeThreadId === 'thread-dmc') {
-            replyText = 'Desk Officer: "Thank you! Feel free to reach out anytime."';
-          } else if (activeThreadId === 'thread-support') {
-            replyText = 'SBDS Support: "We have updated your record. Let us know if you need assistance."';
-          }
-
-          const replyTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          conversationStore[activeThreadId].push({ sender: 'coordinator', text: replyText, time: replyTime });
-
-          if (chatMessagesContainer) {
-            const replyBubble = document.createElement('div');
-            replyBubble.className = 'chat-bubble bubble-received';
-            replyBubble.innerHTML = `
-              <div>${replyText}</div>
-              <div class="chat-bubble-time">${replyTime} · Coordinator</div>
-            `;
-            if (typingIndicator) {
-              chatMessagesContainer.insertBefore(replyBubble, typingIndicator);
-            } else {
-              chatMessagesContainer.appendChild(replyBubble);
-            }
-            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-          }
-        }, 1200);
+      .then(data => {
+        newMsg.id = data.sent.id;
+        fetchThreadMessages(sentThreadId, true);
+        loadLiveDonorThreads();
+        if (typingIndicator) typingIndicator.style.display = 'none';
+      })
+      .catch(error => {
+        conversationStore[sentThreadId] = (conversationStore[sentThreadId] || []).filter(message => message !== newMsg);
+        if (activeThreadId === sentThreadId) renderMessages(sentThreadId);
+        if (chatInput && !chatInput.value) chatInput.value = text;
+        if (typingIndicator) typingIndicator.style.display = 'none';
+        showToast(error.message || 'Message could not be sent.', 'error');
       });
   };
 
@@ -997,12 +1098,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let donorWsReconnectTimer = null;
   let donorWsPingInterval = null;
   let donorTypingTimeout = null;
-
-  function escapeHtml(text) {
-    if (!text) return '';
-    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-    return String(text).replace(/[&<>"']/g, m => map[m]);
-  }
 
   function playChatNotificationSound() {
     try {
@@ -1122,14 +1217,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const isChatActive = document.getElementById('section-chat')?.classList.contains('active-section');
             if (activeThreadId === threadId && isChatActive) {
               if (typingIndicator) typingIndicator.style.display = 'none';
-              if (chatMessagesContainer) {
+              if (data.sender !== 'you' && chatMessagesContainer) {
                 const bubble = document.createElement('div');
                 bubble.className = 'chat-bubble bubble-received';
                 const senderDisplay = data.sender_name || (threadId === 'thread-nabil' ? 'Nabil Hasan (Seeker)' : 'Coordinator');
-                bubble.innerHTML = `
-                  <div>${escapeHtml(data.text)}</div>
-                  <div class="chat-bubble-time">${data.time || 'Just now'} · ${senderDisplay}</div>
-                `;
+                const textNode = document.createElement('div');
+                textNode.textContent = data.text;
+                const timeNode = document.createElement('div');
+                timeNode.className = 'chat-bubble-time';
+                timeNode.textContent = `${data.time || 'Just now'} · ${senderDisplay}`;
+                bubble.append(textNode, timeNode);
                 if (typingIndicator) {
                   chatMessagesContainer.insertBefore(bubble, typingIndicator);
                 } else {
@@ -1137,9 +1234,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
               }
-              // Mark as read on server
-              fetch(`/api/v1/donor/chat/${threadId}/read`, { method: 'POST' }).catch(() => {});
-            } else {
+              if (data.sender !== 'you') {
+                fetch(`/api/v1/donor/chat/${threadId}/read`, { method: 'POST' })
+                  .then(response => {
+                    if (!response.ok) throw new Error('Could not update message read status.');
+                  })
+                  .catch(error => showToast(error.message, 'error'));
+              }
+            } else if (data.sender !== 'you') {
               // Increment unread count on thread
               if (threadItem) {
                 let badge = threadItem.querySelector('.chat-unread-count');
@@ -1162,9 +1264,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {}
       };
 
-      donorWs.onclose = () => {
+      donorWs.onclose = event => {
         clearInterval(donorWsPingInterval);
         clearTimeout(donorWsReconnectTimer);
+        if (event.code === 4401 || event.code === 4404) {
+          const statusBadge = document.getElementById('donorWsStatusBadge');
+          if (statusBadge) {
+            statusBadge.className = 'nav-pill-badge pill-red';
+            statusBadge.textContent = 'Sign in to use chat';
+          }
+          return;
+        }
         donorWsReconnectTimer = setTimeout(() => {
           initDonorChatWebSocket();
         }, 3000);
@@ -1220,6 +1330,49 @@ document.addEventListener('DOMContentLoaded', () => {
   const checkChips = document.querySelectorAll('#donationTypesWrap .check-chip');
   const btnUpdatePassword = document.getElementById('btnUpdatePassword');
   const btnRevokeSessions = document.getElementById('btnRevokeSessions');
+  const allowSeekerContact = document.getElementById('settingAllowSeekerContact');
+
+  if (allowSeekerContact) {
+    fetch('/api/v1/donor/direct-contact-preference')
+      .then(async response => {
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(data.detail || 'Could not load direct-contact preference.');
+        }
+        allowSeekerContact.checked = data.share_direct_contact === true;
+      })
+      .catch(error => {
+        allowSeekerContact.disabled = true;
+        showToast(error.message || 'Could not load direct-contact preference.', 'error');
+      });
+
+    allowSeekerContact.addEventListener('change', async () => {
+      const requestedValue = allowSeekerContact.checked;
+      allowSeekerContact.disabled = true;
+      try {
+        const response = await fetch('/api/v1/donor/direct-contact-preference', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ share_direct_contact: requestedValue })
+        });
+        const data = await response.json();
+        if (!response.ok || data.status !== 'success') {
+          throw new Error(data.detail || 'Could not update direct-contact preference.');
+        }
+        allowSeekerContact.checked = data.share_direct_contact === true;
+        showToast(
+          allowSeekerContact.checked
+            ? 'Seekers can now request your number for calls or WhatsApp.'
+            : 'Direct contact is disabled; your number remains private.'
+        );
+      } catch (error) {
+        allowSeekerContact.checked = !requestedValue;
+        showToast(error.message || 'Could not update direct-contact preference.', 'error');
+      } finally {
+        allowSeekerContact.disabled = false;
+      }
+    });
+  }
 
   // Sync radius value display
   if (radiusRangeInput && radiusValueDisplay) {

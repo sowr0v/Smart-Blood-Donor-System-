@@ -354,3 +354,305 @@ class HospitalBloodBankPortalTests(unittest.TestCase):
         self.assertIn("DGHS certified baseline", data["message"])
         self.assertIn("Dhaka General Hospital", data["settings"]["facility_name"])
 
+    # ------------------------------------------------------------------
+    # Donor Search & Direct Outreach – Section 2 API tests
+    # ------------------------------------------------------------------
+
+    def test_hospital_donor_search_returns_all_donors_without_filters(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertGreater(data["count"], 0)
+        donors = data["donors"]
+        self.assertIsInstance(donors, list)
+        # Every donor must have the mandatory public fields
+        for d in donors:
+            self.assertIn("id", d)
+            self.assertIn("blood_group", d)
+            self.assertIn("is_available", d)
+            self.assertIn("is_verified", d)
+            self.assertIn("contact_available", d)
+
+    def test_hospital_donor_search_blood_group_filter(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors?blood_group=A%2B", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for donor in data["donors"]:
+            self.assertEqual(donor["blood_group"], "A+")
+
+    def test_hospital_donor_search_available_only_filter(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors?available_only=true", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for donor in data["donors"]:
+            self.assertTrue(donor["is_available"])
+
+    def test_hospital_donor_search_query_filter(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors?query=Ayesha", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        # Ayesha Rahman should appear in the results (name match)
+        names = [d["name"] for d in data["donors"]]
+        self.assertTrue(any("Ayesha" in n for n in names))
+
+    def test_hospital_donor_search_location_filter(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors?location=Dhanmondi", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for donor in data["donors"]:
+            area = (donor.get("area") or "").lower()
+            district = (donor.get("district") or "").lower()
+            self.assertTrue("dhanmondi" in area or "dhanmondi" in district)
+
+    def test_hospital_donor_search_radius_filter(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors?radius_km=1.0", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for donor in data["donors"]:
+            self.assertLessEqual(donor["distance_km"], 1.0)
+
+    def test_hospital_donor_search_privacy_no_phone_without_consent(self):
+        """Donors without share_contact_hospital=True must NOT have contact_phone exposed."""
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        for donor in resp.json()["donors"]:
+            if not donor.get("contact_available"):
+                self.assertNotIn("contact_phone", donor)
+                self.assertIn("contact_note", donor)
+
+    def test_hospital_donor_detail_returns_correct_donor(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors/dn-001", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        donor = data["donor"]
+        self.assertEqual(donor["id"], "dn-001")
+        self.assertEqual(donor["blood_group"], "A+")
+        self.assertIn("contact_available", donor)
+
+    def test_hospital_donor_detail_404_for_unknown_id(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors/nonexistent-id", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_hospital_donor_search_blocked_for_seeker_role(self):
+        seeker_token = _generate_jwt("+8801723456789", "seeker")
+        resp = self.client.get("/api/v1/hospital/donors", cookies={"access_token": seeker_token})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_hospital_donor_detail_blocked_for_donor_role(self):
+        donor_token = _generate_jwt("+8801712345678", "donor")
+        resp = self.client.get("/api/v1/hospital/donors/dn-001", cookies={"access_token": donor_token})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_log_hospital_outreach_action(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        payload = {
+            "donor_id": "dn-001",
+            "donor_name": "Ayesha Rahman",
+            "blood_group": "A+",
+            "contact_type": "call",
+            "notes": "Confirmed donor availability for surgical blood supply.",
+        }
+        resp = self.client.post("/api/v1/hospital/outreach/log", json=payload, cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        log = data["log"]
+        self.assertEqual(log["donor_id"], "dn-001")
+        self.assertEqual(log["contact_type"], "call")
+        self.assertIn("notes", log)
+        self.assertIn("created_at", log)
+
+    def test_get_hospital_outreach_logs(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/outreach/logs", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertGreater(data["count"], 0)
+        logs = data["logs"]
+        self.assertIsInstance(logs, list)
+        for log in logs:
+            self.assertIn("donor_name", log)
+            self.assertIn("blood_group", log)
+            self.assertIn("contact_type", log)
+
+    def test_outreach_logs_blocked_for_seeker_role(self):
+        seeker_token = _generate_jwt("+8801723456789", "seeker")
+        resp = self.client.get("/api/v1/hospital/outreach/logs", cookies={"access_token": seeker_token})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_hospital_donor_search_returns_badge_tier_and_response_time(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/donors", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        donors = resp.json()["donors"]
+        # At least one donor should have badge_tier and response_time (from mock data)
+        self.assertTrue(any(d.get("badge_tier") for d in donors))
+        self.assertTrue(any(d.get("response_time") for d in donors))
+
+    def test_hospital_donor_search_section_exists_in_html(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/hospital/dashboard", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        # Section container
+        self.assertIn('id="section-donor-search"', html)
+        # Key UI elements
+        self.assertIn('id="donorSearchQuery"', html)
+        self.assertIn('id="donorSearchLocation"', html)
+        self.assertIn('id="donorSearchRadius"', html)
+        self.assertIn('id="donorAvailableOnly"', html)
+        self.assertIn('id="donorBgChips"', html)
+        self.assertIn('id="donorSearchResults"', html)
+        self.assertIn('id="outreachLogTable"', html)
+        self.assertIn('id="donorDetailModal"', html)
+        # Blood group chips present
+        self.assertIn("donor-bg-chip", html)
+
+    # ------------------------------------------------------------------------
+    # Institutional Blood Request & Allocation Tests
+    # ------------------------------------------------------------------------
+
+    def test_get_institutional_blood_requests_list(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertGreaterEqual(data["count"], 1)
+        self.assertIsInstance(data["requests"], list)
+
+    def test_filter_institutional_requests_by_blood_group(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests?blood_group=O-", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for r in data["requests"]:
+            self.assertEqual(r["blood_group"], "O-")
+
+    def test_filter_institutional_requests_by_priority(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests?priority=Critical", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for r in data["requests"]:
+            self.assertEqual(r["priority"], "Critical")
+
+    def test_filter_institutional_requests_by_status(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests?status=Pending", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        for r in data["requests"]:
+            self.assertEqual(r["status"], "Pending")
+
+    def test_create_institutional_blood_request(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        payload = {
+            "blood_group": "AB+",
+            "units_requested": 4,
+            "priority": "Urgent",
+            "department": "Intensive Care Unit (ICU)",
+            "patient_diagnosis": "Acute septicemia with coagulopathy",
+            "required_within_hours": 6,
+            "notes": "Emergency blood reserve needed immediately"
+        }
+        resp = self.client.post("/api/v1/hospital/institutional-requests", json=payload, cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        new_req = data["request"]
+        self.assertEqual(new_req["blood_group"], "AB+")
+        self.assertEqual(new_req["units_requested"], 4)
+        self.assertEqual(new_req["units_allocated"], 0)
+        self.assertEqual(new_req["priority"], "Urgent")
+        self.assertEqual(new_req["status"], "Pending")
+        self.assertEqual(new_req["department"], "Intensive Care Unit (ICU)")
+
+    def test_create_institutional_request_invalid_blood_group(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        payload = {
+            "blood_group": "XYZ",
+            "units_requested": 2,
+            "priority": "Normal",
+            "department": "Surgery"
+        }
+        resp = self.client.post("/api/v1/hospital/institutional-requests", json=payload, cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 422)
+
+    def test_get_institutional_request_detail(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests/inst-req-101", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["request"]["id"], "inst-req-101")
+        self.assertEqual(data["request"]["blood_group"], "O-")
+
+    def test_get_institutional_request_detail_404(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/api/v1/hospital/institutional-requests/inst-req-invalid-999", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 404)
+
+    def test_record_blood_allocation_for_request(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        # inst-req-103 needs 3 units of B+, 0 allocated
+        payload = {
+            "units_allocated": 2,
+            "source_facility": "Central Hospital Cold Store",
+            "batch_number": "BATCH-BPOS-TEST-001",
+            "allocated_by": "Dr. Testing Lead",
+            "notes": "2 units matched and issued for transfusion"
+        }
+        resp = self.client.post("/api/v1/hospital/institutional-requests/inst-req-103/allocate", json=payload, cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        req = data["request"]
+        self.assertEqual(req["units_allocated"], 2)
+        self.assertEqual(req["status"], "Partially Allocated")
+        self.assertEqual(len(req["allocations"]), 1)
+        self.assertEqual(req["allocations"][0]["batch_number"], "BATCH-BPOS-TEST-001")
+
+    def test_update_institutional_request_status(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.patch("/api/v1/hospital/institutional-requests/inst-req-101/status", json={"status": "Dispatched"}, cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["status"], "success")
+        self.assertEqual(data["request"]["status"], "Dispatched")
+
+    def test_institutional_requests_unauthorized_for_seeker(self):
+        seeker_token = _generate_jwt("+8801723456789", "seeker")
+        resp = self.client.get("/api/v1/hospital/institutional-requests", cookies={"access_token": seeker_token})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_institutional_requests_unauthorized_for_donor(self):
+        donor_token = _generate_jwt("+8801712345678", "donor")
+        resp = self.client.get("/api/v1/hospital/institutional-requests", cookies={"access_token": donor_token})
+        self.assertEqual(resp.status_code, 403)
+
+    def test_html_contains_institutional_request_and_allocation_section(self):
+        token = _generate_jwt("+8801734567890", "hospital")
+        resp = self.client.get("/hospital/dashboard", cookies={"access_token": token})
+        self.assertEqual(resp.status_code, 200)
+        html = resp.text
+        self.assertIn('id="section-blood-allocation"', html)
+        self.assertIn('id="instRequestsTable"', html)
+        self.assertIn('id="modalCreateRequest"', html)
+        self.assertIn('id="modalAllocateBlood"', html)
+        self.assertIn('id="modalRequestDetails"', html)
+
+
+

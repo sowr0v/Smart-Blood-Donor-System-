@@ -201,9 +201,11 @@
 
 /* Content Area */
 .hospital-content-shell {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: min(100%, 1380px);
+  overflow-x: hidden;
   padding: 24px 32px 60px;
-  max-width: 1380px;
   margin: 0 auto;
   width: 100%;
 }
@@ -1593,6 +1595,260 @@
   border-color: #222d42;
 }
 
+.inventory-page-header {
+  margin: 0 0 24px;
+}
+
+.inventory-page-overline {
+  margin-bottom: 6px;
+  color: #14b8a6;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.inventory-page-header h1 {
+  margin: 0 0 6px;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.inventory-page-header p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.inventory-matrix-panel {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 24px;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  background: #0b1329;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+}
+
+.inventory-table-scroll {
+  overflow-x: auto;
+  scrollbar-color: #334155 transparent;
+}
+
+.inventory-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  color: #f8fafc;
+}
+
+.inventory-table th,
+.inventory-table td {
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+  vertical-align: middle;
+}
+
+.inventory-table thead th {
+  padding: 14px 18px;
+  color: #64748b;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border-bottom: 1px solid #1e293b;
+}
+
+.inventory-table thead th:last-child,
+.inventory-table tbody td:last-child {
+  text-align: right;
+}
+
+.inventory-table tbody tr {
+  transition: background-color 0.18s ease;
+}
+
+.inventory-table tbody tr:hover {
+  background: rgba(30, 41, 59, 0.5);
+}
+
+.inventory-table tbody tr:last-child th,
+.inventory-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.inventory-table tbody th {
+  font-weight: 600;
+}
+
+.inventory-blood-group {
+  display: inline-block;
+  padding: 4px 14px;
+  border: 1px solid rgba(225, 29, 72, 0.35);
+  border-radius: 8px;
+  color: #fb7185;
+  background: rgba(225, 29, 72, 0.15);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.inventory-quantity {
+  color: #fff;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.inventory-quantity[data-stock="empty"] {
+  color: #94a3b8;
+}
+
+.inventory-units {
+  margin-left: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.inventory-update-form {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.inventory-update-form input {
+  box-sizing: border-box;
+  width: 85px;
+  min-height: 20px;
+  margin-right: 10px;
+  padding: 8px 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #fff;
+  background: #1e293b;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: center;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.inventory-update-form input:focus {
+  outline: none;
+  border-color: #fb7185;
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.2);
+}
+
+.inventory-update-form button {
+  min-height: 36px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #e11d48;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+  transition: all 0.2s ease-in-out;
+}
+
+.inventory-update-form button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #f43f5e;
+  box-shadow: 0 5px 16px rgba(225, 29, 72, 0.48);
+}
+
+.inventory-update-form button:focus-visible {
+  outline: 3px solid rgba(251, 113, 133, 0.45);
+  outline-offset: 2px;
+}
+
+.inventory-update-form button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.inventory-row-feedback {
+  flex-basis: 100%;
+  min-height: 1em;
+  color: #94a3b8;
+  font-size: 0.78rem;
+}
+
+.inventory-updated-at {
+  min-width: 180px;
+  padding: 16px 18px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.inventory-updated-at[data-timestamp=""] {
+  color: #64748b;
+}
+
+.inventory-updated-at[data-timestamp=""]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: #64748b;
+  opacity: 0.55;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 700px) {
+  .inventory-matrix-panel {
+    padding: 16px;
+  }
+
+  .inventory-page-header h1 {
+    font-size: 21px;
+  }
+
+  .inventory-table {
+    min-width: 650px;
+  }
+
+  .inventory-table th,
+  .inventory-table td {
+    padding: 13px 16px;
+  }
+
+  .inventory-updated-at {
+    min-width: 170px;
+  }
+}
+
 [data-theme="dark"] .master-req-table th {
   background: #182030;
   border-bottom-color: #222d42;
@@ -2199,4 +2455,631 @@
   }
 }
 
+/* ============================================================
+   Donor Search & Direct Outreach – Section 2
+   ============================================================ */
+
+/* Blood-group chip filter buttons */
+.donor-bg-chip {
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.donor-bg-chip:hover {
+  border-color: #e11d48;
+  color: #e11d48;
+}
+.donor-bg-chip.active {
+  background: rgba(225, 29, 72, 0.12);
+  border-color: #e11d48;
+  color: #fb7185;
+}
+
+/* Donor result card */
+.donor-result-card {
+  background: #0b1329;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.2s, transform 0.15s;
+  cursor: pointer;
+}
+.donor-result-card:hover {
+  border-color: #334155;
+  transform: translateY(-2px);
+}
+
+/* Blood group badge on card */
+.donor-bg-badge {
+  display: inline-block;
+  background: rgba(225, 29, 72, 0.15);
+  color: #fb7185;
+  border: 1px solid rgba(225, 29, 72, 0.35);
+  border-radius: 8px;
+  padding: 3px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Availability indicator dot */
+.donor-availability-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.donor-availability-dot.available {
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+}
+.donor-availability-dot.unavailable {
+  background: #ef4444;
+}
+
+/* Contact action button row */
+.donor-contact-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.donor-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.donor-action-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.donor-action-btn.call {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.35);
+}
+.donor-action-btn.message {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35);
+}
+.donor-action-btn.dispatch {
+  background: linear-gradient(135deg, #d97706, #b45309);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.35);
+}
+.donor-action-btn.disabled-contact {
+  background: #1e293b;
+  color: #475569;
+  cursor: not-allowed;
+}
+
+/* Toggle switch (available-only toggle) */
+.hospital-toggle-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.hospital-toggle-wrap input[type="checkbox"] {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.hospital-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #1e293b;
+  border-radius: 24px;
+  transition: background 0.2s;
+}
+.hospital-toggle-slider::before {
+  content: "";
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  top: 3px;
+  background: #64748b;
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.hospital-toggle-wrap input:checked + .hospital-toggle-slider {
+  background: rgba(225, 29, 72, 0.25);
+}
+.hospital-toggle-wrap input:checked + .hospital-toggle-slider::before {
+  transform: translateX(20px);
+  background: #e11d48;
+}
+
+/* Outreach log table body rows */
+#outreachLogBody tr {
+  border-bottom: 1px solid rgba(30, 41, 59, 0.7);
+  transition: background 0.1s;
+}
+#outreachLogBody tr:hover {
+  background: rgba(30, 41, 59, 0.4);
+}
+#outreachLogBody td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #94a3b8;
+  vertical-align: middle;
+}
+#outreachLogBody td:first-child {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* Donor detail modal overlay animation */
+#donorDetailModal.open {
+  display: flex !important;
+}
+
+/* ==========================================================================
+   5. Institutional Blood Request & Allocation Styles
+   ========================================================================== */
+.inst-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.inst-kpi-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.inst-kpi-icon-wrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.inst-kpi-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.inst-kpi-label {
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.inst-kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin-top: 2px;
+}
+
+.inst-controls-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.inst-filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.inst-filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inst-filter-item label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+}
+
+.inst-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--text-primary, #0f172a);
+  font-size: 0.88rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.inst-select:focus {
+  border-color: #e11d48;
+}
+
+.inst-action-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inst-table-container {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.inst-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.inst-table th {
+  padding: 14px 18px;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.inst-table td {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-color, #f1f5f9);
+  color: var(--text-primary, #1e293b);
+  vertical-align: middle;
+}
+
+.inst-table tr:last-child td {
+  border-bottom: none;
+}
+
+.inst-table tr:hover td {
+  background: rgba(248, 250, 252, 0.8);
+}
+
+.inst-badge-bg {
+  display: inline-block;
+  padding: 3px 9px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-weight: 700;
+  border-radius: 6px;
+  font-size: 0.84rem;
+}
+
+.inst-priority-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.inst-priority-critical {
+  background: rgba(225, 29, 72, 0.15);
+  color: #e11d48;
+  border: 1px solid rgba(225, 29, 72, 0.3);
+}
+
+.inst-priority-urgent {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.inst-priority-normal {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.inst-priority-routine {
+  background: rgba(100, 116, 139, 0.12);
+  color: #475569;
+}
+
+.inst-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.inst-status-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.inst-status-partially-allocated {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.inst-status-fully-allocated {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.inst-status-dispatched {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.inst-empty-state {
+  text-align: center;
+  padding: 50px 20px;
+  color: var(--text-muted, #64748b);
+}
+
+.inst-empty-state h4 {
+  font-size: 1.1rem;
+  color: var(--text-primary, #0f172a);
+  margin: 12px 0 6px 0;
+}
+
+/* Modals */
+.inst-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.inst-modal.open {
+  display: flex;
+}
+
+.inst-modal-dialog {
+  background: var(--surface, #ffffff);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: modalScaleIn 0.2s ease-out;
+}
+
+.inst-modal-dialog-wide {
+  max-width: 760px;
+}
+
+@keyframes modalScaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.inst-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.inst-modal-header h3 {
+  font-size: 1.18rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin: 0;
+}
+
+.inst-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.6rem;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.inst-modal-body {
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inst-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color, #e2e8f0);
+  background: #f8fafc;
+  border-radius: 0 0 16px 16px;
+}
+
+.inst-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.inst-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inst-form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary, #1e293b);
+}
+
+.inst-form-control {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: var(--surface, #ffffff);
+  color: var(--text-primary, #0f172a);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  width: 100%;
+}
+
+.inst-form-control:focus {
+  border-color: #e11d48;
+}
+
+.req-star {
+  color: #e11d48;
+}
+
+.inst-alloc-summary {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 14px 18px;
+}
+
+.inst-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-inst-action {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color, #cbd5e1);
+  background: #ffffff;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-inst-action:hover {
+  background: #f1f5f9;
+}
+
+.btn-inst-allocate {
+  background: #e11d48;
+  color: #ffffff;
+  border-color: #e11d48;
+}
+
+.btn-inst-allocate:hover {
+  background: #be123c;
+  border-color: #be123c;
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .inst-kpi-card,
+[data-theme="dark"] .inst-controls-panel,
+[data-theme="dark"] .inst-table-container,
+[data-theme="dark"] .inst-modal-dialog {
+  background: #111827;
+  border-color: #1f2937;
+}
+
+[data-theme="dark"] .inst-kpi-value,
+[data-theme="dark"] .inst-modal-header h3 {
+  color: #f9fafb;
+}
+
+[data-theme="dark"] .inst-table th {
+  background: #1f2937;
+  color: #9ca3af;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .inst-table td {
+  border-color: #1f2937;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .inst-table tr:hover td {
+  background: rgba(31, 41, 55, 0.7);
+}
+
+[data-theme="dark"] .inst-select,
+[data-theme="dark"] .inst-form-control {
+  background: #1f2937;
+  border-color: #374151;
+  color: #f9fafb;
+}
+
+[data-theme="dark"] .inst-modal-footer {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .inst-alloc-summary {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .btn-inst-action {
+  background: #1f2937;
+  border-color: #374151;
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] .btn-inst-action:hover {
+  background: #374151;
+}
 
