@@ -122,7 +122,7 @@
       </div>
       <div class="notif-drawer-actions">
         <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
-        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">âœ•</button>
       </div>
     </div>
 
@@ -687,8 +687,8 @@
   <div class="admin-modal" id="emergencySmsModal" aria-hidden="true">
     <div class="admin-modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">🚨 Life-Critical Emergency SMS Dispatch</h3>
-        <button type="button" class="btn-close" onclick="closeEmergencySmsModal()">✕</button>
+        <h3 class="modal-title">ðŸš¨ Life-Critical Emergency SMS Dispatch</h3>
+        <button type="button" class="btn-close" onclick="closeEmergencySmsModal()">âœ•</button>
       </div>
       <form id="emergencySmsForm" onsubmit="submitEmergencySms(event)">
         <div class="modal-body">
@@ -736,7 +736,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeEmergencySmsModal()">Cancel</button>
-          <button type="submit" class="btn btn-danger" id="submitSmsBtn">⚡ Dispatch SMS to Donors</button>
+          <button type="submit" class="btn btn-danger" id="submitSmsBtn">âš¡ Dispatch SMS to Donors</button>
         </div>
       </form>
     </div>
@@ -746,8 +746,8 @@
   <div class="admin-modal" id="pushModal" aria-hidden="true">
     <div class="admin-modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title">🔔 Web Push Notification Gateway (FCM)</h3>
-        <button type="button" class="btn-close" onclick="closePushModal()">✕</button>
+        <h3 class="modal-title">ðŸ”” Web Push Notification Gateway (FCM)</h3>
+        <button type="button" class="btn-close" onclick="closePushModal()">âœ•</button>
       </div>
       <form id="pushNotificationForm" onsubmit="submitWebPush(event)">
         <div class="modal-body">
@@ -783,7 +783,7 @@
     <div class="admin-modal-dialog">
       <div class="modal-header">
         <h3 class="modal-title">Edit User & Role Assignment</h3>
-        <button type="button" class="btn-close" onclick="closeUserEditModal()">✕</button>
+        <button type="button" class="btn-close" onclick="closeUserEditModal()">âœ•</button>
       </div>
       <form id="userEditForm" onsubmit="saveUserEdit(event)">
         <div class="modal-body">
@@ -986,7 +986,7 @@
     <div class="admin-modal-dialog modal-lg">
       <div class="modal-header">
         <h3 class="modal-title" id="kycModalTitle">Donor KYC Verification Review</h3>
-        <button type="button" class="btn-close" onclick="closeKycReviewModal()">✕</button>
+        <button type="button" class="btn-close" onclick="closeKycReviewModal()">âœ•</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="kycReviewId">
@@ -994,7 +994,7 @@
           <div class="kyc-doc-preview-panel">
             <h4>Uploaded Document Preview</h4>
             <div class="doc-preview-box" id="kycDocPreview">
-              <div class="doc-placeholder-icon">📄</div>
+              <div class="doc-placeholder-icon">ðŸ“„</div>
               <span id="kycDocTypeLabel">National ID (NID)</span>
             </div>
           </div>
@@ -1025,8 +1025,8 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeKycReviewModal()">Cancel</button>
-        <button type="button" class="btn btn-danger" onclick="submitKycDecision('reject')">✕ Reject Submission</button>
-        <button type="button" class="btn btn-success" onclick="submitKycDecision('approve')">✓ Approve & Grant Verified Badge</button>
+        <button type="button" class="btn btn-danger" onclick="submitKycDecision('reject')">âœ• Reject Submission</button>
+        <button type="button" class="btn btn-success" onclick="submitKycDecision('approve')">âœ“ Approve & Grant Verified Badge</button>
       </div>
     </div>
   </div>
@@ -1035,8 +1035,8 @@
   <div class="admin-modal" id="duplicateInspectionModal" aria-hidden="true">
     <div class="admin-modal-dialog modal-lg">
       <div class="modal-header">
-        <h3 class="modal-title">🔍 Duplicate Detection Analysis & Moderation</h3>
-        <button type="button" class="btn-close" onclick="closeDuplicateModal()">✕</button>
+        <h3 class="modal-title">ðŸ” Duplicate Detection Analysis & Moderation</h3>
+        <button type="button" class="btn-close" onclick="closeDuplicateModal()">âœ•</button>
       </div>
       <div class="modal-body" id="duplicateModalContent">
         <div class="loading-spinner-row">Evaluating duplicate candidate algorithms...</div>
@@ -1052,7 +1052,7 @@
     <div class="admin-modal-dialog">
       <div class="modal-header">
         <h3 class="modal-title">Update Request Status</h3>
-        <button type="button" class="btn-close" onclick="closeStatusUpdateModal()">✕</button>
+        <button type="button" class="btn-close" onclick="closeStatusUpdateModal()">âœ•</button>
       </div>
       <form id="statusUpdateForm" onsubmit="submitRequestStatusUpdate(event)">
         <div class="modal-body">
@@ -1084,8 +1084,8 @@
   <div class="admin-modal" id="requestHistoryModal" aria-hidden="true">
     <div class="admin-modal-dialog modal-lg">
       <div class="modal-header">
-        <h3 class="modal-title">📜 Request Moderation History &amp; Audit Trail</h3>
-        <button type="button" class="btn-close" onclick="closeRequestHistoryModal()">✕</button>
+        <h3 class="modal-title">ðŸ“œ Request Moderation History &amp; Audit Trail</h3>
+        <button type="button" class="btn-close" onclick="closeRequestHistoryModal()">âœ•</button>
       </div>
       <div class="modal-body" id="requestHistoryModalContent">
         <div class="loading-spinner-row">Loading audit records...</div>
@@ -1101,7 +1101,7 @@
     <div class="admin-modal-dialog">
       <div class="modal-header">
         <h3 class="modal-title">Resolve Moderation Report</h3>
-        <button type="button" class="btn-close" onclick="closeReportResolutionModal()">✕</button>
+        <button type="button" class="btn-close" onclick="closeReportResolutionModal()">âœ•</button>
       </div>
       <div class="modal-body">
         <input type="hidden" id="resolutionReportId">
@@ -1115,7 +1115,8 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeReportResolutionModal()">Cancel</button>
-        <button type="button" class="btn btn-outline" onclick="submitReportAction('dismiss')">Dismiss Report</button>
+        <button type="button" class="btn btn-info" onclick="submitReportAction('under_review')">Mark Under Review</button>
+          <button type="button" class="btn btn-outline" onclick="submitReportAction('dismiss')">Dismiss Report</button>
         <button type="button" class="btn btn-warning" onclick="submitReportAction('warn_user')">Issue Warning Notice</button>
         <button type="button" class="btn btn-danger" onclick="submitReportAction('suspend_user')">Suspend User</button>
         <button type="button" class="btn btn-success" onclick="submitReportAction('resolve')">Mark Resolved</button>

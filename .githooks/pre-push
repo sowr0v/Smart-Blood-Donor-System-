@@ -14,16 +14,19 @@ do
     fi
 
     if [ "$remote_sha" = "$z40" ]; then
-        # New branch being pushed
-        range="$local_sha"
+        # New branch being pushed — only check commits NOT already reachable
+        # from any existing remote-tracking ref (e.g. origin/main).
+        # Using ^refs/remotes/* excludes commits already pushed to the remote,
+        # preventing false positives from historical commits in the base branch.
+        range="$local_sha $(git for-each-ref --format='^%(refname)' refs/remotes/ 2>/dev/null | tr '\n' ' ')"
     else
         range="$remote_sha..$local_sha"
     fi
 
     # Check commit logs in this push range
-    copilot_commits=$(git log "$range" --grep="[Cc]opilot" --oneline 2>/dev/null)
-    copilot_authors=$(git log "$range" --author="[Cc]opilot" --oneline 2>/dev/null)
-    copilot_committers=$(git log "$range" --committer="[Cc]opilot" --oneline 2>/dev/null)
+    copilot_commits=$(git log $range --grep="[Cc]opilot" --oneline 2>/dev/null)
+    copilot_authors=$(git log $range --author="[Cc]opilot" --oneline 2>/dev/null)
+    copilot_committers=$(git log $range --committer="[Cc]opilot" --oneline 2>/dev/null)
 
     if [ -n "$copilot_commits" ] || [ -n "$copilot_authors" ] || [ -n "$copilot_committers" ]; then
         echo "================================================================="
