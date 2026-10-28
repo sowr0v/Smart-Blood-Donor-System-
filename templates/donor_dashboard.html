@@ -1220,6 +1220,114 @@
             </div>
           </div>
 
+          <!-- CARD 3B: Location Sharing Granularity & GPS Permissions (SBDS-52) -->
+          <div class="donor-card" id="card-location-permissions">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">📍</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="locationPermissionsHeading">Location Sharing Granularity &amp; GPS Permissions</h3>
+                  <div class="card-subtitle">Configure geographical precision, GPS auto-detection, and emergency location routing</div>
+                </div>
+              </div>
+              <button type="button" class="btn-donor-outline" id="btnSaveLocationSettings" style="font-size: 0.82rem; padding: 6px 14px;">
+                Save Location Settings
+              </button>
+            </div>
+
+            <!-- Granularity Selection Cards -->
+            <div style="margin-bottom: 18px;">
+              <label style="font-size: 0.85rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: block;">
+                Geographical Precision on Public Seeker Maps
+              </label>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;">
+                <!-- Exact GPS Pinpoint -->
+                <label class="granularity-option-card" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: var(--bg-card);">
+                  <input type="radio" name="locationGranularity" id="granularityExact" value="exact" style="margin-top: 3px;">
+                  <div>
+                    <strong style="display: block; font-size: 0.88rem; color: var(--text-primary);">🎯 Exact GPS Pinpoint</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; display: block;">Full coordinate precision for hospital ambulances &amp; emergency responders.</span>
+                  </div>
+                </label>
+                <!-- Approximate Area Grid (Default) -->
+                <label class="granularity-option-card" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: var(--bg-card);">
+                  <input type="radio" name="locationGranularity" id="granularityApproximate" value="approximate" checked style="margin-top: 3px;">
+                  <div>
+                    <strong style="display: block; font-size: 0.88rem; color: var(--text-primary);">🌐 Approximate Grid (~1 km)</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; display: block;">Coordinates rounded to safe neighborhood center (e.g., Dhanmondi Area).</span>
+                  </div>
+                </label>
+                <!-- District / City Only -->
+                <label class="granularity-option-card" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: var(--bg-card);">
+                  <input type="radio" name="locationGranularity" id="granularityDistrict" value="district_only" style="margin-top: 3px;">
+                  <div>
+                    <strong style="display: block; font-size: 0.88rem; color: var(--text-primary);">🏙️ District / City Only</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; display: block;">Reveals city name only (e.g. Dhaka). Coordinate markers removed from map.</span>
+                  </div>
+                </label>
+                <!-- Location Hidden -->
+                <label class="granularity-option-card" style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; background: var(--bg-card);">
+                  <input type="radio" name="locationGranularity" id="granularityHidden" value="hidden" style="margin-top: 3px;">
+                  <div>
+                    <strong style="display: block; font-size: 0.88rem; color: var(--text-primary);">🚫 Location Hidden</strong>
+                    <span style="font-size: 0.78rem; color: var(--text-secondary); line-height: 1.3; display: block;">Omits donor pins entirely from seeker map searches for total anonymity.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- GPS Sensor Permissions Toggles -->
+            <div class="settings-group-stack">
+              <!-- Toggle 1: GPS Auto Detection -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Live Browser GPS Auto-Detection</div>
+                  <div class="setting-desc">Permit HTML5 Geolocation sensor to detect your current zone for proximity-matched blood donation requests.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Live GPS Detection">
+                  <input type="checkbox" id="settingAllowGpsDetection" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <!-- Toggle 2: Emergency Auto-Elevation -->
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc">
+                  <div class="setting-name">Emergency Transit Auto-Elevation</div>
+                  <div class="setting-desc">Automatically elevate to exact turn-by-turn GPS routing when accepting critical hospital blood requests.</div>
+                </div>
+                <label class="switch-toggle-btn" aria-label="Toggle Emergency Location Elevation">
+                  <input type="checkbox" id="settingEmergencyElevation" checked>
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Interactive GPS Sensor Probe Bar -->
+            <div style="margin-top: 16px; padding: 12px 14px; background: var(--bg-page); border: 1px solid var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+              <div>
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">📍 Device GPS Sensor:</span>
+                <span id="donorGpsStatus" style="font-size: 0.83rem; color: var(--text-secondary); margin-left: 6px;">Ready · 23.7461° N, 90.3742° E (Dhanmondi, Dhaka)</span>
+              </div>
+              <button type="button" class="btn-donor-outline" id="btnDetectDonorGps" style="font-size: 0.8rem; padding: 5px 12px;">
+                🔄 Detect Current GPS
+              </button>
+            </div>
+
+            <!-- Live Granularity Preview Box -->
+            <div class="privacy-preview-box" id="locationPreviewBox" style="margin-top: 16px; padding: 14px 16px; background: var(--bg-page); border: 1px dashed var(--border-color); border-radius: 10px; font-size: 0.85rem;">
+              <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                <span>🗺️</span> Public Location &amp; Map Precision Live Preview
+              </div>
+              <div style="color: var(--text-secondary); line-height: 1.6;">
+                <div><strong>Selected Granularity:</strong> <span id="previewGranularityStatus" style="color: var(--success-green); font-weight: 600;">Approximate Grid (~1 km Area Buffer)</span></div>
+                <div><strong>Public Coordinates Display:</strong> <code id="previewCoordsDisplay">23.75° N, 90.37° E (Neighborhood Obscured)</code></div>
+                <div><strong>Emergency Auto-Elevation:</strong> <span id="previewEmergencyElevationStatus">Active on Accepted Critical Requests</span></div>
+                <div><strong>Seeker Map View:</strong> <span id="previewMapViewStatus">Standard Area Pinpoint Displayed</span></div>
+              </div>
+            </div>
+          </div>
+
           <!-- CARD 4: Security, Authentication & Session Control -->
           <div class="donor-card">
             <div class="card-header-flex" style="margin-bottom: 16px;">

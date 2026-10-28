@@ -270,6 +270,70 @@
 
       <!-- 2. User & Role Control (SBDS-40) -->
       <section class="admin-section" id="section-users">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">User Management &amp; Role Control</h1>
+            <p class="section-subtext">Search registered users, assign role-based access permissions, manage account status, and inspect user activity dossiers.</p>
+          </div>
+          <div class="hero-actions-group">
+            <button type="button" class="btn btn-primary" onclick="openCreateUserModal()">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Onboard New User</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Tabs & Search Controls -->
+        <div class="admin-card mb-3">
+          <div class="user-filters-bar" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center; justify-content: space-between;">
+            <!-- Role Filter Pills -->
+            <div class="tabs-clean" id="roleFilterPills" style="margin: 0;">
+              <button type="button" class="tab-clean pill-btn active" data-role="all" onclick="filterUsersByRole('all')">All Roles</button>
+              <button type="button" class="tab-clean pill-btn" data-role="donor" onclick="filterUsersByRole('donor')">Donors</button>
+              <button type="button" class="tab-clean pill-btn" data-role="seeker" onclick="filterUsersByRole('seeker')">Seekers</button>
+              <button type="button" class="tab-clean pill-btn" data-role="hospital" onclick="filterUsersByRole('hospital')">Hospitals &amp; Banks</button>
+              <button type="button" class="tab-clean pill-btn" data-role="admin" onclick="filterUsersByRole('admin')">Admins</button>
+            </div>
+
+            <!-- Search Bar & Status Filter -->
+            <div style="display: flex; gap: 10px; align-items: center; flex: 1; max-width: 520px; justify-content: flex-end;">
+              <div class="search-input-wrap" style="position: relative; flex: 1;">
+                <input type="text" id="userSearchInput" class="admin-input full-width" placeholder="Search by name, phone, blood group..." oninput="handleUserSearch()" style="padding-left: 36px;" />
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--admin-text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+              <select id="userStatusSelect" class="admin-select" onchange="handleUserStatusFilter()" style="min-width: 140px;">
+                <option value="all">All Statuses</option>
+                <option value="active">Active Only</option>
+                <option value="suspended">Suspended</option>
+                <option value="banned">Banned</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registered Users Table -->
+        <div class="admin-card">
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User Identity</th>
+                  <th>Contact Phone</th>
+                  <th>Assigned Role</th>
+                  <th>Blood Group</th>
+                  <th>District / Location</th>
+                  <th>Account Status</th>
+                  <th>Verification</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody">
+                <!-- Dynamically populated via renderUsersTable() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- 3. Donor KYC Approval Queue (SBDS-41) -->
@@ -586,7 +650,7 @@
         <!-- System Audit Trail Table -->
         <div class="admin-card mt-4">
           <div class="card-header-clean">
-            <h2 class="card-title">Immutable System Audit Trail</h2>
+            <h2 class="card-title">Security &amp; Administrative Audit Trail</h2>
             <div class="action-buttons-wrap">
               <button type="button" class="btn btn-sm btn-outline" onclick="exportAuditLogs()">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -771,10 +835,147 @@
               <input type="text" id="editUserDistrict" class="admin-input full-width" value="Dhaka">
             </div>
           </div>
+          <div class="form-group">
+            <label for="editUserReason" class="form-label">Audit Reason / Justification</label>
+            <input type="text" id="editUserReason" class="admin-input full-width" placeholder="e.g., Requested role modification after verification">
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeUserEditModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">Save User Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. User Dossier & Audit History Modal (SBDS-40) -->
+  <div class="admin-modal" id="userDossierModal" aria-hidden="true">
+    <div class="admin-modal-dialog" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title">User Account Dossier</h3>
+        <button type="button" class="btn-close" onclick="closeUserDossierModal()">???</button>
+      </div>
+      <div class="modal-body">
+        <div class="dossier-meta-card admin-card mb-3" style="background: var(--admin-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <h2 id="dossierUserName" style="font-size: 1.25rem; font-weight: 700; margin: 0 0 4px 0;">???</h2>
+              <code id="dossierUserPhone" style="font-size: 0.88rem; color: var(--admin-primary);">???</code>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <span id="dossierUserRole" class="badge badge-pill badge-primary">???</span>
+              <span id="dossierUserStatus" class="badge badge-success">???</span>
+            </div>
+          </div>
+          <div class="form-row-3" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 14px;">
+            <div class="dossier-stat-box">
+              <span class="text-muted" style="font-size: 0.72rem; text-transform: uppercase;">Blood Group</span>
+              <strong id="dossierBloodGroup" style="display: block; font-size: 1.05rem; margin-top: 2px;">???</strong>
+            </div>
+            <div class="dossier-stat-box">
+              <span class="text-muted" style="font-size: 0.72rem; text-transform: uppercase;">Location</span>
+              <strong id="dossierDistrict" style="display: block; font-size: 1.05rem; margin-top: 2px;">???</strong>
+            </div>
+            <div class="dossier-stat-box">
+              <span class="text-muted" style="font-size: 0.72rem; text-transform: uppercase;">KYC Verification</span>
+              <strong id="dossierKycStatus" style="display: block; font-size: 1.05rem; margin-top: 2px;">???</strong>
+            </div>
+          </div>
+          <div class="form-row-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+            <div class="dossier-stat-box">
+              <span class="text-muted" style="font-size: 0.72rem; text-transform: uppercase;">Completed Donations</span>
+              <strong id="dossierDonationsCount" style="display: block; font-size: 1.05rem; margin-top: 2px;">0</strong>
+            </div>
+            <div class="dossier-stat-box">
+              <span class="text-muted" style="font-size: 0.72rem; text-transform: uppercase;">Requests Posted</span>
+              <strong id="dossierRequestsCount" style="display: block; font-size: 1.05rem; margin-top: 2px;">0</strong>
+            </div>
+          </div>
+        </div>
+
+        <h4 style="font-size: 0.95rem; font-weight: 700; margin: 16px 0 8px 0;">Recent Account Audit History</h4>
+        <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Admin Actor</th>
+                <th>Action</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody id="dossierAuditLogsTableBody">
+              <tr><td colspan="4" class="text-center py-2 text-muted">No audit events recorded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeUserDossierModal()">Close Dossier</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Create User Modal (SBDS-40) -->
+  <div class="admin-modal" id="createUserModal" aria-hidden="true">
+    <div class="admin-modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Onboard New User Account</h3>
+        <button type="button" class="btn-close" onclick="closeCreateUserModal()">???</button>
+      </div>
+      <form id="createUserForm" onsubmit="submitCreateUser(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="createName" class="form-label">Full Name</label>
+            <input type="text" id="createName" class="admin-input full-width" placeholder="e.g. Dr. Farhan Ahmed" required>
+          </div>
+          <div class="form-group">
+            <label for="createPhone" class="form-label">Mobile Number</label>
+            <input type="text" id="createPhone" class="admin-input full-width" placeholder="01799887766 or +8801799887766" required>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="createRole" class="form-label">Assigned Role</label>
+              <select id="createRole" class="admin-select full-width" required>
+                <option value="donor">Blood Donor</option>
+                <option value="seeker">Blood Seeker</option>
+                <option value="hospital">Hospital Staff</option>
+                <option value="bank">Blood Bank Staff</option>
+                <option value="admin">System Administrator</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="createStatus" class="form-label">Account Status</label>
+              <select id="createStatus" class="admin-select full-width">
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="createBloodGroup" class="form-label">Blood Group</label>
+              <select id="createBloodGroup" class="admin-select full-width">
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="createPassword" class="form-label">Initial Password</label>
+              <input type="password" id="createPassword" class="admin-input full-width" value="Password12345" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create User</button>
         </div>
       </form>
     </div>

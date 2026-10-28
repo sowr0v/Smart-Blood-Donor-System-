@@ -529,12 +529,13 @@ function renderUsersTable(users) {
         <td>${escapeHtml(u.district || 'Dhaka')}</td>
         <td>${statusBadge}</td>
         <td>${verifiedIcon}</td>
-        <td>
-          <div class="table-actions">
+        <td style="text-align: right;">
+          <div class="table-actions" style="justify-content: flex-end; gap: 6px;">
+            <button type="button" class="btn btn-xs btn-outline" onclick="openUserDossierModal('${u.phone}')">View Dossier</button>
             <button type="button" class="btn btn-xs btn-outline" onclick="openUserEditModal('${u.phone}')">Edit Role</button>
             ${u.status === 'active'
-              ? `<button type="button" class="btn btn-xs btn-warning-soft" onclick="quickToggleUserStatus('${u.phone}', 'suspended')">Suspend</button>`
-              : `<button type="button" class="btn btn-xs btn-success-soft" onclick="quickToggleUserStatus('${u.phone}', 'active')">Activate</button>`
+              ? `<button type="button" class="btn btn-xs btn-warning-soft" onclick="confirmStatusToggle('${u.phone}', 'suspended')">Suspend</button>`
+              : `<button type="button" class="btn btn-xs btn-success-soft" onclick="confirmStatusToggle('${u.phone}', 'active')">Activate</button>`
             }
           </div>
         </td>
@@ -563,6 +564,13 @@ function handleUserStatusFilter() {
   loadUsersData();
 }
 
+function confirmStatusToggle(phone, newStatus) {
+  const actionText = newStatus === 'suspended' ? 'suspend this account and revoke all active sessions' : 'reactivate this account';
+  if (confirm(`Are you sure you want to ${actionText} for user ${phone}?`)) {
+    quickToggleUserStatus(phone, newStatus);
+  }
+}
+
 async function quickToggleUserStatus(phone, newStatus) {
   try {
     const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(phone)}/status`, {
@@ -574,12 +582,134 @@ async function quickToggleUserStatus(phone, newStatus) {
     if (res.ok && data.status === 'success') {
       showAdminToast(`User ${phone} status changed to ${newStatus}.`, 'success');
       loadUsersData();
+      if (typeof loadAnalyticsData === 'function') loadAnalyticsData();
     } else {
       showAdminToast(data.detail || 'Failed to update user status', 'danger');
     }
   } catch (err) {
     console.error('Error toggling status:', err);
     showAdminToast('Network error while updating user status', 'danger');
+  }
+}
+
+async function openUserDossierModal(phone) {
+  try {
+    const res = await fetch(`/api/v1/admin/users/${encodeURIComponent(phone)}`);
+    if (!res.ok) throw new Error('Failed to fetch user dossier');
+    const data = await res.json();
+    const u = data.user;
+
+    const nameEl = document.getElementById('dossierUserName');
+    if (nameEl) nameEl.textContent = u.name || 'Anonymous User';
+
+    const phoneEl = document.getElementById('dossierUserPhone');
+    if (phoneEl) phoneEl.textContent = u.phone;
+
+    const roleEl = document.getElementById('dossierUserRole');
+    if (roleEl) roleEl.textContent = (u.role || 'donor').toUpperCase();
+
+    const statusEl = document.getElementById('dossierUserStatus');
+    if (statusEl) {
+      statusEl.textContent = (u.status || 'active').toUpperCase();
+      statusEl.className = `badge ${u.status === 'active' ? 'badge-success' : (u.status === 'suspended' ? 'badge-warning' : 'badge-danger')}`;
+    }
+
+    const bgEl = document.getElementById('dossierBloodGroup');
+    if (bgEl) bgEl.textContent = u.blood_group || '???';
+
+    const distEl = document.getElementById('dossierDistrict');
+    if (distEl) distEl.textContent = u.district || 'Dhaka';
+
+    const kycEl = document.getElementById('dossierKycStatus');
+    if (kycEl) kycEl.textContent = (u.kyc_status || 'unsubmitted').toUpperCase();
+
+    const donEl = document.getElementById('dossierDonationsCount');
+    if (donEl) donEl.textContent = u.donations_count || 0;
+
+    const reqEl = document.getElementById('dossierRequestsCount');
+    if (reqEl) reqEl.textContent = u.requests_posted_count || 0;
+
+    const auditTbody = document.getElementById('dossierAuditLogsTableBody');
+    if (auditTbody) {
+      const logs = data.audit_history || data.audit_logs || [];
+      if (logs.length === 0) {
+        auditTbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-muted">No audit events recorded for this user yet.</td></tr>';
+      } else {
+        auditTbody.innerHTML = logs.map(l => `
+          <tr>
+            <td><small>${l.created_at ? l.created_at.replace('T', ' ').substring(0, 19) : '???'}</small></td>
+            <td><small>${escapeHtml(l.admin_name || l.admin_phone || 'Admin')}</small></td>
+            <td><span class="badge badge-pill badge-primary">${escapeHtml(l.action || 'MODIFIED')}</span></td>
+            <td><small>${escapeHtml(l.details || '???')}</small></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    const modal = document.getElementById('userDossierModal');
+    if (modal) {
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+  } catch (err) {
+    console.error('Error fetching dossier:', err);
+    showAdminToast('Could not load user dossier details.', 'danger');
+  }
+}
+
+function closeUserDossierModal() {
+  const modal = document.getElementById('userDossierModal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openCreateUserModal() {
+  const form = document.getElementById('createUserForm');
+  if (form) form.reset();
+  const modal = document.getElementById('createUserModal');
+  if (modal) {
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeCreateUserModal() {
+  const modal = document.getElementById('createUserModal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+async function submitCreateUser(event) {
+  event.preventDefault();
+  const name = document.getElementById('createName').value.trim();
+  const phone = document.getElementById('createPhone').value.trim();
+  const role = document.getElementById('createRole').value;
+  const status = document.getElementById('createStatus').value;
+  const blood_group = document.getElementById('createBloodGroup').value;
+  const password = document.getElementById('createPassword').value;
+
+  try {
+    const res = await fetch('/api/v1/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, name, role, status, blood_group, password }),
+    });
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      showAdminToast(`User ${name} successfully onboarded.`, 'success');
+      closeCreateUserModal();
+      loadUsersData();
+      if (typeof loadAnalyticsData === 'function') loadAnalyticsData();
+    } else {
+      showAdminToast(data.detail || 'Failed to create user', 'danger');
+    }
+  } catch (err) {
+    console.error('Error creating user:', err);
+    showAdminToast('Network error while registering user.', 'danger');
   }
 }
 
@@ -625,6 +755,7 @@ async function saveUserEdit(event) {
   const status = document.getElementById('editUserStatus').value;
   const bloodGroup = document.getElementById('editUserBloodGroup').value;
   const district = document.getElementById('editUserDistrict').value;
+  const reason = (document.getElementById('editUserReason')?.value || '').trim() || 'Admin role & account adjustment';
 
   try {
     // 1. Update basic profile
@@ -638,16 +769,31 @@ async function saveUserEdit(event) {
     const roleRes = await fetch(`/api/v1/admin/users/${encodeURIComponent(phone)}/role`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role }),
+      body: JSON.stringify({ role, reason }),
     });
 
-    if (profileRes.ok && roleRes.ok) {
-      showAdminToast(`Successfully updated profile & role for ${phone}.`, 'success');
+    // 3. Update status
+    const statusRes = await fetch(`/api/v1/admin/users/${encodeURIComponent(phone)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, reason }),
+    });
+
+    if (profileRes.ok && roleRes.ok && statusRes.ok) {
+      showAdminToast(`Successfully updated profile, role & status for ${phone}.`, 'success');
       closeUserEditModal();
       loadUsersData();
-      loadAnalyticsData();
+      if (typeof loadAnalyticsData === 'function') loadAnalyticsData();
     } else {
-      showAdminToast('Could not save user modifications.', 'danger');
+      let errDetail = 'Could not save user modifications.';
+      if (!roleRes.ok) {
+        const d = await roleRes.json();
+        errDetail = d.detail || errDetail;
+      } else if (!statusRes.ok) {
+        const d = await statusRes.json();
+        errDetail = d.detail || errDetail;
+      }
+      showAdminToast(errDetail, 'danger');
     }
   } catch (err) {
     console.error('Error saving user edit:', err);
