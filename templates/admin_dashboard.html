@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/admin_dashboard.css">
   <link rel="stylesheet" href="/static/css/notifications.css">
+  <!-- Leaflet Map CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script>
     function getSunIcon() {
       return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>';
@@ -472,12 +474,215 @@
 
       <!-- 5. Blood Stock Oversight & Heatmap (SBDS-43) -->
       <section class="admin-section" id="section-stock">
-        <div style="display:none;" aria-hidden="true">
-          <h2>Low Blood Stock Alerts &amp; Reorder Triggers</h2>
-          {% for group in blood_groups or [] %}
-          <button type="button" data-save-stock-threshold="{{ group }}">Save</button>
-          {% endfor %}
-          <table><tbody id="adminStockAlertsTableBody"></tbody></table>
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Blood Stock &amp; Geographic Availability Overview</h1>
+            <p class="section-subtext">Aggregated blood bank inventories, institutional reserves, and interactive GIS heatmap across Bangladesh's 8 administrative divisions.</p>
+          </div>
+          <div class="header-actions">
+            <button type="button" class="btn btn-outline" onclick="loadInventoryHeatmap(true)">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Refresh Stock</span>
+            </button>
+            <button type="button" class="btn btn-danger" onclick="openEmergencySmsModal()">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Broadcast Shortage SOS</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Metric Badges -->
+        <div class="stock-overview-grid mb-4">
+          <div class="stock-overview-card">
+            <span class="stock-label">Total Institutional Stock</span>
+            <strong class="stock-val" id="stockTotalUnitsVal">-- Units</strong>
+            <span class="text-xs text-muted mt-1" style="display:block;">Aggregated across all blood groups</span>
+          </div>
+          <div class="stock-overview-card">
+            <span class="stock-label">Reporting Facilities</span>
+            <strong class="stock-val" id="stockFacilitiesCountVal">-- Connected</strong>
+            <span class="text-xs text-success mt-1" style="display:block;">Hospitals &amp; specialized blood banks</span>
+          </div>
+          <div class="stock-overview-card alert">
+            <span class="stock-label">Critical Shortage Blood Groups</span>
+            <strong class="stock-val text-danger" id="stockCriticalGroupsVal">Scanning regional deficits...</strong>
+            <span class="text-xs text-danger mt-1" style="display:block;">Below safety replenishment threshold</span>
+          </div>
+        </div>
+
+        <!-- Blood Group Availability Matrix (All 8 ABO/Rh Groups) -->
+        <div class="admin-card mb-4">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Blood Group Availability Matrix (8 ABO/Rh Types)</h2>
+              <p class="card-subtext">Click any blood group card to focus and filter the geographic map and facility inventory list.</p>
+            </div>
+            <span class="tag-status" id="activeBloodGroupFilterTag">Showing: All Blood Groups</span>
+          </div>
+          <div class="blood-group-overview-grid" id="bloodGroupAvailabilityGrid">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+
+        <!-- Geographic View: Interactive Leaflet Map & Regional Heatmap -->
+        <div class="admin-card mb-4">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Geographic Availability Map &amp; Regional Shortage Heatmap</h2>
+              <p class="card-subtext">Interactive spatial overview of blood availability across divisions, hospitals, and blood banks. Visual markers indicate stock adequacy.</p>
+            </div>
+            <div class="map-controls-bar">
+              <select id="mapBloodGroupFilter" class="admin-select" onchange="handleMapFilterChange()">
+                <option value="all">All Blood Groups</option>
+                <option value="A+">A+</option>
+                <option value="A-">A-</option>
+                <option value="B+">B+</option>
+                <option value="B-">B-</option>
+                <option value="AB+">AB+</option>
+                <option value="AB-">AB-</option>
+                <option value="O+">O+</option>
+                <option value="O-">O-</option>
+              </select>
+              <select id="mapStockStatusFilter" class="admin-select" onchange="handleMapFilterChange()">
+                <option value="all">All Facilities</option>
+                <option value="critical">Critical Shortage Only</option>
+                <option value="low">Low Stock Only</option>
+                <option value="adequate">Adequate Stock Only</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Division Quick-Zoom Buttons -->
+          <div class="division-pill-row">
+            <span class="division-pill-label">Quick Jump:</span>
+            <button type="button" class="division-pill active" onclick="focusDivisionOnMap('all', this)">All Bangladesh</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Dhaka', this)">Dhaka</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Chittagong', this)">Chittagong</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Sylhet', this)">Sylhet</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Rajshahi', this)">Rajshahi</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Khulna', this)">Khulna</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Barisal', this)">Barisal</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Rangpur', this)">Rangpur</button>
+            <button type="button" class="division-pill" onclick="focusDivisionOnMap('Mymensingh', this)">Mymensingh</button>
+          </div>
+
+          <!-- Leaflet Interactive Map Container -->
+          <div class="map-wrapper mt-3">
+            <div id="bloodStockMap" style="height: 480px; width: 100%; border-radius: 12px; z-index: 1;"></div>
+            <div class="map-legend-overlay">
+              <div class="legend-title">Stock Status Legend</div>
+              <div class="legend-row"><span class="legend-dot critical"></span> Critical Deficit (&lt;10u / Rare group depleted)</div>
+              <div class="legend-row"><span class="legend-dot low"></span> Low Supply Warning (Below Threshold)</div>
+              <div class="legend-row"><span class="legend-dot adequate"></span> Adequate Surplus (&ge;25 Units)</div>
+              <div class="legend-row"><span class="legend-dot maintenance"></span> Maintenance Mode (Restricted)</div>
+            </div>
+          </div>
+
+          <!-- Bangladesh 8 Divisions Regional Shortage Heat Index Cards -->
+          <div class="mt-4">
+            <div class="sub-header-clean">
+              <h3 class="text-sm font-bold text-muted uppercase">Division Shortage Index &amp; Regional Deficits</h3>
+              <span class="text-xs text-muted">Click any division card to pan map and filter facility table</span>
+            </div>
+            <div class="heatmap-divisions-grid" id="heatmapDivisionsGrid">
+              <!-- Dynamically populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Facility Drilldown Table -->
+        <div class="admin-card mb-4">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title" id="facilityTableTitle">Hospital &amp; Blood Bank Inventories (All Divisions)</h2>
+              <p class="card-subtext">Real-time breakdown of all 8 blood groups at each monitored facility.</p>
+            </div>
+            <div class="filter-group">
+              <div class="search-input-wrap">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <input type="text" id="facilitySearchInput" placeholder="Search facility name, district..." oninput="handleFacilitySearch()">
+              </div>
+              <select id="districtFilterSelect" class="admin-select" onchange="filterFacilitiesByDistrict(this.value)">
+                <option value="all">All Divisions</option>
+                <option value="Dhaka">Dhaka</option>
+                <option value="Chittagong">Chittagong</option>
+                <option value="Sylhet">Sylhet</option>
+                <option value="Rajshahi">Rajshahi</option>
+                <option value="Khulna">Khulna</option>
+                <option value="Barisal">Barisal</option>
+                <option value="Rangpur">Rangpur</option>
+                <option value="Mymensingh">Mymensingh</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Facility Name</th>
+                  <th>Type</th>
+                  <th>District</th>
+                  <th>A+</th>
+                  <th>A-</th>
+                  <th>B+</th>
+                  <th>B-</th>
+                  <th>AB+</th>
+                  <th>AB-</th>
+                  <th>O+</th>
+                  <th>O-</th>
+                  <th>Total Units</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="facilitiesTableBody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 6. Low Blood Stock Alerts & Reorder Triggers (Administrative Configuration & Testing Compatibility) -->
+        <div class="admin-card" id="adminThresholdsCard">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Low Blood Stock Alerts &amp; Reorder Triggers</h2>
+              <p class="card-subtext">Configure minimum unit safety thresholds (0–50 units) per blood group. Stock falling below these triggers automated hospital SOS warnings and alerts.</p>
+            </div>
+            <span class="tag-status">Facility Automated Reorder Triggers</span>
+          </div>
+
+          <div class="threshold-pills-grid mt-3">
+            {% for group in blood_groups or ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] %}
+            <div class="threshold-pill-item">
+              <span class="threshold-group-badge">{{ group }}</span>
+              <input type="number" id="threshold-input-{{ group }}" class="threshold-input" min="0" max="50" value="{{ (stock_thresholds or {}).get(group, 5) }}" aria-label="Threshold for {{ group }}">
+              <button type="button" class="btn btn-xs btn-outline" data-save-stock-threshold="{{ group }}" onclick="updateStockThreshold('{{ group }}')">Save</button>
+            </div>
+            {% endfor %}
+          </div>
+
+          <div class="mt-4">
+            <h3 class="text-sm font-bold text-muted uppercase mb-2">Aggregated Facility Active Low-Stock Alerts</h3>
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Facility</th>
+                    <th>District</th>
+                    <th>Blood Group</th>
+                    <th>Available Quantity</th>
+                    <th>Configured Threshold</th>
+                    <th>Alert Status</th>
+                    <th>Triggered At</th>
+                  </tr>
+                </thead>
+                <tbody id="adminStockAlertsTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -938,6 +1143,8 @@
   <!-- Toast Container -->
   <div class="admin-toast-container" id="adminToastContainer"></div>
 
+  <!-- Leaflet Map JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <!-- Core Javascript Modules -->
   <script src="/static/js/notifications.js"></script>
   <script src="/static/js/admin_dashboard.js"></script>
