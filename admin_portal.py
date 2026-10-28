@@ -2695,7 +2695,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
         type: Optional[str] = Query(None),
         category: Optional[str] = Query(None),
         q: Optional[str] = Query(None),
-        limit: int = Query(100),
+        limit: int = Query(500),
     ):
         initialize_admin_and_notification_database()
         target_phone = phone.strip() if phone else None
