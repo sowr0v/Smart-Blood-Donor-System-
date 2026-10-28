@@ -50,6 +50,11 @@ class DonorDashboardTests(unittest.TestCase):
         self.assertIn('id="summaryMedications"', html)
         self.assertIn('id="summaryAllergies"', html)
         self.assertIn('id="settingAllowSeekerContact"', html)
+        self.assertIn('id="saveCommunicationPreferences"', html)
+        for channel in ("in_app_chat", "sms", "phone_call", "whatsapp", "push_notification"):
+            self.assertIn(f'data-communication-channel="{channel}"', html)
+        self.assertIn('data-communication-alert="critical_emergency"', html)
+        self.assertIn('id="communicationFrequency"', html)
 
     def test_donor_in_app_chat_rendered(self):
         token = _generate_jwt("+8801712345678", "donor")

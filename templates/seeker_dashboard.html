@@ -738,7 +738,7 @@
                   <p>Send automated SMS alerts to matching donors whenever you post an emergency blood request.</p>
                 </div>
                 <label class="switch-toggle-btn">
-                  <input type="checkbox" id="toggleSmsAlerts" checked>
+                  <input type="checkbox" id="toggleSmsAlerts" checked data-communication-channel="sms">
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -749,9 +749,73 @@
                   <p>Receive immediate alerts on screen when a donor accepts or responds to your blood request.</p>
                 </div>
                 <label class="switch-toggle-btn">
-                  <input type="checkbox" id="togglePushAlerts" checked>
+                  <input type="checkbox" id="togglePushAlerts" checked data-communication-channel="push_notification">
                   <span class="switch-slider"></span>
                 </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>In-App Chat</h4>
+                  <p>Receive private donor and support conversations in your dashboard inbox.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" checked data-communication-channel="in_app_chat">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Phone Calls</h4>
+                  <p>Choose phone calls as a preferred contact channel when available.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" data-communication-channel="phone_call">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>WhatsApp</h4>
+                  <p>Choose WhatsApp as a preferred contact channel when available.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" data-communication-channel="whatsapp">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-info-col">
+                  <h4>Critical Emergency Alerts</h4>
+                  <p>Mandatory system alerts bypass quiet hours and notification frequency.</p>
+                </div>
+                <label class="switch-toggle-btn">
+                  <input type="checkbox" checked disabled data-communication-alert="critical_emergency">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+
+              <div class="form-field-group" style="margin: 16px 0;">
+                <label for="communicationFrequency">Routine alert frequency</label>
+                <select id="communicationFrequency">
+                  <option value="immediate">As they happen</option>
+                  <option value="hourly">Hourly digest</option>
+                  <option value="daily">Daily digest</option>
+                  <option value="weekly">Weekly digest</option>
+                </select>
+              </div>
+              <div class="communication-alert-types" style="display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0;">
+                <label><input type="checkbox" checked data-communication-alert="matching_requests"> Matching requests</label>
+                <label><input type="checkbox" checked data-communication-alert="chat_messages"> Chat messages</label>
+                <label><input type="checkbox" checked data-communication-alert="donation_reminders"> Donation reminders</label>
+                <label><input type="checkbox" checked data-communication-alert="account_updates"> Account updates</label>
+              </div>
+              <div style="display: flex; gap: 12px; align-items: center; margin: 12px 0;">
+                <button type="button" class="btn btn-primary" id="saveCommunicationPreferences">Save Communication Preferences</button>
+                <span id="communicationPreferencesStatus" role="status" aria-live="polite"></span>
               </div>
 
               <div class="settings-row">
@@ -874,6 +938,7 @@
   <!-- Leaflet Map JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/static/js/main.js"></script>
+  <script src="/static/js/communication_preferences.js"></script>
   <script src="/static/js/seeker_dashboard.js"></script>
 </body>
 </html>
