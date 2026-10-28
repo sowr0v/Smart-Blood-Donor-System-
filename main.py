@@ -823,7 +823,7 @@ def initialize_auth_database():
                     phlebotomy_chairs INTEGER DEFAULT 8,
                     components_json TEXT DEFAULT '["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"]',
                     apheresis_active INTEGER DEFAULT 1,
-                    cold_storage_temp TEXT DEFAULT '3.8°C',
+                    cold_storage_temp TEXT DEFAULT '3.8Â°C',
                     ultra_freezer_active INTEGER DEFAULT 1,
                     nat_screening INTEGER DEFAULT 1,
                     continuous_shift INTEGER DEFAULT 1,
@@ -3169,10 +3169,10 @@ DONOR_CHAT_THREADS = [
         "id": "thread-square",
         "name": "Square Hospital - Blood Desk",
         "category": "hospital",
-        "avatar": "🏥",
+        "avatar": "ðŸ¥",
         "avatar_bg": "rgba(225, 29, 72, 0.15)",
         "avatar_color": "#E11D48",
-        "status": "● Online · Request #REQ-001 (A+ Emergency)",
+        "status": "â— Online Â· Request #REQ-001 (A+ Emergency)",
         "is_online": True,
         "phone": "+8801700000001",
         "request_id": "REQ-001",
@@ -3188,10 +3188,10 @@ DONOR_CHAT_THREADS = [
         "id": "thread-dmc",
         "name": "Dhaka Medical College Desk",
         "category": "hospital",
-        "avatar": "🏛️",
+        "avatar": "ðŸ›ï¸",
         "avatar_bg": "rgba(59, 130, 246, 0.15)",
         "avatar_color": "#3B82F6",
-        "status": "● Active Coordinator · Rest Gap Completed",
+        "status": "â— Active Coordinator Â· Rest Gap Completed",
         "is_online": True,
         "phone": "+8801700000002",
         "request_id": "REQ-003",
@@ -3207,10 +3207,10 @@ DONOR_CHAT_THREADS = [
         "id": "thread-nabil",
         "name": "Nabil Hasan (Emergency Seeker)",
         "category": "seeker",
-        "avatar": "👨",
+        "avatar": "ðŸ‘¨",
         "avatar_bg": "rgba(16, 185, 129, 0.15)",
         "avatar_color": "#10B981",
-        "status": "● Matched Recipient Guardian",
+        "status": "â— Matched Recipient Guardian",
         "is_online": True,
         "phone": "+8801723456789",
         "request_id": "REQ-004",
@@ -3226,10 +3226,10 @@ DONOR_CHAT_THREADS = [
         "id": "thread-support",
         "name": "SBDS Volunteer Support Desk",
         "category": "support",
-        "avatar": "🛡️",
+        "avatar": "ðŸ›¡ï¸",
         "avatar_bg": "rgba(245, 158, 11, 0.15)",
         "avatar_color": "#F59E0B",
-        "status": "● 24/7 Platform Assistance",
+        "status": "â— 24/7 Platform Assistance",
         "is_online": True,
         "phone": "+8801700000000",
         "request_id": "",
@@ -4112,7 +4112,7 @@ class FacilitySettingsPayload(BaseModel):
     phlebotomy_chairs: int = 8
     components: list[str] = Field(default_factory=lambda: ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"])
     apheresis_active: bool = True
-    cold_storage_temp: str = "3.8°C"
+    cold_storage_temp: str = "3.8Â°C"
     ultra_freezer_active: bool = True
     nat_screening: bool = True
     continuous_shift: bool = True
@@ -4140,7 +4140,7 @@ SEEKER_CONTACT_LOGS = [
         "donor_phone": "+880 1712-345678",
         "blood_group": "A+",
         "contact_type": "call",
-        "notes": "Donor answered • Confirmed arriving in 35 mins",
+        "notes": "Donor answered â€¢ Confirmed arriving in 35 mins",
         "created_at": "20 mins ago",
     },
     {
@@ -4148,7 +4148,7 @@ SEEKER_CONTACT_LOGS = [
         "donor_phone": "+880 1711-223344",
         "blood_group": "O+",
         "contact_type": "whatsapp",
-        "notes": "Message delivered • Awaiting acknowledgment",
+        "notes": "Message delivered â€¢ Awaiting acknowledgment",
         "created_at": "1 hour ago",
     },
 ]
@@ -4179,12 +4179,12 @@ FACILITY_SETTINGS = {
         "address": "100 Shaheed Minar Road, Shahbagh",
         "division": "Dhaka",
         "area": "Shahbagh",
-        "gps_coords": "23.7257° N, 90.3980° E",
+        "gps_coords": "23.7257Â° N, 90.3980Â° E",
         "landmark": "Opposite BSMMU Emergency Gate 2",
         "phlebotomy_chairs": 8,
         "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
         "apheresis_active": True,
-        "cold_storage_temp": "3.8°C",
+        "cold_storage_temp": "3.8Â°C",
         "ultra_freezer_active": True,
         "nat_screening": True,
         "continuous_shift": True,
@@ -4211,12 +4211,12 @@ FACILITY_SETTINGS = {
         "address": "684-686 Bara Moghbazar",
         "division": "Dhaka",
         "area": "Moghbazar",
-        "gps_coords": "23.7482° N, 90.4072° E",
+        "gps_coords": "23.7482Â° N, 90.4072Â° E",
         "landmark": "Near Moghbazar Wireless Railgate",
         "phlebotomy_chairs": 12,
         "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"],
         "apheresis_active": True,
-        "cold_storage_temp": "3.5°C",
+        "cold_storage_temp": "3.5Â°C",
         "ultra_freezer_active": True,
         "nat_screening": True,
         "continuous_shift": True,
@@ -4288,12 +4288,12 @@ def _get_facility_settings(phone: str, role: str = "hospital", name: str = "") -
         "address": def_addr,
         "division": "Dhaka",
         "area": def_area,
-        "gps_coords": "23.7482° N, 90.4072° E" if is_bank else "23.7257° N, 90.3980° E",
+        "gps_coords": "23.7482Â° N, 90.4072Â° E" if is_bank else "23.7257Â° N, 90.3980Â° E",
         "landmark": def_landmark,
         "phlebotomy_chairs": 12 if is_bank else 8,
         "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"] if is_bank else ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
         "apheresis_active": True,
-        "cold_storage_temp": "3.5°C" if is_bank else "3.8°C",
+        "cold_storage_temp": "3.5Â°C" if is_bank else "3.8Â°C",
         "ultra_freezer_active": True,
         "nat_screening": True,
         "continuous_shift": True,
@@ -4337,7 +4337,7 @@ def _save_facility_settings(phone: str, data: dict) -> dict:
         "components": components,
         "components_json": components_json,
         "apheresis_active": bool(data.get("apheresis_active", True)),
-        "cold_storage_temp": str(data.get("cold_storage_temp", "3.8°C")).strip(),
+        "cold_storage_temp": str(data.get("cold_storage_temp", "3.8Â°C")).strip(),
         "ultra_freezer_active": bool(data.get("ultra_freezer_active", True)),
         "nat_screening": bool(data.get("nat_screening", True)),
         "continuous_shift": bool(data.get("continuous_shift", True)),
@@ -5533,7 +5533,7 @@ async def update_facility_inventory(
 
 
 # ---------------------------------------------------------------------------
-# Hospital / Blood Bank – Donor Search & Direct Outreach
+# Hospital / Blood Bank â€“ Donor Search & Direct Outreach
 # ---------------------------------------------------------------------------
 
 HOSPITAL_AUTHORIZED_ROLES = {"hospital", "bank", "blood_bank", "admin"}
@@ -6091,10 +6091,86 @@ async def delete_hospital_account(request: Request, response: Response):
         "status": "success",
         "message": "Institutional facility account has been permanently deleted.",
         "redirect_url": "/login?account_deleted=1&role=hospital",
-    }
+
+@app.get("/api/v1/auth/sessions")
+async def list_sessions(request: Request):
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    phone = user.get("phone")
+    try:
+        phone = normalize_phone(phone)
+    except Exception:
+        pass
+    initialize_auth_database()
+    current_token = request.cookies.get(SESSION_COOKIE)
+    current_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
+    sessions = []
+    with closing(_connection()) as connection:
+        user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=401, detail="Sign in required.")
+        user_id = user_row["id"]
+        now = int(time.time())
+        connection.execute("DELETE FROM auth_sessions WHERE expires_at <= ?", (now,))
+        rows = connection.execute("SELECT id, token_hash, created_at, expires_at FROM auth_sessions WHERE user_id = ? ORDER BY id DESC", (user_id,)).fetchall()
+        for r in rows:
+            is_current = current_hash is not None and r["token_hash"] == current_hash
+            sessions.append({"id": r["id"], "is_current": bool(is_current), "created_at": r["created_at"], "expires_at": r["expires_at"], "device": "Web Browser", "ip": request.client.host if request.client else None})
+    return {"status": "success", "sessions": sessions}
 
 
-if __name__ == "__main__":
-    import uvicorn
+@app.post("/api/v1/auth/sessions/{session_id}/logout")
+async def logout_session(session_id: int, request: Request, response: Response):
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    phone = user.get("phone")
+    try:
+        phone = normalize_phone(phone)
+    except Exception:
+        pass
+    current_token = request.cookies.get(SESSION_COOKIE)
+    current_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=401, detail="Sign in required.")
+        user_id = user_row["id"]
+        target = connection.execute("SELECT id, token_hash FROM auth_sessions WHERE id = ? AND user_id = ?", (session_id, user_id)).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="Session not found or not accessible.")
+        is_current = current_hash is not None and target["token_hash"] == current_hash
+        with connection:
+            connection.execute("DELETE FROM auth_sessions WHERE id = ? AND user_id = ?", (session_id, user_id))
+        if is_current:
+            response.delete_cookie(SESSION_COOKIE, path="/")
+            response.delete_cookie("access_token", path="/")
+            return {"status": "success", "message": "Current session logged out.", "logged_out_current": True}
+    return {"status": "success", "message": "Session logged out remotely.", "logged_out_current": False}
 
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+@app.post("/api/v1/auth/sessions/logout-others")
+async def logout_other_sessions(request: Request):
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    phone = user.get("phone")
+    try:
+        phone = normalize_phone(phone)
+    except Exception:
+        pass
+    current_token = request.cookies.get(SESSION_COOKIE)
+    current_hash = hashlib.sha256(current_token.encode()).hexdigest() if current_token else None
+    if not current_hash:
+        raise HTTPException(status_code=400, detail="No active session found.")
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        user_row = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+        if not user_row:
+            raise HTTPException(status_code=401, detail="Sign in required.")
+        user_id = user_row["id"]
+        with connection:
+            connection.execute("DELETE FROM auth_sessions WHERE user_id = ? AND token_hash != ?", (user_id, current_hash))
+    return {"status": "success", "message": "All other sessions logged out."}
