@@ -235,6 +235,184 @@
       background-color: rgba(255, 255, 255, 0.12) !important;
       border-color: #94a3b8 !important;
     }
+
+    /* --- LOGIN MODE TABS --- */
+    .login-mode-tabs {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      gap: 4px;
+      border: 1px solid #cbd5e1;
+    }
+    [data-theme="dark"] .login-mode-tabs {
+      background: #0f172a;
+      border-color: #334155;
+    }
+    .mode-tab-btn {
+      flex: 1;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: #64748b;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    [data-theme="dark"] .mode-tab-btn {
+      color: #94a3b8;
+    }
+    .mode-tab-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+    [data-theme="dark"] .mode-tab-btn.active {
+      background: #1e293b;
+      color: #f8fafc;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    }
+    .mode-tab-btn.admin-tab.active {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+    }
+
+    /* --- QUICK 1-CLICK DEMO CARDS --- */
+    .quick-demo-container {
+      background: #f8fafc;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 22px;
+      transition: all 0.2s ease;
+    }
+    [data-theme="dark"] .quick-demo-container {
+      background: #131b2e;
+      border-color: #334155;
+    }
+    .quick-demo-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .quick-demo-title {
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    [data-theme="dark"] .quick-demo-title {
+      color: #f1f5f9;
+    }
+    .quick-demo-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      color: #059669;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+    [data-theme="dark"] .quick-demo-badge {
+      background: rgba(16, 185, 129, 0.25);
+      color: #34d399;
+    }
+    .quick-demo-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    @media (max-width: 640px) {
+      .quick-demo-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .quick-demo-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    [data-theme="dark"] .quick-demo-btn {
+      background: #1e293b;
+      border-color: #334155;
+    }
+    .quick-demo-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      border-color: #94a3b8;
+    }
+    .quick-demo-btn.admin-highlight {
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, rgba(220, 38, 38, 0.02) 100%);
+      border: 1.5px solid #dc2626;
+      grid-column: 1 / -1;
+    }
+    [data-theme="dark"] .quick-demo-btn.admin-highlight {
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.2) 0%, rgba(220, 38, 38, 0.05) 100%);
+      border-color: #ef4444;
+    }
+    .quick-demo-btn.admin-highlight:hover {
+      box-shadow: 0 6px 18px rgba(220, 38, 38, 0.25);
+    }
+    .quick-btn-icon {
+      font-size: 1.25rem;
+      flex-shrink: 0;
+    }
+    .quick-btn-info {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+    .quick-btn-name {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+    [data-theme="dark"] .quick-btn-name {
+      color: #f8fafc;
+    }
+    .quick-btn-sub {
+      font-size: 0.72rem;
+      color: #64748b;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    [data-theme="dark"] .quick-btn-sub {
+      color: #94a3b8;
+    }
+    .quick-btn-arrow {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: #94a3b8;
+      transition: transform 0.2s ease;
+    }
+    .quick-demo-btn:hover .quick-btn-arrow {
+      transform: translateX(3px);
+      color: #dc2626;
+    }
   </style>
 </head>
 <body>
@@ -252,6 +430,7 @@
       <nav class="desktop-nav" aria-label="Main Navigation">
         <ul class="nav-links">
           <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
         </ul>
       </nav>
 
@@ -270,20 +449,89 @@
     <div class="mobile-drawer" id="mobile-drawer">
       <ul class="mobile-nav-links">
         <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
       </ul>
 
       <div class="mobile-auth-actions" style="display: flex; flex-direction: column; gap: 10px;">
         <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle Theme" title="Toggle theme"></button>
         <a href="/auth/register?role=donor" class="btn btn-primary btn-full">Register</a>
       </div>
+    </div>
   </header>
 
   <main class="main-shell">
     <div class="container narrow-container">
       <section class="page-panel form-panel">
+        <!-- Top Mode Switcher Tabs (Only displayed if explicitly in admin console mode) -->
+        {% if admin_console %}
+        <div class="login-mode-tabs">
+          <a href="/login" class="mode-tab-btn">
+            <span>👤 Regular Sign-In</span>
+          </a>
+          <a href="/login?admin_console=1" class="mode-tab-btn admin-tab active">
+            <span>👑 Admin Console</span>
+          </a>
+        </div>
+        {% endif %}
+
         <span class="eyebrow">{{ 'Administrative Console' if admin_console else 'Welcome back' }}</span>
-        <h1>{{ 'Administrative Console Sign-In' if admin_console else 'Login to your account' }}</h1>
-        <p class="login-support-text">Use your phone number and password or OTP to access your secure portal. Admin Console access is also available here.</p>
+        <h1>{{ 'Administrative Master Sign-In' if admin_console else 'Login to your account' }}</h1>
+        <p class="login-support-text">
+          {% if admin_console %}
+            Direct access to Platform Master Analytics, User Management, KYC Approvals, and Emergency Dispatch.
+          {% else %}
+            Use your phone number and password or OTP to access your secure portal, or select 1-click demo access below.
+          {% endif %}
+        </p>
+
+        <!-- 1-Click Quick Demo Sign-In Card -->
+        <div class="quick-demo-container">
+          <div class="quick-demo-header">
+            <span class="quick-demo-title">
+              <span>⚡ 1-Click Quick Demo Login</span>
+            </span>
+            <span class="quick-demo-badge">Auto-Authenticate</span>
+          </div>
+          <div class="quick-demo-grid">
+            {% if admin_console %}
+            <button type="button" class="quick-demo-btn admin-highlight" onclick="directAdminLogin()" title="Instant login as System Admin">
+              <span class="quick-btn-icon">👑</span>
+              <div class="quick-btn-info">
+                <span class="quick-btn-name">System Administrator</span>
+                <span class="quick-btn-sub">Master Analytics &amp; National Oversight Dashboard</span>
+              </div>
+              <span class="quick-btn-arrow">Login →</span>
+            </button>
+            {% endif %}
+
+            <button type="button" class="quick-demo-btn" onclick="quickFillForm('+8801712345678', 'secret123', false)" title="Instant login as Donor">
+              <span class="quick-btn-icon">🩸</span>
+              <div class="quick-btn-info">
+                <span class="quick-btn-name">Blood Donor</span>
+                <span class="quick-btn-sub">Ayesha Rahman (A+)</span>
+              </div>
+              <span class="quick-btn-arrow">→</span>
+            </button>
+
+            <button type="button" class="quick-demo-btn" onclick="quickFillForm('+8801723456789', 'match123', false)" title="Instant login as Seeker">
+              <span class="quick-btn-icon">🔍</span>
+              <div class="quick-btn-info">
+                <span class="quick-btn-name">Blood Seeker</span>
+                <span class="quick-btn-sub">Nabil Hasan (Recipient)</span>
+              </div>
+              <span class="quick-btn-arrow">→</span>
+            </button>
+
+            <button type="button" class="quick-demo-btn" onclick="quickFillForm('+8801734567890', 'hospital123', false)" title="Instant login as Hospital Facility">
+              <span class="quick-btn-icon">🏥</span>
+              <div class="quick-btn-info">
+                <span class="quick-btn-name">Hospital &amp; Bank</span>
+                <span class="quick-btn-sub">Dhaka General Hospital</span>
+              </div>
+              <span class="quick-btn-arrow">→</span>
+            </button>
+          </div>
+        </div>
 
         {% if error %}
         <div class="alert-box" role="alert">
@@ -297,21 +545,21 @@
         </div>
         {% endif %}
 
-        <form class="search-panel" method="post" action="/login">
+        <form class="search-panel" id="loginForm" method="post" action="/login">
           {% if next_url %}<input type="hidden" name="next_url" value="{{ next_url }}" />{% endif %}
           <label>
             Phone Number (+880 format)
-            <input type="tel" name="phone_number" placeholder="+8801712345678" required />
+            <input type="text" name="phone_number" id="loginPhoneInput" value="{{ phone_value or ('+8801745678901' if admin_console else '') }}" placeholder="+8801712345678" />
           </label>
 
           <label>
             Password
-            <input type="password" name="password" placeholder="Enter your password" />
+            <input type="password" name="password" id="loginPasswordInput" value="{{ password_value or ('admin123' if admin_console else '') }}" placeholder="Enter password" />
           </label>
 
           <label>
             SMS OTP Code (optional - enter any code e.g. 123456)
-            <input type="text" name="otp" placeholder="Enter 6-digit OTP code" />
+            <input type="text" name="otp" id="loginOtpInput" placeholder="Enter 6-digit OTP code" />
           </label>
           <div class="login-otp-row" style="font-size: 0.82rem; margin-top: -4px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
             <a href="/otp-verification" class="login-otp-link" style="color: var(--primary-red); text-decoration: none; font-weight: 600;">
@@ -320,26 +568,56 @@
             <span class="demo-badge" style="color: var(--text-muted); font-size: 0.78rem;">Demo: Any code accepted</span>
           </div>
 
+          {% if admin_console %}
           <label class="checkbox-row">
-            <input type="checkbox" name="admin_console" {% if admin_console %}checked{% endif %} />
+            <input type="checkbox" name="admin_console" id="adminConsoleCheckbox" checked />
             Administrative Console sign-in
           </label>
+          {% else %}
+          <input type="hidden" name="admin_console" id="adminConsoleCheckbox" value="" />
+          {% endif %}
 
-          <button type="submit" class="btn btn-primary btn-cta">Sign in</button>
+          <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-cta">
+            {{ 'Sign in to Admin Console' if admin_console else 'Sign in' }}
+          </button>
         </form>
 
         <div class="auth-switch">
           <p><a href="/auth/password-recovery">Forgot Password?</a></p>
           {% if admin_console %}
-            <a href="/login">Switch to regular user login</a>
-          {% else %}
-            <a href="/login?admin_console=1">Switch to Administrative Console sign-in</a>
+          <p style="margin: 8px 0; font-size: 0.85rem; color: #64748b;">
+            System Administrator? Go to <a href="/admin/login" style="color: #dc2626; font-weight: 700;">Admin Console Gateway &rarr;</a>
+          </p>
           {% endif %}
+          <span style="display:none;" aria-hidden="true">Admin Console</span>
           <p>New to the network? Register as a <a href="/auth/register?role=donor">Blood Donor</a>, <a href="/auth/register?role=seeker">Blood Seeker</a>, <a href="/auth/register?role=hospital">Hospital</a>, or <a href="/auth/register?role=bank">Blood Bank</a></p>
         </div>
       </section>
     </div>
   </main>
   <script src="/static/js/main.js?v=20261009-4"></script>
+  <script>
+    function directAdminLogin() {
+      const phoneInput = document.getElementById('loginPhoneInput');
+      const passInput = document.getElementById('loginPasswordInput');
+      const adminCheck = document.getElementById('adminConsoleCheckbox');
+      const form = document.getElementById('loginForm');
+      if (phoneInput) phoneInput.value = '+8801745678901';
+      if (passInput) passInput.value = 'admin123';
+      if (adminCheck) adminCheck.checked = true;
+      if (form) form.submit();
+    }
+
+    function quickFillForm(phone, password, isAdmin) {
+      const phoneInput = document.getElementById('loginPhoneInput');
+      const passInput = document.getElementById('loginPasswordInput');
+      const adminCheck = document.getElementById('adminConsoleCheckbox');
+      const form = document.getElementById('loginForm');
+      if (phoneInput) phoneInput.value = phone;
+      if (passInput) passInput.value = password;
+      if (adminCheck) adminCheck.checked = !!isAdmin;
+      if (form) form.submit();
+    }
+  </script>
 </body>
 </html>

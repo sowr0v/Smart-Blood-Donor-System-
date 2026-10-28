@@ -31,10 +31,10 @@
         </ul>
       </nav>
 
-            <div class="nav-auth-actions">
+      <div class="nav-auth-actions">
         {% set current_u = user or logged_in_user %}
         {% if current_u %}
-          <a href="{{ '/seeker/dashboard' if current_u.role == 'seeker' else '/donor/dashboard' }}" class="btn btn-outline">Dashboard</a>
+          <a href="{{ '/admin/dashboard' if current_u.role == 'admin' else ('/seeker/dashboard' if current_u.role == 'seeker' else ('/hospital/dashboard' if current_u.role in ['hospital', 'bank', 'blood_bank'] else '/donor/dashboard')) }}" class="btn btn-outline">Dashboard</a>
           <a href="/logout" class="btn btn-primary">Logout</a>
         {% else %}
           <a href="/login" class="btn btn-outline">Login</a>
