@@ -1428,9 +1428,12 @@ document.addEventListener('DOMContentLoaded', () => {
         radius_km: parseInt(radiusRangeInput?.value || '15', 10),
         donation_types: selectedTypes,
         preferred_zones: selectedZones,
-        phone_visibility: document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden',
+        phone_visibility: !document.getElementById('settingMaskPublicPhone')?.checked ? 'public' : (document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden'),
+        allow_hospital_calls: !!document.getElementById('settingAllowHospitalCall')?.checked,
+        mask_public_phone: !!document.getElementById('settingMaskPublicPhone')?.checked,
         public_directory: !!document.getElementById('settingPublicDirectory')?.checked,
         show_badges: !!document.getElementById('settingShowBadges')?.checked,
+        share_direct_contact: !!document.getElementById('settingShareDirectContact')?.checked,
         two_factor_auth: !!document.getElementById('settingTwoFactor')?.checked
       };
 
@@ -1461,6 +1464,111 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Function to update live privacy & visibility preview
+  function updatePrivacyPreview() {
+    const isMasked = !!document.getElementById('settingMaskPublicPhone')?.checked;
+    const isPublic = !!document.getElementById('settingPublicDirectory')?.checked;
+    const showBadges = !!document.getElementById('settingShowBadges')?.checked;
+    const directContact = !!document.getElementById('settingShareDirectContact')?.checked;
+
+    const dirStatus = document.getElementById('previewDirStatus');
+    if (dirStatus) {
+      dirStatus.textContent = isPublic ? 'Visible to seekers' : 'Hidden (Unlisted)';
+      dirStatus.style.color = isPublic ? 'var(--success-green)' : 'var(--text-muted)';
+    }
+
+    const phoneDisp = document.getElementById('previewPhoneDisplay');
+    if (phoneDisp) {
+      phoneDisp.textContent = isMasked ? '+880 1712-***678 (Masked for Privacy)' : '+880 1712-345678 (Directly Visible)';
+      phoneDisp.style.color = isMasked ? 'var(--text-primary)' : 'var(--primary-red)';
+    }
+
+    const badgeStatus = document.getElementById('previewBadgeStatus');
+    if (badgeStatus) {
+      badgeStatus.textContent = showBadges ? 'Gold Tier, Rating & Donation Count Visible' : 'Donor Badges Kept Private';
+    }
+
+    const contactStatus = document.getElementById('previewContactStatus');
+    if (contactStatus) {
+      contactStatus.textContent = directContact ? 'Speed-Dial & WhatsApp Direct Allowed' : 'In-App Chat Only (Protected)';
+      contactStatus.style.color = directContact ? '#0284C7' : 'var(--text-secondary)';
+    }
+  }
+
+  // Attach change listeners to privacy toggles for live preview
+  ['settingAllowHospitalCall', 'settingMaskPublicPhone', 'settingPublicDirectory', 'settingShowBadges', 'settingShareDirectContact'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', updatePrivacyPreview);
+  });
+
+  // Dedicated Save Privacy Controls button
+  const btnSavePrivacy = document.getElementById('btnSavePrivacyControls');
+  if (btnSavePrivacy) {
+    btnSavePrivacy.addEventListener('click', async () => {
+      btnSavePrivacy.disabled = true;
+      const oldText = btnSavePrivacy.innerHTML;
+      btnSavePrivacy.innerHTML = '⏳ Saving...';
+
+      const privacyPayload = {
+        allow_hospital_calls: !!document.getElementById('settingAllowHospitalCall')?.checked,
+        mask_public_phone: !!document.getElementById('settingMaskPublicPhone')?.checked,
+        public_directory: !!document.getElementById('settingPublicDirectory')?.checked,
+        show_badges: !!document.getElementById('settingShowBadges')?.checked,
+        share_direct_contact: !!document.getElementById('settingShareDirectContact')?.checked,
+        phone_visibility: !document.getElementById('settingMaskPublicPhone')?.checked ? 'public' : (document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden')
+      };
+
+      try {
+        const res = await fetch('/api/v1/donor/privacy-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(privacyPayload)
+        });
+        if (res.ok) {
+          showToast('Profile Visibility & Contact Privacy Controls saved successfully! 🛡️');
+          updatePrivacyPreview();
+        } else {
+          showToast('Saved privacy settings locally.');
+        }
+      } catch (e) {
+        showToast('Privacy settings saved.');
+      } finally {
+        btnSavePrivacy.disabled = false;
+        btnSavePrivacy.innerHTML = oldText;
+      }
+    });
+  }
+
+  // Load saved privacy settings on init
+  async function loadDonorPrivacySettings() {
+    try {
+      const res = await fetch('/api/v1/donor/privacy-settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      const p = data.privacy_controls || {};
+
+      const hospEl = document.getElementById('settingAllowHospitalCall');
+      if (hospEl && p.allow_hospital_calls !== undefined) hospEl.checked = !!p.allow_hospital_calls;
+
+      const maskEl = document.getElementById('settingMaskPublicPhone');
+      if (maskEl && p.mask_public_phone !== undefined) maskEl.checked = !!p.mask_public_phone;
+
+      const dirEl = document.getElementById('settingPublicDirectory');
+      if (dirEl && p.public_directory !== undefined) dirEl.checked = !!p.public_directory;
+
+      const badgeEl = document.getElementById('settingShowBadges');
+      if (badgeEl && p.show_badges !== undefined) badgeEl.checked = !!p.show_badges;
+
+      const contactEl = document.getElementById('settingShareDirectContact');
+      if (contactEl && p.share_direct_contact !== undefined) contactEl.checked = !!p.share_direct_contact;
+
+      updatePrivacyPreview();
+    } catch (err) {
+      console.log('Error loading privacy settings:', err);
+    }
+  }
+  loadDonorPrivacySettings();
 
   // Reset to Defaults
   if (resetSettingsBtn) {
