@@ -338,6 +338,144 @@
 
       <!-- 7. Portal Settings & Security (SBDS-45) -->
       <section class="admin-section" id="section-settings">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Admin Portal Settings &amp; Access Security</h1>
+            <p class="section-subtext">System-wide 2FA enforcement, session timeout durations, gateway credentials, and immutable audit logs.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid-2">
+          <!-- Security Controls Form -->
+          <div class="admin-card">
+            <div class="card-header-clean">
+              <h2 class="card-title">Security &amp; Governance Policies</h2>
+            </div>
+            <form id="adminSettingsForm" onsubmit="saveAdminSettings(event)">
+              <div class="form-toggle-row">
+                <div class="toggle-text">
+                  <strong>Mandatory Two-Factor Authentication (2FA)</strong>
+                  <p>Enforce SMS/Email OTP verification for all administrator console logins.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting2fa" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-toggle-row">
+                <div class="toggle-text">
+                  <strong>Emergency SMS Auto-Broadcast Failsafe Lock</strong>
+                  <p>Prevent accidental mass SMS dispatches without secondary authorization.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settingSmsLock">
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-toggle-row">
+                <div class="toggle-text">
+                  <strong>Automated Request Duplicate Moderation</strong>
+                  <p>Automatically mark and pause requests with duplicate risk score above 75%.</p>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="settingAutoModeration" checked>
+                  <span class="slider round"></span>
+                </label>
+              </div>
+
+              <div class="form-group mt-3">
+                <label for="settingSessionTimeout" class="form-label">Inactivity Session Expiration (Minutes)</label>
+                <select id="settingSessionTimeout" class="admin-select full-width">
+                  <option value="15">15 Minutes</option>
+                  <option value="30">30 Minutes</option>
+                  <option value="60" selected>60 Minutes (Recommended)</option>
+                  <option value="120">2 Hours</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="settingMaxOtp" class="form-label">Max Allowed OTP Verification Attempts</label>
+                <input type="number" id="settingMaxOtp" class="admin-input full-width" value="5" min="3" max="10">
+              </div>
+
+              <div class="form-group">
+                <label for="settingSmsProvider" class="form-label">Primary SMS Dispatch Gateway</label>
+                <select id="settingSmsProvider" class="admin-select full-width">
+                  <option value="Twilio / SSL Wireless" selected>Twilio / SSL Wireless BD Telecom Gateway</option>
+                  <option value="Greenweb SMS Gateway">Greenweb Direct Gateway</option>
+                  <option value="Generic HTTP Post Gateway">Generic HTTP/REST Gateway</option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn btn-primary mt-3">Save Security Policies</button>
+            </form>
+          </div>
+
+          <!-- Password Change & Admin Credentials -->
+          <div class="admin-card">
+            <div class="card-header-clean">
+              <h2 class="card-title">Update Administrator Password</h2>
+            </div>
+            <form id="adminPasswordForm" onsubmit="changeAdminPassword(event)">
+              <div class="form-group">
+                <label for="adminCurrentPassword" class="form-label">Current Password</label>
+                <input type="password" id="adminCurrentPassword" class="admin-input full-width" placeholder="Enter current admin password" required>
+              </div>
+              <div class="form-group">
+                <label for="adminNewPassword" class="form-label">New Password</label>
+                <input type="password" id="adminNewPassword" class="admin-input full-width" placeholder="Min. 6 characters" required>
+              </div>
+              <div class="form-group">
+                <label for="adminConfirmPassword" class="form-label">Confirm New Password</label>
+                <input type="password" id="adminConfirmPassword" class="admin-input full-width" placeholder="Re-enter new password" required>
+              </div>
+              <button type="submit" class="btn btn-secondary mt-3">Change Admin Password</button>
+            </form>
+
+            <div class="rbac-overview-box mt-4">
+              <h3 class="rbac-title">Role-Based Access Matrix (RBAC)</h3>
+              <p class="card-subtext">Active operational role permissions:</p>
+              <ul class="rbac-list" id="rbacOverviewList">
+                <li><strong>Super Admin:</strong> Full Platform Privileges &amp; SMS Dispatch</li>
+                <li><strong>Medical Moderator:</strong> KYC Verification &amp; Request Moderation</li>
+                <li><strong>Verification Officer:</strong> Donor KYC Reviews</li>
+                <li><strong>Auditor:</strong> Read-Only Analytics &amp; Inventory Logs</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Audit Trail Table -->
+        <div class="admin-card mt-4">
+          <div class="card-header-clean">
+            <h2 class="card-title">Immutable System Audit Trail</h2>
+            <div class="action-buttons-wrap">
+              <button type="button" class="btn btn-sm btn-outline" onclick="exportAuditLogs()">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Export Audit JSON</span>
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Timestamp (UTC)</th>
+                  <th>Admin Actor</th>
+                  <th>Action Type</th>
+                  <th>Target Entity</th>
+                  <th>Details &amp; Justification</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody id="auditLogsTableBody">
+                <!-- Dynamically populated via loadAuditLogs -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
     </main>
