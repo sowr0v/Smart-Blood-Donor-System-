@@ -851,6 +851,38 @@ def initialize_auth_database():
                 );
                 """
             )
+            communication_preference_columns = connection.execute(
+                "PRAGMA table_info(communication_preferences)"
+            ).fetchall()
+            communication_preference_primary_key = [
+                row[1]
+                for row in sorted(
+                    (row for row in communication_preference_columns if row[5]),
+                    key=lambda row: row[5],
+                )
+            ]
+            if communication_preference_primary_key != ["phone", "role"]:
+                connection.execute("BEGIN")
+                connection.execute(
+                    """CREATE TABLE communication_preferences_v2 (
+                           phone TEXT NOT NULL,
+                           role TEXT NOT NULL CHECK (role IN ('donor', 'seeker')),
+                           preferences_json TEXT NOT NULL,
+                           updated_at INTEGER NOT NULL,
+                           PRIMARY KEY (phone, role)
+                       )"""
+                )
+                connection.execute(
+                    """INSERT INTO communication_preferences_v2
+                       (phone, role, preferences_json, updated_at)
+                       SELECT phone, role, preferences_json, updated_at
+                       FROM communication_preferences"""
+                )
+                connection.execute("DROP TABLE communication_preferences")
+                connection.execute(
+                    """ALTER TABLE communication_preferences_v2
+                       RENAME TO communication_preferences"""
+                )
             connection.executemany(
                 """INSERT OR IGNORE INTO blood_stock_thresholds
                    (blood_group, threshold, updated_at) VALUES (?, 5, ?)""",
