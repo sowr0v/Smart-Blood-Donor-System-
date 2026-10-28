@@ -2235,7 +2235,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     async def resolve_moderation_report(report_id: int, payload: ReportResolutionPayload, request: Request):
         initialize_admin_and_notification_database()
         action = payload.action.strip().lower()
-        if action not in {"resolve", "dismiss", "warn_user", "suspend_user"}:
+        if action not in {"resolve", "dismiss", "warn_user", "suspend_user", "under_review", "mark_under_review"}:
             raise HTTPException(status_code=422, detail="Invalid action")
 
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -2246,7 +2246,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                     raise HTTPException(status_code=404, detail="Report not found")
                 target_phone = rep[3]
 
-                new_status = "resolved" if action in {"resolve", "warn_user", "suspend_user"} else "dismissed"
+                new_status = "resolved" if action in {"resolve", "warn_user", "suspend_user"} else ("under_review" if action in {"under_review", "mark_under_review"} else "dismissed")
                 u_conn.execute(
                     """
                     UPDATE user_moderation_reports
