@@ -255,6 +255,8 @@ The notification system keeps users informed about important activities.
 * Account Notification
 * System Notification
 
+Donors and seekers can manage In-App Chat, SMS, phone call, WhatsApp, and push notification preferences in their dashboard settings. Routine alert frequency can be set to immediate, hourly, daily, or weekly, with separate controls for matching requests, chats, donation reminders, and account updates. Critical emergency alerts are always enabled and remain immediate. Donor phone-call and WhatsApp channels require public phone visibility and explicit direct-contact consent; preferences are stored per account role in `auth.db` through `GET` and `PUT /api/v1/account/communication-preferences`.
+
 ---
 
 # ⚙️ 05 — Settings & Privacy

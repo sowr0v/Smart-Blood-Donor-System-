@@ -24,7 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi import HTTPException, Response
 from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Optional
+from typing import Any, Literal, Optional
 
 logger = logging.getLogger(__name__)
 AUTH_DATABASE_PATH = Path(
@@ -793,6 +793,13 @@ def initialize_auth_database():
                     phone TEXT PRIMARY KEY,
                     settings_json TEXT NOT NULL,
                     updated_at INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS communication_preferences (
+                    phone TEXT NOT NULL,
+                    role TEXT NOT NULL CHECK (role IN ('donor', 'seeker')),
+                    preferences_json TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (phone, role)
                 );
                 CREATE TABLE IF NOT EXISTS donor_location_settings (
                     phone TEXT PRIMARY KEY,
@@ -2737,6 +2744,187 @@ class DonorSettingsPreferences(BaseModel):
     show_badges: bool = True
     share_direct_contact: bool = False
     two_factor_auth: bool = True
+
+
+class CommunicationChannelsPayload(BaseModel):
+    in_app_chat: bool = True
+    sms: bool = True
+    phone_call: bool = False
+    whatsapp: bool = False
+    push_notification: bool = True
+
+
+class NotificationAlertTypesPayload(BaseModel):
+    critical_emergency: bool = True
+    matching_requests: bool = True
+    chat_messages: bool = True
+    donation_reminders: bool = True
+    account_updates: bool = True
+
+
+class CommunicationPreferencesPayload(BaseModel):
+    channels: CommunicationChannelsPayload
+    alert_types: NotificationAlertTypesPayload
+    frequency: Literal["immediate", "hourly", "daily", "weekly"] = "immediate"
+
+
+def _default_communication_preferences() -> dict:
+    return {
+        "channels": {
+            "in_app_chat": True,
+            "sms": True,
+            "phone_call": False,
+            "whatsapp": False,
+            "push_notification": True,
+        },
+        "alert_types": {
+            "critical_emergency": True,
+            "matching_requests": True,
+            "chat_messages": True,
+            "donation_reminders": True,
+            "account_updates": True,
+        },
+        "frequency": "immediate",
+        "critical_frequency": "immediate",
+    }
+
+
+def _get_communication_preferences(phone: str, role: str) -> dict:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT role, preferences_json FROM communication_preferences
+               WHERE phone = ? AND role = ?""",
+            (phone, role),
+        ).fetchone()
+    preferences = _default_communication_preferences()
+    if row and row["role"] == role:
+        try:
+            stored = json.loads(row["preferences_json"])
+            preferences["channels"].update(stored.get("channels", {}))
+            preferences["alert_types"].update(stored.get("alert_types", {}))
+            if stored.get("frequency") in {"immediate", "hourly", "daily", "weekly"}:
+                preferences["frequency"] = stored["frequency"]
+        except (json.JSONDecodeError, TypeError):
+            logger.warning("Stored communication preferences are invalid for account %s", phone)
+    elif role == "donor":
+        with closing(_connection()) as connection:
+            legacy = connection.execute(
+                "SELECT settings_json FROM donor_settings WHERE phone = ?",
+                (phone,),
+            ).fetchone()
+        if legacy:
+            try:
+                settings = json.loads(legacy["settings_json"])
+                preferences["channels"]["sms"] = bool(
+                    settings.get("sms_alerts", preferences["channels"]["sms"])
+                )
+                preferences["channels"]["push_notification"] = bool(
+                    settings.get("inapp_notifications", preferences["channels"]["push_notification"])
+                )
+                preferences["alert_types"]["donation_reminders"] = bool(
+                    settings.get("gap_reminders", preferences["alert_types"]["donation_reminders"])
+                )
+            except (json.JSONDecodeError, TypeError):
+                logger.warning("Legacy donor settings are invalid for account %s", phone)
+    elif role == "seeker":
+        legacy = SEEKER_SETTINGS.get(phone, {})
+        preferences["channels"]["sms"] = bool(
+            legacy.get("sms_alerts", preferences["channels"]["sms"])
+        )
+        preferences["channels"]["push_notification"] = bool(
+            legacy.get("push_alerts", preferences["channels"]["push_notification"])
+        )
+
+    preferences["alert_types"]["critical_emergency"] = True
+    privacy_restrictions = []
+    if role == "donor":
+        privacy = _get_donor_privacy_settings(phone)
+        if not privacy["share_direct_contact"] or privacy["phone_visibility"] != "public":
+            privacy_restrictions = [
+                channel
+                for channel in ("phone_call", "whatsapp")
+                if preferences["channels"][channel]
+            ]
+            preferences["channels"]["phone_call"] = False
+            preferences["channels"]["whatsapp"] = False
+    preferences["critical_frequency"] = "immediate"
+    preferences["privacy_restrictions"] = privacy_restrictions
+    return preferences
+
+
+@app.get("/api/v1/account/communication-preferences")
+async def get_communication_preferences(request: Request) -> dict[str, Any]:
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to manage communication preferences.")
+    role = str(user.get("role", "")).lower()
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=403, detail="Communication preferences are available to donors and seekers.")
+    phone = user.get("phone")
+    if not phone:
+        raise HTTPException(status_code=401, detail="Authenticated account has no phone number.")
+    return {
+        "status": "success",
+        "preferences": _get_communication_preferences(phone, role),
+    }
+
+
+@app.put("/api/v1/account/communication-preferences")
+async def update_communication_preferences(
+    payload: CommunicationPreferencesPayload,
+    request: Request,
+) -> dict[str, Any]:
+    user = _get_current_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to manage communication preferences.")
+    role = str(user.get("role", "")).lower()
+    if role not in {"donor", "seeker"}:
+        raise HTTPException(status_code=403, detail="Communication preferences are available to donors and seekers.")
+    phone = user.get("phone")
+    if not phone:
+        raise HTTPException(status_code=401, detail="Authenticated account has no phone number.")
+
+    preferences = payload.model_dump()
+    preferences["alert_types"]["critical_emergency"] = True
+    preferences["critical_frequency"] = "immediate"
+    privacy_restrictions = []
+    if role == "donor":
+        privacy = _get_donor_privacy_settings(phone)
+        if not privacy["share_direct_contact"] or privacy["phone_visibility"] != "public":
+            privacy_restrictions = [
+                channel
+                for channel in ("phone_call", "whatsapp")
+                if preferences["channels"][channel]
+            ]
+            preferences["channels"]["phone_call"] = False
+            preferences["channels"]["whatsapp"] = False
+
+    initialize_auth_database()
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO communication_preferences
+                   (phone, role, preferences_json, updated_at)
+                   VALUES (?, ?, ?, ?)
+                   ON CONFLICT(phone, role) DO UPDATE SET
+                       preferences_json = excluded.preferences_json,
+                       updated_at = excluded.updated_at""",
+                (phone, role, json.dumps(preferences), now),
+            )
+    saved = _get_communication_preferences(phone, role)
+    return {
+        "status": "success",
+        "message": (
+            "Preferences saved. Phone and WhatsApp channels require public contact visibility "
+            "and direct-contact consent."
+            if privacy_restrictions
+            else "Communication preferences saved."
+        ),
+        "preferences": saved,
+        "privacy_restrictions": privacy_restrictions,
+    }
 
 
 def _get_donor_privacy_settings(phone: str) -> dict:

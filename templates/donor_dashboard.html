@@ -1008,7 +1008,7 @@
                   <div class="setting-desc">Instant SMS to {{ user.phone if user and user.phone else "+880 1712345678" }} for Code Red A+ emergency requirements nearby.</div>
                 </div>
                 <label class="switch-toggle-btn" aria-label="Toggle SMS Match Broadcasts">
-                  <input type="checkbox" id="settingSmsAlerts" checked>
+                  <input type="checkbox" id="settingSmsAlerts" checked data-communication-channel="sms">
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1020,7 +1020,7 @@
                   <div class="setting-desc">Audible chime and push notification for chat messages and urgent patient broadcasts.</div>
                 </div>
                 <label class="switch-toggle-btn" aria-label="Toggle In-App Push Notifications">
-                  <input type="checkbox" id="settingInAppPush" checked>
+                  <input type="checkbox" id="settingInAppPush" checked data-communication-channel="push_notification">
                   <span class="switch-slider"></span>
                 </label>
               </div>
@@ -1048,6 +1048,55 @@
                   <span class="switch-slider"></span>
                 </label>
               </div>
+            </div>
+          </div>
+
+          <div class="donor-card">
+            <div class="card-header-flex" style="margin-bottom: 16px;">
+              <div class="card-title-combo">
+                <span style="font-size: 1.3rem;">📬</span>
+                <div>
+                  <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Communication Channels &amp; Alert Preferences</h3>
+                  <div class="card-subtitle">Choose how you receive routine notifications. Critical emergency alerts remain immediate and enabled.</div>
+                </div>
+              </div>
+            </div>
+            <div class="settings-group-stack">
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc"><div class="setting-name">In-App Chat</div><div class="setting-desc">Receive messages in your protected dashboard inbox.</div></div>
+                <label class="switch-toggle-btn" aria-label="Enable in-app chat notifications"><input type="checkbox" checked data-communication-channel="in_app_chat"><span class="switch-slider"></span></label>
+              </div>
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc"><div class="setting-name">Phone Calls</div><div class="setting-desc">Direct calls require your explicit direct-contact consent and public phone visibility.</div></div>
+                <label class="switch-toggle-btn" aria-label="Enable phone call notifications"><input type="checkbox" data-communication-channel="phone_call"><span class="switch-slider"></span></label>
+              </div>
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc"><div class="setting-name">WhatsApp</div><div class="setting-desc">WhatsApp contact requires your explicit direct-contact consent and public phone visibility.</div></div>
+                <label class="switch-toggle-btn" aria-label="Enable WhatsApp notifications"><input type="checkbox" data-communication-channel="whatsapp"><span class="switch-slider"></span></label>
+              </div>
+              <div class="setting-toggle-row">
+                <div class="setting-title-desc"><div class="setting-name">Critical Emergency Alerts</div><div class="setting-desc">Mandatory system alerts bypass quiet hours and notification frequency.</div></div>
+                <label class="switch-toggle-btn" aria-label="Critical emergency alerts are mandatory"><input type="checkbox" checked disabled data-communication-alert="critical_emergency"><span class="switch-slider"></span></label>
+              </div>
+            </div>
+            <div class="form-field-group" style="margin-top: 16px;">
+              <label for="communicationFrequency">Routine alert frequency</label>
+              <select id="communicationFrequency" class="admin-select">
+                <option value="immediate">As they happen</option>
+                <option value="hourly">Hourly digest</option>
+                <option value="daily">Daily digest</option>
+                <option value="weekly">Weekly digest</option>
+              </select>
+            </div>
+            <div class="communication-alert-types" style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px;">
+              <label><input type="checkbox" checked data-communication-alert="matching_requests"> Matching requests</label>
+              <label><input type="checkbox" checked data-communication-alert="chat_messages"> Chat messages</label>
+              <label><input type="checkbox" checked data-communication-alert="donation_reminders"> Donation reminders</label>
+              <label><input type="checkbox" checked data-communication-alert="account_updates"> Account updates</label>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center; margin-top: 16px;">
+              <button type="button" class="btn-donor-primary" id="saveCommunicationPreferences">Save Communication Preferences</button>
+              <span id="communicationPreferencesStatus" role="status" aria-live="polite"></span>
             </div>
           </div>
 
@@ -1415,6 +1464,7 @@
 
   <!-- Scripts -->
   <script src="/static/js/main.js"></script>
+  <script src="/static/js/communication_preferences.js"></script>
   <script src="/static/js/donor_dashboard.js"></script>
 </body>
 </html>
