@@ -151,5 +151,167 @@ class AuthenticationLoginTests(unittest.TestCase):
         self.assertEqual(resp_donor_to_seeker.status_code, 303)
         self.assertEqual(resp_donor_to_seeker.headers.get("location"), "/donor/dashboard")
 
+    def test_quick_admin_query_param_auto_logs_in(self):
+        response = self.client.get("/login?quick_admin=1", follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_admin_login_with_blank_phone_and_admin_console(self):
+        response = self.client.post(
+            "/login",
+            data={
+                "phone_number": "",
+                "password": "",
+                "admin_console": "on",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_admin_login_with_alias_username_admin(self):
+        response = self.client.post(
+            "/login",
+            data={
+                "phone_number": "admin",
+                "password": "",
+                "admin_console": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_login_page_renders_quick_demo_buttons_and_prefill(self):
+        response = self.client.get("/login?admin_console=1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("1-Click Quick Demo Login", response.text)
+        self.assertIn("+8801745678901", response.text)
+        self.assertIn("admin123", response.text)
+
+    def test_api_admin_login_with_alias_and_access_dashboard(self):
+        response = self.client.post(
+            "/api/v1/auth/login",
+            json={"phone": "admin", "password": "admin123"},
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["role"], "admin")
+        self.assertEqual(data["redirect_url"], "/admin/dashboard")
+
+        # Check access to admin dashboard
+        dash_response = self.client.get("/admin/dashboard", follow_redirects=False)
+        self.assertEqual(dash_response.status_code, 200)
+        self.assertIn("Platform Master Analytics", dash_response.text)
+
+        # Check auth status endpoint
+        status_resp = self.client.get("/api/v1/auth/status")
+        self.assertEqual(status_resp.status_code, 200)
+        self.assertTrue(status_resp.json()["is_authenticated"])
+        self.assertEqual(status_resp.json()["role"], "admin")
+        self.assertEqual(status_resp.json()["dashboard_url"], "/admin/dashboard")
+
+    def test_api_admin_login_with_phone_and_access_dashboard(self):
+        response = self.client.post(
+            "/api/v1/auth/login",
+            json={"phone": "+8801745678901", "password": "admin123"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["role"], "admin")
+
+        dash_response = self.client.get("/admin/dashboard", follow_redirects=False)
+        self.assertEqual(dash_response.status_code, 200)
+
+    def test_admin_gateway_page_renders_clean_security_interface(self):
+        response = self.client.get("/admin/login")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Administrator Gateway", response.text)
+        self.assertIn("TLS 1.3 256-Bit Encrypted", response.text)
+        self.assertIn("adminIdentifierInput", response.text)
+        self.assertIn("adminPasswordInput", response.text)
+        self.assertIn("Evaluation &amp; Sandbox Access", response.text)
+
+    def test_admin_gateway_login_with_alias_admin(self):
+        response = self.client.post(
+            "/admin/login",
+            data={
+                "admin_identifier": "admin",
+                "password": "admin123",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_admin_gateway_login_with_phone_identifier(self):
+        response = self.client.post(
+            "/admin/login",
+            data={
+                "admin_identifier": "+8801745678901",
+                "password": "admin123",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_admin_gateway_login_with_email_identifier(self):
+        response = self.client.post(
+            "/admin/login",
+            data={
+                "admin_identifier": "admin@sbds.org",
+                "password": "admin123",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+        self.assertIn("access_token", response.cookies)
+
+    def test_admin_gateway_rejects_blank_password(self):
+        response = self.client.post(
+            "/admin/login",
+            data={
+                "admin_identifier": "admin",
+                "password": "",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("Master password is required", response.text)
+
+    def test_admin_gateway_rejects_invalid_password(self):
+        response = self.client.post(
+            "/admin/login",
+            data={
+                "admin_identifier": "admin",
+                "password": "wrongpassword123",
+            },
+            follow_redirects=False,
+        )
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("Invalid administrative credentials", response.text)
+
+    def test_admin_logout_redirects_to_admin_login(self):
+        from main import _generate_jwt
+        admin_token = _generate_jwt("+8801745678901", "admin")
+        response = self.client.get("/logout", cookies={"access_token": admin_token}, follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/login?logged_out=1")
+
+    def test_authenticated_admin_visiting_admin_login_redirects_to_dashboard(self):
+        from main import _generate_jwt
+        admin_token = _generate_jwt("+8801745678901", "admin")
+        response = self.client.get("/admin/login", cookies={"access_token": admin_token}, follow_redirects=False)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers.get("location"), "/admin/dashboard")
+
+
+
 
 

@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Administrator Gateway | Smart Blood Donor System</title>
+  <meta name="description" content="Centralized Master Admin Authentication Gateway for Smart Blood Donor System. DGHS & National Health IT Compliant. Authorized personnel only.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/admin_dashboard.css">
+  <style>
+    :root {
+      --adm-bg: #070b14;
+      --adm-card-bg: rgba(13, 19, 33, 0.88);
+      --adm-card-border: rgba(255, 255, 255, 0.08);
+      --adm-border-focus: #dc2626;
+      --adm-text: #f8fafc;
+      --adm-muted: #94a3b8;
+      --adm-accent: #dc2626;
+      --adm-accent-hover: #ef4444;
+      --adm-input-bg: #0b1120;
+      --adm-input-border: #1e293b;
+      --adm-success: #10b981;
+      --adm-warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body.admin-gateway-body {
+      background-color: var(--adm-bg);
+      background-image: 
+        radial-gradient(circle at 50% 12%, rgba(220, 38, 38, 0.16) 0%, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.1) 0%, transparent 50%),
+        radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 28px 28px;
+      color: var(--adm-text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Glow Pulses */
+    .ambient-glow {
+      position: absolute;
+      width: 650px;
+      height: 650px;
+      border-radius: 50%;
+      filter: blur(150px);
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.28;
+      animation: floatGlow 12s ease-in-out infinite alternate;
+    }
+    .ambient-glow-red {
+      top: -180px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: radial-gradient(circle, #dc2626 0%, rgba(220, 38, 38, 0) 70%);
+    }
+    .ambient-glow-blue {
+      bottom: -160px;
+      right: 5%;
+      background: radial-gradient(circle, #2563eb 0%, rgba(37, 99, 235, 0) 70%);
+      opacity: 0.18;
+    }
+
+    @keyframes floatGlow {
+      0% { transform: translateX(-50%) translateY(0); }
+      100% { transform: translateX(-48%) translateY(20px); }
+    }
+
+    /* Top Gateway Header */
+    .gateway-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 36px;
+      position: relative;
+      z-index: 10;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(7, 11, 20, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .gateway-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: inherit;
+    }
+    .gateway-logo-icon {
+      width: 42px;
+      height: 42px;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.25) 0%, rgba(185, 28, 28, 0.1) 100%);
+      border: 1.5px solid rgba(220, 38, 38, 0.45);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px rgba(220, 38, 38, 0.3);
+      position: relative;
+    }
+    .gateway-logo-icon svg {
+      width: 22px;
+      height: 22px;
+      fill: #ef4444;
+    }
+    .gateway-brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+    .gateway-title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .gateway-tag {
+      font-size: 0.65rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.3) 0%, rgba(220, 38, 38, 0.15) 100%);
+      color: #fca5a5;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      border: 1px solid rgba(220, 38, 38, 0.4);
+    }
+    .gateway-subtitle {
+      font-size: 0.75rem;
+      color: var(--adm-muted);
+    }
+
+    .gateway-top-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .live-clock-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.76rem;
+      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 6px 12px;
+      border-radius: 9999px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .live-clock-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      animation: pulseDot 2s infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .gateway-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 9999px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: #34d399;
+    }
+    .public-portal-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #cbd5e1;
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .public-portal-link:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Main Container */
+    .gateway-main {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      position: relative;
+      z-index: 5;
+    }
+    .gateway-card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--adm-card-bg);
+      border: 1px solid var(--adm-card-border);
+      border-top: 2.5px solid #ef4444;
+      border-radius: 20px;
+      padding: 38px 36px;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      position: relative;
+    }
+
+    /* Card Header */
+    .gateway-card-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .shield-badge-wrap {
+      width: 62px;
+      height: 62px;
+      margin: 0 auto 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.22) 0%, rgba(15, 23, 42, 0.9) 100%);
+      border: 1.5px solid rgba(220, 38, 38, 0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 30px rgba(220, 38, 38, 0.35);
+      position: relative;
+    }
+    .shield-badge-wrap svg {
+      width: 32px;
+      height: 32px;
+      stroke: #ef4444;
+      filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+    }
+    .gateway-heading {
+      font-size: 1.58rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .gateway-subheading {
+      font-size: 0.85rem;
+      color: var(--adm-muted);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Security Notice Strip */
+    .security-notice-strip {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(220, 38, 38, 0.08);
+      border: 1px solid rgba(220, 38, 38, 0.22);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.77rem;
+      color: #fca5a5;
+      margin-bottom: 22px;
+      line-height: 1.4;
+    }
+    .security-notice-strip svg {
+      flex-shrink: 0;
+      width: 17px;
+      height: 17px;
+      stroke: #ef4444;
+      margin-top: 2px;
+    }
+
+    /* Alerts */
+    .admin-error-box {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 0.84rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: alertShake 0.4s ease;
+    }
+    @keyframes alertShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+    .admin-success-box {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #a7f3d0;
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      font-size: 0.84rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Form Inputs */
+    .admin-form-group {
+      margin-bottom: 18px;
+      position: relative;
+    }
+    .admin-form-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 8px;
+      letter-spacing: 0.01em;
+    }
+    .admin-form-label-tag {
+      font-size: 0.68rem;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .admin-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-icon-left {
+      position: absolute;
+      left: 14px;
+      width: 18px;
+      height: 18px;
+      color: #64748b;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s ease;
+    }
+    .admin-input {
+      width: 100%;
+      background: var(--adm-input-bg);
+      border: 1.5px solid var(--adm-input-border);
+      border-radius: 12px;
+      padding: 13px 44px 13px 44px;
+      font-size: 0.92rem;
+      color: #ffffff;
+      font-family: inherit;
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.35);
+      transition: all 0.2s ease;
+    }
+    .admin-input:focus {
+      outline: none;
+      border-color: #ef4444;
+      background: #0d1527;
+      box-shadow: 0 0 0 3.5px rgba(239, 68, 68, 0.22), inset 0 2px 4px rgba(0, 0, 0, 0.35);
+    }
+    .admin-input:focus ~ .input-icon-left,
+    .admin-input-wrap:focus-within .input-icon-left {
+      color: #ef4444;
+    }
+    .admin-input::placeholder {
+      color: #475569;
+    }
+
+    .input-clear-btn {
+      position: absolute;
+      right: 38px;
+      background: transparent;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .input-clear-btn:hover {
+      color: #cbd5e1;
+    }
+    .pw-toggle-btn {
+      position: absolute;
+      right: 12px;
+      background: transparent;
+      border: none;
+      color: #64748b;
+      cursor: pointer;
+      padding: 4px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      transition: color 0.2s;
+    }
+    .pw-toggle-btn:hover {
+      color: #cbd5e1;
+    }
+
+    /* Real-time Recognition Badge */
+    .id-indicator-badge {
+      display: none;
+      align-items: center;
+      gap: 5px;
+      margin-top: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: #38bdf8;
+      background: rgba(56, 189, 248, 0.08);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      padding: 3px 8px;
+      border-radius: 6px;
+      width: fit-content;
+    }
+    .id-indicator-badge.admin-match {
+      color: #f87171;
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.25);
+    }
+
+    /* Caps Lock Warning */
+    .caps-lock-warning {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-top: 6px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    /* Options row */
+    .admin-options-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 16px 0 22px;
+      font-size: 0.82rem;
+    }
+    .remember-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #94a3b8;
+      cursor: pointer;
+      user-select: none;
+    }
+    .remember-label input[type="checkbox"] {
+      width: 17px;
+      height: 17px;
+      accent-color: #dc2626;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .security-policy-link {
+      color: #f87171;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .security-policy-link:hover {
+      text-decoration: underline;
+    }
+
+    /* CTA Button */
+    .btn-admin-submit {
+      width: 100%;
+      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 14px 20px;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 18px rgba(220, 38, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .btn-admin-submit:hover:not(:disabled) {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(220, 38, 38, 0.55);
+    }
+    .btn-admin-submit:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
+    }
+    .submit-spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Sandbox & Evaluation Helper */
+    .admin-sandbox-box {
+      margin-top: 24px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px dashed rgba(255, 255, 255, 0.14);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .sandbox-box-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .sandbox-box-title {
+      font-size: 0.77rem;
+      font-weight: 700;
+      color: #cbd5e1;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sandbox-badge {
+      font-size: 0.68rem;
+      color: #10b981;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .sandbox-credentials-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #080d19;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: #e2e8f0;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .cred-val {
+      color: #38bdf8;
+      font-weight: 700;
+    }
+
+    .sandbox-action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .btn-sandbox-quick {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #f1f5f9;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn-sandbox-quick:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .btn-sandbox-quick.primary {
+      background: rgba(220, 38, 38, 0.2);
+      border-color: rgba(220, 38, 38, 0.45);
+      color: #fca5a5;
+    }
+    .btn-sandbox-quick.primary:hover {
+      background: rgba(220, 38, 38, 0.35);
+      color: #ffffff;
+    }
+
+    /* Security Modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-content {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      max-width: 480px;
+      width: 100%;
+      padding: 28px;
+      color: #e2e8f0;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+
+    /* Footer Legal Strip */
+    .gateway-footer {
+      text-align: center;
+      padding: 24px 20px;
+      font-size: 0.74rem;
+      color: #64748b;
+      position: relative;
+      z-index: 5;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      line-height: 1.6;
+    }
+    .gateway-footer a {
+      color: #94a3b8;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .gateway-footer a:hover {
+      color: #f1f5f9;
+    }
+  </style>
+</head>
+<body class="admin-gateway-body">
+  <div class="ambient-glow ambient-glow-red"></div>
+  <div class="ambient-glow ambient-glow-blue"></div>
+
+  <!-- Gateway Top Bar -->
+  <header class="gateway-topbar">
+    <a href="/" class="gateway-brand">
+      <div class="gateway-logo-icon">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/>
+        </svg>
+      </div>
+      <div class="gateway-brand-text">
+        <div class="gateway-title">
+          <span>Smart Blood Donor System</span>
+          <span class="gateway-tag">Central Command</span>
+        </div>
+        <span class="gateway-subtitle">National Transfusion &amp; Health Network Oversight</span>
+      </div>
+    </a>
+
+    <div class="gateway-top-meta">
+      <div class="live-clock-pill">
+        <span class="live-clock-dot"></span>
+        <span id="liveClockDisplay">BST 00:00:00</span>
+      </div>
+      <div class="gateway-status-pill">
+        <span>TLS 1.3 256-Bit Encrypted</span>
+      </div>
+      <a href="/login" class="public-portal-link">
+        <span>Public Portal</span>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </a>
+    </div>
+  </header>
+
+  <!-- Gateway Main Container -->
+  <main class="gateway-main">
+    <div class="gateway-card">
+      <div class="gateway-card-header">
+        <div class="shield-badge-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="M9 12l2 2 4-4"></path>
+          </svg>
+        </div>
+        <h1 class="gateway-heading">Administrator Gateway</h1>
+        <p class="gateway-subheading">Authorized access point for Platform Master Analytics, Moderator Controls, and Emergency Transfusion Oversight.</p>
+      </div>
+
+      <div class="security-notice-strip">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <span>Authorized Personnel Only. In compliance with Bangladesh Digital Security Act &amp; DGHS Medical IT Standard. All sessions are audited in real time.</span>
+      </div>
+
+      {% if error %}
+      <div class="admin-error-box" role="alert" id="adminErrorBox">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        <span>{{ error }}</span>
+      </div>
+      {% endif %}
+
+      {% if success_message %}
+      <div class="admin-success-box" role="status" id="adminSuccessBox">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <span>{{ success_message }}</span>
+      </div>
+      {% endif %}
+
+      <form id="adminLoginForm" method="post" action="/admin/login" onsubmit="handleAdminSubmit(event)">
+        {% if next_url %}
+        <input type="hidden" name="next_url" value="{{ next_url }}">
+        {% endif %}
+
+        <!-- Administrator Identifier Field -->
+        <div class="admin-form-group">
+          <div class="admin-form-label">
+            <span>Administrator Identifier</span>
+            <span class="admin-form-label-tag">Phone, Alias or Email</span>
+          </div>
+          <div class="admin-input-wrap">
+            <input
+              type="text"
+              name="admin_identifier"
+              id="adminIdentifierInput"
+              class="admin-input"
+              value="{{ phone_value or '' }}"
+              placeholder="e.g. admin or +8801745678901"
+              required
+              autocomplete="username"
+              autofocus
+              oninput="handleIdentifierInput(this.value)"
+            >
+            <div class="input-icon-left">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </div>
+            <button type="button" class="input-clear-btn" id="idClearBtn" onclick="clearIdentifierInput()" aria-label="Clear input">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div class="id-indicator-badge" id="idIndicatorBadge">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            <span id="idIndicatorText">Recognized: Master Admin ID</span>
+          </div>
+        </div>
+
+        <!-- Master Password Field -->
+        <div class="admin-form-group">
+          <div class="admin-form-label">
+            <span>Master Password</span>
+            <span class="admin-form-label-tag">Encrypted Auth</span>
+          </div>
+          <div class="admin-input-wrap">
+            <input
+              type="password"
+              name="password"
+              id="adminPasswordInput"
+              class="admin-input"
+              value="{{ password_value or '' }}"
+              placeholder="Enter master password"
+              required
+              autocomplete="current-password"
+              onkeyup="checkCapsLock(event)"
+              onkeydown="checkCapsLock(event)"
+            >
+            <div class="input-icon-left">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <button type="button" class="pw-toggle-btn" id="pwToggleBtn" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility">
+              <svg id="eyeIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+          <div class="caps-lock-warning" id="capsLockWarning">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span>Notice: Caps Lock is turned ON</span>
+          </div>
+        </div>
+
+        <!-- 2FA Security Token (Optional / Simulated) -->
+        <div class="admin-form-group">
+          <div class="admin-form-label">
+            <span>2FA Security Token</span>
+            <span class="admin-form-label-tag">TOTP / Optional</span>
+          </div>
+          <div class="admin-input-wrap">
+            <input
+              type="text"
+              name="security_code"
+              id="adminSecurityCodeInput"
+              class="admin-input"
+              placeholder="Enter 6-digit code or leave blank"
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+            >
+            <div class="input-icon-left">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remember Me & Security Policy Row -->
+        <div class="admin-options-row">
+          <label class="remember-label">
+            <input type="checkbox" name="remember_me" value="yes" checked>
+            <span>Remember administrative session (7 Days)</span>
+          </label>
+          <a class="security-policy-link" onclick="openPolicyModal()">
+            <span>Security Policy</span>
+          </a>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="adminSubmitBtn" class="btn-admin-submit">
+          <div class="submit-spinner" id="submitSpinner"></div>
+          <svg id="submitBtnIcon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+          <span id="submitBtnText">Sign In to Master Control Console</span>
+        </button>
+      </form>
+
+      <!-- Sandbox & Demo Credentials Panel -->
+      <div class="admin-sandbox-box">
+        <div class="sandbox-box-header">
+          <span class="sandbox-box-title">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#38bdf8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            <span>Evaluation &amp; Sandbox Access</span>
+          </span>
+          <span class="sandbox-badge">ACTIVE</span>
+        </div>
+        <div class="sandbox-credentials-row">
+          <div>Identifier: <span class="cred-val">admin</span> / <span class="cred-val">+8801745678901</span></div>
+          <div>Password: <span class="cred-val">admin123</span></div>
+        </div>
+        <div class="sandbox-action-buttons">
+          <button type="button" class="btn-sandbox-quick" onclick="autoFillAdminCreds()">
+            <span>⚡ Auto-Fill Fields</span>
+          </button>
+          <button type="button" class="btn-sandbox-quick primary" onclick="instantAdminLogin()">
+            <span>🚀 1-Click Instant Sign-In &rarr;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Security Policy Modal -->
+  <div class="modal-backdrop" id="policyModal" onclick="closePolicyModalOnBackdrop(event)">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#ef4444" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>Administrative Security Policy</span>
+        </div>
+        <button class="modal-close-btn" onclick="closePolicyModal()">&times;</button>
+      </div>
+      <p style="font-size: 0.85rem; line-height: 1.6; color: #cbd5e1;">
+        Access to the SBDS Central Administration Console is restricted exclusively to authorized medical informatics personnel and system administrators.
+      </p>
+      <ul style="font-size: 0.82rem; line-height: 1.7; color: #94a3b8; padding-left: 20px;">
+        <li>All actions are cryptographically signed and stored in immutable audit logs.</li>
+        <li>Sessions automatically expire following inactivity unless persistent session is chosen.</li>
+        <li>Multiple failed authentication attempts will lock access temporarily (60 seconds).</li>
+        <li>Complies with DGHS Medical Privacy Guidelines and Bangladesh Digital Security Act 2018.</li>
+      </ul>
+      <div style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn-sandbox-quick" style="display: inline-block; padding: 8px 18px;" onclick="closePolicyModal()">Close Notice</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legal Footer -->
+  <footer class="gateway-footer">
+    <p>&copy; 2026 Smart Blood Donor System (SBDS) • Central Medical IT Operations. DGHS &amp; National Health Network Standard Compliant.</p>
+    <p>Unauthorized access is strictly monitored under Bangladesh Digital Security Act 2018. Operations Hotline: <strong>10666</strong> | Emergency Contact: <a href="mailto:admin@sbds.org">admin@sbds.org</a></p>
+  </footer>
+
+  <script>
+    // Live Clock ticking in BST (UTC+6)
+    function updateLiveClock() {
+      const now = new Date();
+      // Bangladesh is UTC+6
+      const bstHours = (now.getUTCHours() + 6) % 24;
+      const hoursStr = String(bstHours).padStart(2, '0');
+      const minutesStr = String(now.getUTCMinutes()).padStart(2, '0');
+      const secondsStr = String(now.getUTCSeconds()).padStart(2, '0');
+      const clockEl = document.getElementById('liveClockDisplay');
+      if (clockEl) {
+        clockEl.textContent = `BST ${hoursStr}:${minutesStr}:${secondsStr}`;
+      }
+    }
+    setInterval(updateLiveClock, 1000);
+    updateLiveClock();
+
+    // Toggle Password Visibility
+    function togglePasswordVisibility() {
+      const input = document.getElementById('adminPasswordInput');
+      const eye = document.getElementById('eyeIcon');
+      if (input.type === 'password') {
+        input.type = 'text';
+        eye.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+      } else {
+        input.type = 'password';
+        eye.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+      }
+    }
+
+    // Check Caps Lock Status
+    function checkCapsLock(event) {
+      const warning = document.getElementById('capsLockWarning');
+      if (event.getModifierState && event.getModifierState('CapsLock')) {
+        warning.style.display = 'flex';
+      } else {
+        warning.style.display = 'none';
+      }
+    }
+
+    // Real-time Identifier Recognition
+    function handleIdentifierInput(val) {
+      const trimmed = (val || '').trim();
+      const badge = document.getElementById('idIndicatorBadge');
+      const text = document.getElementById('idIndicatorText');
+      const clearBtn = document.getElementById('idClearBtn');
+
+      if (clearBtn) {
+        clearBtn.style.display = trimmed.length > 0 ? 'flex' : 'none';
+      }
+
+      if (!trimmed) {
+        badge.style.display = 'none';
+        return;
+      }
+
+      const lower = trimmed.toLowerCase();
+      if (['admin', 'administrator', 'sysadmin', 'system admin', 'superadmin'].includes(lower)) {
+        badge.className = 'id-indicator-badge admin-match';
+        badge.style.display = 'inline-flex';
+        text.textContent = '✓ Master Administrator ID Recognized';
+      } else if (trimmed.startsWith('+8801745678901') || trimmed === '01745678901') {
+        badge.className = 'id-indicator-badge admin-match';
+        badge.style.display = 'inline-flex';
+        text.textContent = '✓ System Admin Phone Recognized';
+      } else if (trimmed.includes('@')) {
+        badge.className = 'id-indicator-badge';
+        badge.style.display = 'inline-flex';
+        text.textContent = '✓ Administrative Email Format';
+      } else if (/^\+?\d{8,15}$/.test(trimmed)) {
+        badge.className = 'id-indicator-badge';
+        badge.style.display = 'inline-flex';
+        text.textContent = '✓ Normalized Phone Format';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function clearIdentifierInput() {
+      const input = document.getElementById('adminIdentifierInput');
+      if (input) {
+        input.value = '';
+        input.focus();
+        handleIdentifierInput('');
+      }
+    }
+
+    // Form Submission Handling
+    function handleAdminSubmit(event) {
+      const btn = document.getElementById('adminSubmitBtn');
+      const spinner = document.getElementById('submitSpinner');
+      const icon = document.getElementById('submitBtnIcon');
+      const text = document.getElementById('submitBtnText');
+
+      if (btn) {
+        btn.disabled = true;
+        if (spinner) spinner.style.display = 'block';
+        if (icon) icon.style.display = 'none';
+        if (text) text.textContent = 'Authenticating Security Token...';
+      }
+    }
+
+    // Sandbox Autofill & Instant Login
+    function autoFillAdminCreds() {
+      const idInput = document.getElementById('adminIdentifierInput');
+      const passInput = document.getElementById('adminPasswordInput');
+      if (idInput && passInput) {
+        idInput.value = 'admin';
+        passInput.value = 'admin123';
+        handleIdentifierInput('admin');
+        
+        // Highlight effect
+        idInput.style.borderColor = '#10b981';
+        passInput.style.borderColor = '#10b981';
+        setTimeout(() => {
+          idInput.style.borderColor = '';
+          passInput.style.borderColor = '';
+        }, 1200);
+      }
+    }
+
+    function instantAdminLogin() {
+      autoFillAdminCreds();
+      const form = document.getElementById('adminLoginForm');
+      if (form) {
+        handleAdminSubmit();
+        form.submit();
+      }
+    }
+
+    // Security Policy Modal
+    function openPolicyModal() {
+      const modal = document.getElementById('policyModal');
+      if (modal) modal.style.display = 'flex';
+    }
+    function closePolicyModal() {
+      const modal = document.getElementById('policyModal');
+      if (modal) modal.style.display = 'none';
+    }
+    function closePolicyModalOnBackdrop(e) {
+      if (e.target && e.target.id === 'policyModal') {
+        closePolicyModal();
+      }
+    }
+
+    // Initialize state on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      const idInput = document.getElementById('adminIdentifierInput');
+      if (idInput && idInput.value) {
+        handleIdentifierInput(idInput.value);
+      }
+    });
+  </script>
+</body>
+</html>
