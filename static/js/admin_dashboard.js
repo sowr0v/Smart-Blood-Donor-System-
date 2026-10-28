@@ -1385,6 +1385,20 @@ async function loadAdminSettings() {
 
     const elSms = document.getElementById('settingSmsProvider');
     if (elSms && s.sms_gateway_provider) elSms.value = s.sms_gateway_provider;
+
+    const rbacEl = document.getElementById('rbacOverviewList');
+    if (rbacEl && Array.isArray(data.rbac_matrix) && data.rbac_matrix.length > 0) {
+      rbacEl.innerHTML = data.rbac_matrix.map(r => {
+        const perms = [];
+        if (r.user_mgmt) perms.push('User Control');
+        if (r.kyc_review) perms.push('KYC Approval');
+        if (r.requests_moderation) perms.push('Moderation');
+        if (r.inventory_oversight) perms.push('Inventory Oversight');
+        if (r.sms_dispatch) perms.push('SMS Dispatch');
+        if (r.security_settings) perms.push('Security Settings');
+        return `<li><strong>${escapeHtml(r.role)}:</strong> ${perms.join(', ') || 'Read-Only'}</li>`;
+      }).join('');
+    }
   } catch (err) {
     console.error('Error loading settings:', err);
   }
