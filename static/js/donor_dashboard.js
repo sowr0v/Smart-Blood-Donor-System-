@@ -1809,36 +1809,40 @@ document.addEventListener('DOMContentLoaded', () => {
       const newP = document.getElementById('inputNewPass')?.value || '';
       const conf = document.getElementById('inputConfirmPass')?.value || '';
 
-      if (!cur) {
-        showToast('Please enter your current password.');
-        return;
-      }
-      if (newP.length < 8) {
-        showToast('New password must be at least 8 characters long.');
-        return;
-      }
-      if (newP !== conf) {
-        showToast('New password and confirmation do not match.');
-        return;
-      }
+  if (btnUpdatePassword) {
+    btnUpdatePassword.addEventListener('click', async () => {
+      const cur = document.getElementById('inputCurrentPass')?.value || '';
+      const newP = document.getElementById('inputNewPass')?.value || '';
+      const conf = document.getElementById('inputConfirmPass')?.value || '';
 
-      document.getElementById('inputCurrentPass').value = '';
-      document.getElementById('inputNewPass').value = '';
-      document.getElementById('inputConfirmPass').value = '';
-      showToast('Security password updated successfully! 🔐');
+      if (!cur) { showToast('Please enter your current password.'); return; }
+      if (newP.length < 12) { showToast('New password must be at least 12 characters with uppercase, lowercase, number, and symbol.'); return; }
+      if (newP !== conf) { showToast('New password and confirmation do not match.'); return; }
+      if (newP === cur) { showToast('New password must be different from the current password.'); return; }
+
+      btnUpdatePassword.disabled = true;
+      try {
+        const res = await fetch('/api/v1/auth/change-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current_password: cur, new_password: newP, confirm_password: conf })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          document.getElementById('inputCurrentPass').value = '';
+          document.getElementById('inputNewPass').value = '';
+          document.getElementById('inputConfirmPass').value = '';
+          showToast(data.message || 'Password updated successfully.');
+        } else {
+          showToast(data.detail || 'Failed to update password.');
+        }
+      } catch (e) {
+        showToast('Network error while updating password.');
+      } finally {
+        btnUpdatePassword.disabled = false;
+      }
     });
   }
-
-  // Revoke other sessions
-  if (btnRevokeSessions) {
-    btnRevokeSessions.addEventListener('click', () => {
-      showToast('All other active browser sessions have been logged out.');
-    });
-  }
-
-  // Restore saved preferences from localStorage if exists
-  try {
-    const saved = localStorage.getItem('sbds_donor_settings');
     if (saved) {
       const parsed = JSON.parse(saved);
       if (parsed.radius_km && radiusRangeInput && radiusValueDisplay) {
