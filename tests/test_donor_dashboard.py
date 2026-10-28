@@ -1,4 +1,5 @@
 import unittest
+from contextlib import closing
 import uuid
 from fastapi.testclient import TestClient
 
@@ -186,8 +187,9 @@ class DonorDashboardTests(unittest.TestCase):
             )
             self.assertTrue(matches_when_available.json()["requests"])
         finally:
-            with sqlite3.connect(AUTH_DATABASE_PATH) as connection:
-                connection.execute("DELETE FROM donor_profiles WHERE phone = ?", (donor_phone,))
+            with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+                with connection:
+                    connection.execute("DELETE FROM donor_profiles WHERE phone = ?", (donor_phone,))
 
     def test_donor_respond_request_api(self):
         import sqlite3
@@ -196,8 +198,9 @@ class DonorDashboardTests(unittest.TestCase):
 
         donor_phone = f"+88017{uuid.uuid4().int % 10**9:09d}"
         cookies = {"access_token": _generate_jwt(donor_phone, "donor")}
-        with sqlite3.connect(DATABASE_PATH) as conn:
-            cursor = conn.execute(
+        with closing(sqlite3.connect(DATABASE_PATH)) as conn:
+            with conn:
+                cursor = conn.execute(
                 """INSERT INTO blood_requests (
                        blood_group, hospital_name, district, area, distance_km,
                        expires_at, contact_phone, is_emergency
@@ -231,10 +234,11 @@ class DonorDashboardTests(unittest.TestCase):
                 self.assertEqual(data["request_status"], "accepted")
                 self.assertEqual(data["notification"]["recipient"], "seeker")
         finally:
-            with sqlite3.connect(DATABASE_PATH) as conn:
-                conn.execute("DELETE FROM donor_request_responses WHERE request_id = ?", (created_req_id,))
-                conn.execute("DELETE FROM seeker_notifications WHERE request_id = ?", (created_req_id,))
-                conn.execute("DELETE FROM blood_requests WHERE id = ?", (created_req_id,))
+            with closing(sqlite3.connect(DATABASE_PATH)) as conn:
+                with conn:
+                    conn.execute("DELETE FROM donor_request_responses WHERE request_id = ?", (created_req_id,))
+                    conn.execute("DELETE FROM seeker_notifications WHERE request_id = ?", (created_req_id,))
+                    conn.execute("DELETE FROM blood_requests WHERE id = ?", (created_req_id,))
 
     def test_logout_redirects_to_login(self):
         response = self.client.get("/logout", follow_redirects=False)

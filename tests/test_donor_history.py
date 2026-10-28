@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -19,42 +20,44 @@ class DonorHistoryTests(unittest.TestCase):
         self.addCleanup(self._remove_test_history)
 
     def _remove_test_history(self):
-        with sqlite3.connect(DATABASE_PATH) as connection:
-            connection.execute(
-                "DELETE FROM donor_donation_history WHERE donor_phone IN (?, ?)",
-                (self.donor_phone, self.other_donor_phone),
-            )
-            if self.request_id is not None:
-                connection.execute("DELETE FROM blood_requests WHERE id = ?", (self.request_id,))
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            with connection:
+                connection.execute(
+                    "DELETE FROM donor_donation_history WHERE donor_phone IN (?, ?)",
+                    (self.donor_phone, self.other_donor_phone),
+                )
+                if self.request_id is not None:
+                    connection.execute("DELETE FROM blood_requests WHERE id = ?", (self.request_id,))
 
     def test_authenticated_donor_gets_only_own_history_in_reverse_chronological_order(self):
-        with sqlite3.connect(DATABASE_PATH) as connection:
-            cursor = connection.execute(
-                """INSERT INTO blood_requests (
-                       blood_group, hospital_name, district, area, distance_km,
-                       expires_at, contact_phone, is_emergency
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)""",
-                (
-                    "A+",
-                    "History Test Hospital",
-                    "Dhaka",
-                    "Dhanmondi",
-                    2.0,
-                    (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
-                    "+8801700000099",
-                ),
-            )
-            self.request_id = cursor.lastrowid
-            connection.executemany(
-                """INSERT INTO donor_donation_history
-                   (donor_phone, request_id, donated_at, donation_type, notes)
-                   VALUES (?, ?, ?, ?, ?)""",
-                [
-                    (self.donor_phone, self.request_id, "2026-01-14", "Whole Blood", "Verified"),
-                    (self.donor_phone, None, "2026-05-20", "Platelets", ""),
-                    (self.other_donor_phone, self.request_id, "2026-06-01", "Plasma", "Private"),
-                ],
-            )
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            with connection:
+                cursor = connection.execute(
+                    """INSERT INTO blood_requests (
+                           blood_group, hospital_name, district, area, distance_km,
+                           expires_at, contact_phone, is_emergency
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, 0)""",
+                    (
+                        "A+",
+                        "History Test Hospital",
+                        "Dhaka",
+                        "Dhanmondi",
+                        2.0,
+                        (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
+                        "+8801700000099",
+                    ),
+                )
+                self.request_id = cursor.lastrowid
+                connection.executemany(
+                    """INSERT INTO donor_donation_history
+                       (donor_phone, request_id, donated_at, donation_type, notes)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    [
+                        (self.donor_phone, self.request_id, "2026-01-14", "Whole Blood", "Verified"),
+                        (self.donor_phone, None, "2026-05-20", "Platelets", ""),
+                        (self.other_donor_phone, self.request_id, "2026-06-01", "Plasma", "Private"),
+                    ],
+                )
 
         response = self.client.get(
             "/api/v1/donor/donations",
