@@ -4,7 +4,7 @@ import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import DATABASE_PATH, app, _generate_jwt
 

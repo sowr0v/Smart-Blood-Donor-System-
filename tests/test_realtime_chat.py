@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 from starlette.websockets import WebSocketDisconnect
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import DATABASE_PATH, app, _generate_jwt
 

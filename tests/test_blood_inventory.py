@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import (
     AUTH_DATABASE_PATH,

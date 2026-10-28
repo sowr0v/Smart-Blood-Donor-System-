@@ -86,6 +86,10 @@ Password recovery uses the SQLite database at `auth.db` by default; set `SBDS_AU
 
 Passwords are stored as PBKDF2 hashes. New passwords must have at least 12 characters, with uppercase and lowercase letters, a number, and a symbol. A successful reset updates `auth_users` and deletes every persisted session for that account. The existing registration page is still a UI-only stub; an account-registration/authentication provider must provision `auth_users` with an E.164 Bangladesh phone number and a password hash before login or recovery is available.
 
+### Personal Account Information and Phone Updates
+
+Donor and seeker Settings & Privacy pages read and update personal account information through authenticated `GET` and `PUT /api/v1/account/profile` endpoints. Profile updates validate name, email, district, area, and address and synchronize donor profile fields when applicable. Phone numbers are not editable through profile or seeker preference updates. To change one, an authenticated account requests an SMS code with `POST /api/v1/account/phone-update/request` and submits it to `POST /api/v1/account/phone-update/verify`. Codes are hashed in the auth database, expire after 10 minutes, permit at most five attempts, and can be requested once per minute. A successful verification updates the account and associated profile/settings phone keys, then refreshes the access-token cookie. SMS delivery requires the Twilio credentials described above; duplicate numbers, invalid numbers, expired codes, and gateway errors are rejected without changing the registered phone.
+
 ### Emergency Blood Requests
 
 Seekers can create emergency requests from the seeker dashboard. Required blood group, patient, facility, location, unit count, urgency, and contact details are validated and saved in `urgent_requests.db`; new fields are migrated in place for existing databases. Requests remain active and visible in the seeker's request list for status tracking. The emergency endpoint requires a seeker session.

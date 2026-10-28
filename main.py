@@ -842,6 +842,20 @@ def initialize_auth_database():
                     threshold INTEGER NOT NULL CHECK (threshold >= 0 AND threshold <= 50),
                     updated_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS account_phone_update_challenges (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+                    current_phone TEXT NOT NULL,
+                    target_phone TEXT NOT NULL,
+                    otp_hash TEXT NOT NULL,
+                    otp_salt TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    consumed_at INTEGER
+                );
+                CREATE INDEX IF NOT EXISTS idx_account_phone_update_user
+                    ON account_phone_update_challenges(user_id, created_at DESC);
                 """
             )
             connection.executemany(
@@ -879,6 +893,14 @@ def initialize_auth_database():
                 connection.execute("ALTER TABLE auth_users ADD COLUMN manager_name TEXT DEFAULT ''")
             if "address" not in auth_user_columns:
                 connection.execute("ALTER TABLE auth_users ADD COLUMN address TEXT DEFAULT ''")
+            if "email" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN email TEXT DEFAULT ''")
+            if "district" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN district TEXT DEFAULT ''")
+            if "area" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN area TEXT DEFAULT ''")
+            if "status" not in auth_user_columns:
+                connection.execute("ALTER TABLE auth_users ADD COLUMN status TEXT DEFAULT 'active'")
 
 
 def _connection():
@@ -1306,6 +1328,339 @@ def _get_current_user(request: Request) -> dict | None:
                     "name": session["name"] if "name" in session.keys() else "User",
                 }
     return None
+
+
+class AccountProfileUpdatePayload(BaseModel):
+    name: str = Field(..., min_length=2, max_length=80)
+    email: str = Field(default="", max_length=254)
+    district: str = Field(..., min_length=2, max_length=80)
+    area: str = Field(default="", max_length=80)
+    address: str = Field(..., min_length=3, max_length=240)
+
+
+class AccountPhoneUpdateRequest(BaseModel):
+    phone: str = Field(..., min_length=9, max_length=24)
+
+
+class AccountPhoneUpdateVerification(BaseModel):
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+def _require_account_database_user(request: Request) -> dict:
+    user = _get_current_user(request)
+    if not user or not user.get("phone"):
+        raise HTTPException(status_code=401, detail="Sign in to manage your account information.")
+
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT id, phone, role, name, email, district, area, address, status
+               FROM auth_users WHERE phone = ?""",
+            (user["phone"],),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=401, detail="Sign in to manage your account information.")
+    if str(row["status"] or "active").lower() != "active":
+        raise HTTPException(status_code=403, detail="This account is not active.")
+    return {key: row[key] for key in row.keys()}
+
+
+def _account_phone_is_registered(connection: sqlite3.Connection, phone: str) -> bool:
+    return connection.execute(
+        """SELECT 1 FROM auth_users WHERE phone = ?
+           UNION SELECT 1 FROM donor_profiles WHERE phone = ?
+           UNION SELECT 1 FROM donor_privacy_settings WHERE phone = ?
+           UNION SELECT 1 FROM donor_settings WHERE phone = ?
+           UNION SELECT 1 FROM donor_location_settings WHERE phone = ?
+           UNION SELECT 1 FROM facility_settings WHERE phone = ?
+           LIMIT 1""",
+        (phone, phone, phone, phone, phone, phone),
+    ).fetchone() is not None
+
+
+@app.get("/api/v1/account/profile")
+async def get_account_profile(request: Request) -> dict[str, Any]:
+    account = _require_account_database_user(request)
+    profile: dict[str, Any] = {
+        "name": account["name"] or "",
+        "phone": account["phone"],
+        "email": account["email"] or "",
+        "district": account["district"] or "",
+        "area": account["area"] or "",
+        "address": account["address"] or "",
+    }
+    if account["role"] == "donor":
+        with closing(_connection()) as connection:
+            row = connection.execute(
+                """SELECT email, district, area, address
+                   FROM donor_profiles WHERE phone = ?""",
+                (account["phone"],),
+            ).fetchone()
+        if row:
+            profile.update(
+                {
+                    "email": row["email"] or "",
+                    "district": row["district"] or "",
+                    "area": row["area"] or "",
+                    "address": row["address"] or "",
+                }
+            )
+    return {"status": "success", "profile": profile}
+
+
+@app.put("/api/v1/account/profile")
+async def update_account_profile(
+    payload: AccountProfileUpdatePayload,
+    request: Request,
+) -> dict[str, Any]:
+    account = _require_account_database_user(request)
+    name = payload.name.strip()
+    email = payload.email.strip()
+    district = payload.district.strip()
+    area = payload.area.strip()
+    address = payload.address.strip()
+    if not name or not re.fullmatch(r"[^\W\d_][\w .'-]{1,79}", name, re.UNICODE):
+        raise HTTPException(status_code=422, detail="Enter a valid name.")
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=422, detail="Enter a valid email address.")
+    if not district or not address:
+        raise HTTPException(status_code=422, detail="District and address are required.")
+
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """UPDATE auth_users
+                   SET name = ?, email = ?, district = ?, area = ?, address = ?, updated_at = ?
+                   WHERE id = ?""",
+                (name, email, district, area, address, now, account["id"]),
+            )
+            if account["role"] == "donor":
+                connection.execute(
+                    """UPDATE donor_profiles
+                       SET name = ?, email = ?, district = ?, area = ?, address = ?,
+                           updated_at = ?
+                       WHERE phone = ?""",
+                    (
+                        name,
+                        email,
+                        district,
+                        area,
+                        address,
+                        now,
+                        account["phone"],
+                    ),
+                )
+    if account["phone"] in USERS:
+        USERS[account["phone"]].update(
+            {"name": name, "email": email, "district": district, "address": address}
+        )
+    return {
+        "status": "success",
+        "message": "Personal information updated successfully.",
+        "profile": {
+            "name": name,
+            "phone": account["phone"],
+            "email": email,
+            "district": district,
+            "area": area,
+            "address": address,
+        },
+    }
+
+
+@app.post("/api/v1/account/phone-update/request", status_code=202)
+async def request_account_phone_update(
+    payload: AccountPhoneUpdateRequest,
+    request: Request,
+) -> dict[str, str]:
+    account = _require_account_database_user(request)
+    target_phone = normalize_phone(payload.phone)
+    if target_phone == account["phone"]:
+        raise HTTPException(status_code=422, detail="Enter a different phone number.")
+    if not sms_is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Phone verification is temporarily unavailable.",
+        )
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        connection.row_factory = sqlite3.Row
+        with connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if _account_phone_is_registered(connection, target_phone) or target_phone in USERS:
+                raise HTTPException(
+                    status_code=409,
+                    detail="That phone number is already registered.",
+                )
+            recent = connection.execute(
+                """SELECT created_at FROM account_phone_update_challenges
+                   WHERE user_id = ? ORDER BY created_at DESC LIMIT 1""",
+                (account["id"],),
+            ).fetchone()
+            if recent and now - recent["created_at"] < OTP_RESEND_SECONDS:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Wait before requesting another verification code.",
+                )
+            code = f"{secrets.randbelow(1_000_000):06d}"
+            salt = secrets.token_bytes(16)
+            otp_hash = hashlib.pbkdf2_hmac(
+                "sha256", code.encode("ascii"), salt, OTP_HASH_ITERATIONS
+            ).hex()
+            connection.execute(
+                """DELETE FROM account_phone_update_challenges
+                   WHERE user_id = ?""",
+                (account["id"],),
+            )
+            cursor = connection.execute(
+                """INSERT INTO account_phone_update_challenges (
+                       user_id, current_phone, target_phone, otp_hash, otp_salt,
+                       created_at, expires_at, attempts, consumed_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL)""",
+                (
+                    account["id"],
+                    account["phone"],
+                    target_phone,
+                    otp_hash,
+                    salt.hex(),
+                    now,
+                    now + OTP_TTL_SECONDS,
+                ),
+            )
+            challenge_id = cursor.lastrowid
+
+    try:
+        send_sms_message(
+            target_phone,
+            f"Your Smart Blood Donor System phone verification code is {code}. "
+            "It expires in 10 minutes.",
+        )
+    except (OSError, urllib.error.URLError, TimeoutError) as exc:
+        logger.exception("Account phone verification SMS delivery failed")
+        with closing(_connection()) as connection:
+            with connection:
+                connection.execute(
+                    """UPDATE account_phone_update_challenges
+                       SET expires_at = ? WHERE id = ?""",
+                    (now, challenge_id),
+                )
+        raise HTTPException(
+            status_code=503,
+            detail="Could not deliver the verification code. Please try again later.",
+        ) from exc
+    return {
+        "status": "success",
+        "message": "A verification code was sent to the new phone number.",
+    }
+
+
+@app.post("/api/v1/account/phone-update/verify")
+async def verify_account_phone_update(
+    payload: AccountPhoneUpdateVerification,
+    request: Request,
+    response: Response,
+) -> dict[str, str]:
+    account = _require_account_database_user(request)
+    if not re.fullmatch(r"\d{6}", payload.code):
+        raise HTTPException(status_code=400, detail="The code is invalid or expired.")
+
+    now = int(time.time())
+    with closing(_connection()) as connection:
+        connection.row_factory = sqlite3.Row
+        connection.execute("BEGIN IMMEDIATE")
+        challenge = connection.execute(
+            """SELECT id, target_phone, otp_hash, otp_salt, expires_at, attempts
+               FROM account_phone_update_challenges
+               WHERE user_id = ? AND current_phone = ? AND consumed_at IS NULL
+               ORDER BY created_at DESC LIMIT 1""",
+            (account["id"], account["phone"]),
+        ).fetchone()
+        if (
+            not challenge
+            or challenge["expires_at"] <= now
+            or challenge["attempts"] >= OTP_MAX_ATTEMPTS
+        ):
+            raise HTTPException(status_code=400, detail="The code is invalid or expired.")
+
+        actual_hash = hashlib.pbkdf2_hmac(
+            "sha256",
+            payload.code.encode("ascii"),
+            bytes.fromhex(challenge["otp_salt"]),
+            OTP_HASH_ITERATIONS,
+        ).hex()
+        if not hmac.compare_digest(actual_hash, challenge["otp_hash"]):
+            connection.execute(
+                """UPDATE account_phone_update_challenges
+                   SET attempts = attempts + 1 WHERE id = ?""",
+                (challenge["id"],),
+            )
+            connection.commit()
+            raise HTTPException(status_code=400, detail="The code is invalid or expired.")
+
+        new_phone = challenge["target_phone"]
+        if _account_phone_is_registered(connection, new_phone) or new_phone in USERS:
+            raise HTTPException(
+                status_code=409,
+                detail="That phone number is already registered.",
+            )
+        result = connection.execute(
+            """UPDATE auth_users
+               SET phone = ?, updated_at = ? WHERE id = ? AND phone = ?""",
+            (new_phone, now, account["id"], account["phone"]),
+        )
+        if result.rowcount != 1:
+            raise HTTPException(status_code=409, detail="The account phone has changed. Sign in again.")
+        for table in (
+            "donor_profiles",
+            "donor_privacy_settings",
+            "donor_settings",
+            "donor_location_settings",
+            "facility_settings",
+        ):
+            connection.execute(
+                f"UPDATE {table} SET phone = ? WHERE phone = ?",
+                (new_phone, account["phone"]),
+            )
+        connection.execute(
+            """UPDATE account_phone_update_challenges
+               SET consumed_at = ? WHERE id = ?""",
+            (now, challenge["id"]),
+        )
+        connection.execute(
+            "DELETE FROM password_reset_challenges WHERE user_id = ?",
+            (account["id"],),
+        )
+        connection.commit()
+
+    old_phone = account["phone"]
+    old_user = USERS.pop(old_phone, {})
+    USERS[new_phone] = {
+        **old_user,
+        "phone": new_phone,
+        "name": account["name"] or old_user.get("name", "User"),
+        "role": account["role"],
+        "email": account["email"] or "",
+    }
+    if old_phone in SEEKER_SETTINGS:
+        seeker_settings = SEEKER_SETTINGS.pop(old_phone)
+        seeker_settings["phone"] = new_phone
+        SEEKER_SETTINGS[new_phone] = seeker_settings
+
+    response.set_cookie(
+        key="access_token",
+        value=_generate_jwt(new_phone, account["role"]),
+        httponly=True,
+        secure=request.url.scheme == "https",
+        samesite="lax",
+        max_age=TOKEN_TTL_SECONDS,
+        expires=now + TOKEN_TTL_SECONDS,
+        path="/",
+    )
+    return {
+        "status": "success",
+        "message": "Phone number updated and verified successfully.",
+        "phone": new_phone,
+    }
 
 
 @app.get("/api/v1/auth/status")
@@ -4085,8 +4440,6 @@ class SeekerContactLogPayload(BaseModel):
 
 
 class SeekerSettingsPayload(BaseModel):
-    full_name: str
-    phone: str
     default_hospital: str = "Square Hospital"
     sms_alerts: bool = True
     push_alerts: bool = True
@@ -5319,51 +5672,35 @@ async def mark_seeker_chat_read(thread_id: str):
 
 @app.get("/api/v1/seeker/settings")
 async def get_seeker_settings(request: Request):
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    phone = token.get("sub") if token and token.get("role") == "seeker" else "+8801723456789"
-    user = _get_user_by_phone(phone) or USERS.get(phone)
-    default_name = (user.get("name") if user else None) or "Nabil Hasan"
-    settings = SEEKER_SETTINGS.get(phone, {
-        "full_name": default_name,
-        "phone": phone,
+    account = _require_account_database_user(request)
+    if account["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Seeker access is required.")
+    settings = SEEKER_SETTINGS.get(account["phone"], {
         "default_hospital": "Square Hospital, Dhaka",
         "sms_alerts": True,
         "push_alerts": True,
         "audio_siren": True,
         "default_radius": "10",
     })
-    return {"status": "success", "settings": settings}
+    return {
+        "status": "success",
+        "settings": {**settings, "full_name": account["name"], "phone": account["phone"]},
+    }
 
 
 @app.post("/api/v1/seeker/settings")
 async def save_seeker_settings(payload: SeekerSettingsPayload, request: Request):
-    phone = payload.phone.strip()
-    full_name = payload.full_name.strip()
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    token_phone = token.get("sub") if token and token.get("role") == "seeker" else phone
-
-    SEEKER_SETTINGS[phone] = payload.model_dump()
-    if token_phone and token_phone != phone:
-        SEEKER_SETTINGS[token_phone] = payload.model_dump()
-
-    # Update in-memory USERS cache
-    for p in (phone, token_phone):
-        if p in USERS:
-            USERS[p]["name"] = full_name
-        else:
-            USERS[p] = {"name": full_name, "role": "seeker", "phone": p}
-
-    # Persist updated name to auth.db
-    try:
-        with closing(_connection()) as connection:
-            with connection:
-                connection.execute("UPDATE auth_users SET name = ? WHERE phone = ?", (full_name, phone))
-                if token_phone and token_phone != phone:
-                    connection.execute("UPDATE auth_users SET name = ? WHERE phone = ?", (full_name, token_phone))
-    except Exception as exc:
-        logger.warning(f"Could not persist seeker name to auth_users: {exc}")
-
-    return {"status": "success", "message": "Settings saved successfully", "settings": SEEKER_SETTINGS[phone]}
+    account = _require_account_database_user(request)
+    if account["role"] != "seeker":
+        raise HTTPException(status_code=403, detail="Seeker access is required.")
+    phone = account["phone"]
+    settings = payload.model_dump()
+    SEEKER_SETTINGS[phone] = settings
+    return {
+        "status": "success",
+        "message": "Settings saved successfully",
+        "settings": {**settings, "full_name": account["name"], "phone": phone},
+    }
 
 
 @app.delete("/api/v1/seeker/account")

@@ -2,7 +2,7 @@ import unittest
 import sqlite3
 from contextlib import closing
 from datetime import datetime, timezone
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import app, _generate_jwt
 from admin_portal import (
@@ -332,4 +332,3 @@ class AdminBloodRequestModerationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
