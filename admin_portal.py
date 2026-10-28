@@ -1086,6 +1086,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             approved_cnt = u_conn.execute("SELECT COUNT(*) FROM donor_kyc_verifications WHERE status = 'approved'").fetchone()[0]
             rejected_cnt = u_conn.execute("SELECT COUNT(*) FROM donor_kyc_verifications WHERE status = 'rejected'").fetchone()[0]
 
+            records = [dict(r) for r in rows]
             return {
                 "status": "success",
                 "counts": {
@@ -1094,7 +1095,11 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                     "rejected": rejected_cnt,
                     "total": pending_cnt + approved_cnt + rejected_cnt,
                 },
-                "queue": [dict(r) for r in rows],
+                "pending_count": pending_cnt,
+                "approved_count": approved_cnt,
+                "rejected_count": rejected_cnt,
+                "queue": records,
+                "kyc_requests": records,
             }
 
     @app.get("/api/v1/admin/kyc/{item_id}")
@@ -1105,7 +1110,8 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             row = u_conn.execute("SELECT * FROM donor_kyc_verifications WHERE id = ?", (item_id,)).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="KYC verification record not found")
-            return {"status": "success", "record": dict(row)}
+            rec = dict(row)
+            return {"status": "success", "record": rec, "kyc": rec}
 
     @app.post("/api/v1/admin/kyc/{item_id}/review")
     async def review_donor_kyc(item_id: int, payload: KycReviewPayload, request: Request):

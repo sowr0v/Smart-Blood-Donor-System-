@@ -274,6 +274,47 @@
 
       <!-- 3. Donor KYC Approval Queue (SBDS-41) -->
       <section class="admin-section" id="section-kyc">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Donor Verification &amp; KYC Approval Queue</h1>
+            <p class="section-subtext">Review submitted National IDs, Passport records, and blood certificates to award the Verified Donor badge.</p>
+          </div>
+          <div class="kyc-stats-badges">
+            <span class="badge badge-warning" id="kycPendingCountBadge">0 Pending Review</span>
+            <span class="badge badge-success" id="kycApprovedCountBadge">0 Approved</span>
+          </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="tabs-clean">
+          <button type="button" class="tab-clean active" onclick="loadKycQueue('pending', this)">Pending Review</button>
+          <button type="button" class="tab-clean" onclick="loadKycQueue('approved', this)">Approved Donors</button>
+          <button type="button" class="tab-clean" onclick="loadKycQueue('rejected', this)">Rejected Documents</button>
+          <button type="button" class="tab-clean" onclick="loadKycQueue('all', this)">All Submissions</button>
+        </div>
+
+        <!-- KYC Cards / Table -->
+        <div class="admin-card mt-3">
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Donor Name</th>
+                  <th>Phone Number</th>
+                  <th>Blood Group</th>
+                  <th>NID / Doc Number</th>
+                  <th>Document Type</th>
+                  <th>Submission Date</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="kycTableBody">
+                <!-- Dynamically populated via loadKycQueue -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- 4. Requests Moderation & Duplicate Detection (SBDS-42) -->
@@ -469,7 +510,7 @@
   <div class="admin-modal" id="kycReviewModal" aria-hidden="true">
     <div class="admin-modal-dialog modal-lg">
       <div class="modal-header">
-        <h3 class="modal-title">Donor KYC Verification Review</h3>
+        <h3 class="modal-title" id="kycModalTitle">Donor KYC Verification Review</h3>
         <button type="button" class="btn-close" onclick="closeKycReviewModal()">✕</button>
       </div>
       <div class="modal-body">
@@ -477,7 +518,7 @@
         <div class="kyc-review-grid">
           <div class="kyc-doc-preview-panel">
             <h4>Uploaded Document Preview</h4>
-            <div class="doc-preview-box" id="kycDocPreviewBox">
+            <div class="doc-preview-box" id="kycDocPreview">
               <div class="doc-placeholder-icon">📄</div>
               <span id="kycDocTypeLabel">National ID (NID)</span>
             </div>
@@ -485,11 +526,12 @@
           <div class="kyc-meta-panel">
             <h4>Donor Information</h4>
             <table class="kyc-meta-table">
-              <tr><td><strong>Donor Name:</strong></td><td id="kycDonorNameVal">Tanvir Ahmed</td></tr>
-              <tr><td><strong>Phone Number:</strong></td><td id="kycDonorPhoneVal">+8801735070125</td></tr>
-              <tr><td><strong>Blood Group:</strong></td><td><span class="badge badge-primary" id="kycBloodGroupVal">O+</span></td></tr>
-              <tr><td><strong>ID Number:</strong></td><td id="kycNidVal">19942691234567891</td></tr>
-              <tr><td><strong>Submission Date:</strong></td><td id="kycSubmittedAtVal">2 hours ago</td></tr>
+              <tr><td><strong>Donor Name:</strong></td><td id="kycDonorName">Tanvir Ahmed</td></tr>
+              <tr><td><strong>Phone Number:</strong></td><td id="kycDonorPhone">+8801735070125</td></tr>
+              <tr><td><strong>Blood Group:</strong></td><td><span class="badge badge-primary" id="kycBloodGroup">O+</span></td></tr>
+              <tr><td><strong>Document Type:</strong></td><td id="kycDocType">National ID (NID)</td></tr>
+              <tr><td><strong>ID Number:</strong></td><td id="kycNidNumber">19942691234567891</td></tr>
+              <tr><td><strong>Submission Date:</strong></td><td id="kycSubmissionDate">2 hours ago</td></tr>
             </table>
 
             <div class="form-group mt-3">
