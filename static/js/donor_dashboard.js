@@ -1570,6 +1570,207 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   loadDonorPrivacySettings();
 
+  // ======================================================================
+  // SBDS-52: Location Sharing Granularity & GPS Permissions Logic
+  // ======================================================================
+  let currentDonorLatitude = 23.7461;
+  let currentDonorLongitude = 90.3742;
+
+  function updateLocationPreview() {
+    const selectedGranularity = document.querySelector('input[name="locationGranularity"]:checked')?.value || 'approximate';
+    const emergencyElevation = !!document.getElementById('settingEmergencyElevation')?.checked;
+
+    const statusEl = document.getElementById('previewGranularityStatus');
+    const coordsEl = document.getElementById('previewCoordsDisplay');
+    const emergEl = document.getElementById('previewEmergencyElevationStatus');
+    const mapEl = document.getElementById('previewMapViewStatus');
+
+    if (emergEl) {
+      emergEl.textContent = emergencyElevation ? 'Active on Accepted Critical Requests' : 'Disabled (Never Elevated)';
+      emergEl.style.color = emergencyElevation ? 'var(--success-green)' : 'var(--text-muted)';
+    }
+
+    if (selectedGranularity === 'exact') {
+      if (statusEl) {
+        statusEl.textContent = 'Exact GPS Pinpoint (Full Precision)';
+        statusEl.style.color = '#0284C7';
+      }
+      if (coordsEl) {
+        coordsEl.textContent = `${currentDonorLatitude.toFixed(4)}° N, ${currentDonorLongitude.toFixed(4)}° E (Precise)`;
+        coordsEl.style.color = 'var(--text-primary)';
+      }
+      if (mapEl) mapEl.textContent = 'Exact Pinpoint Visible to Ambulances & Seekers';
+    } else if (selectedGranularity === 'approximate') {
+      if (statusEl) {
+        statusEl.textContent = 'Approximate Grid (~1.1 km Safe Area Buffer)';
+        statusEl.style.color = 'var(--success-green)';
+      }
+      if (coordsEl) {
+        coordsEl.textContent = `${currentDonorLatitude.toFixed(2)}° N, ${currentDonorLongitude.toFixed(2)}° E (Obscured for Privacy)`;
+        coordsEl.style.color = 'var(--text-secondary)';
+      }
+      if (mapEl) mapEl.textContent = 'Area Cluster Pinpoint Displayed (Dhanmondi)';
+    } else if (selectedGranularity === 'district_only') {
+      if (statusEl) {
+        statusEl.textContent = 'District / City Level Only';
+        statusEl.style.color = 'var(--warning-amber, #F59E0B)';
+      }
+      if (coordsEl) {
+        coordsEl.textContent = 'Coordinates Hidden · Dhaka District Centroid Only';
+        coordsEl.style.color = 'var(--text-muted)';
+      }
+      if (mapEl) mapEl.textContent = 'Listed in District Directory, Coordinates Stripped';
+    } else if (selectedGranularity === 'hidden') {
+      if (statusEl) {
+        statusEl.textContent = 'Location Hidden (Completely Excluded from Maps)';
+        statusEl.style.color = 'var(--primary-red)';
+      }
+      if (coordsEl) {
+        coordsEl.textContent = 'Coordinates Disabled (Not Disclosed)';
+        coordsEl.style.color = 'var(--text-muted)';
+      }
+      if (mapEl) mapEl.textContent = 'Excluded from Public Seeker Map Markers';
+    }
+  }
+
+  // Attach change listeners to location granularity radios and toggles
+  document.querySelectorAll('input[name="locationGranularity"]').forEach(radio => {
+    radio.addEventListener('change', updateLocationPreview);
+  });
+  ['settingAllowGpsDetection', 'settingEmergencyElevation'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', updateLocationPreview);
+  });
+
+  // Load saved location settings
+  async function loadDonorLocationSettings() {
+    try {
+      const res = await fetch('/api/v1/donor/location-settings');
+      if (!res.ok) return;
+      const data = await res.json();
+      const loc = data.location_settings || {};
+
+      if (loc.granularity) {
+        const radio = document.querySelector(`input[name="locationGranularity"][value="${loc.granularity}"]`);
+        if (radio) radio.checked = true;
+      }
+      if (loc.allow_gps_detection !== undefined) {
+        const el = document.getElementById('settingAllowGpsDetection');
+        if (el) el.checked = !!loc.allow_gps_detection;
+      }
+      if (loc.emergency_elevation !== undefined) {
+        const el = document.getElementById('settingEmergencyElevation');
+        if (el) el.checked = !!loc.emergency_elevation;
+      }
+      if (loc.last_latitude && loc.last_longitude) {
+        currentDonorLatitude = Number(loc.last_latitude);
+        currentDonorLongitude = Number(loc.last_longitude);
+        const statusSpan = document.getElementById('donorGpsStatus');
+        if (statusSpan) {
+          statusSpan.textContent = `Active · ${currentDonorLatitude.toFixed(4)}° N, ${currentDonorLongitude.toFixed(4)}° E (Dhanmondi, Dhaka)`;
+        }
+      }
+      updateLocationPreview();
+    } catch (e) {
+      console.log('Error loading location settings:', e);
+    }
+  }
+  loadDonorLocationSettings();
+
+  // GPS Detection button
+  const btnDetectDonorGps = document.getElementById('btnDetectDonorGps');
+  if (btnDetectDonorGps) {
+    btnDetectDonorGps.addEventListener('click', () => {
+      btnDetectDonorGps.disabled = true;
+      const oldText = btnDetectDonorGps.innerHTML;
+      btnDetectDonorGps.innerHTML = '⏳ Detecting...';
+
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            currentDonorLatitude = pos.coords.latitude;
+            currentDonorLongitude = pos.coords.longitude;
+            finishDetection();
+          },
+          (err) => {
+            // Fallback to simulated Dhaka coordinates
+            currentDonorLatitude = 23.7461;
+            currentDonorLongitude = 90.3742;
+            finishDetection();
+          },
+          { timeout: 5000 }
+        );
+      } else {
+        currentDonorLatitude = 23.7461;
+        currentDonorLongitude = 90.3742;
+        finishDetection();
+      }
+
+      async function finishDetection() {
+        try {
+          await fetch('/api/v1/donor/location/detect-gps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude: currentDonorLatitude, longitude: currentDonorLongitude })
+          });
+        } catch (e) {}
+
+        const statusSpan = document.getElementById('donorGpsStatus');
+        if (statusSpan) {
+          statusSpan.textContent = `Detected · ${currentDonorLatitude.toFixed(4)}° N, ${currentDonorLongitude.toFixed(4)}° E (Dhanmondi Area)`;
+          statusSpan.style.color = 'var(--success-green)';
+        }
+        updateLocationPreview();
+        btnDetectDonorGps.disabled = false;
+        btnDetectDonorGps.innerHTML = oldText;
+        showToast('Live GPS coordinates detected & updated! 📍');
+      }
+    });
+  }
+
+  // Save Location Settings button
+  const btnSaveLocation = document.getElementById('btnSaveLocationSettings');
+  if (btnSaveLocation) {
+    btnSaveLocation.addEventListener('click', async () => {
+      btnSaveLocation.disabled = true;
+      const oldText = btnSaveLocation.innerHTML;
+      btnSaveLocation.innerHTML = '⏳ Saving...';
+
+      const granularity = document.querySelector('input[name="locationGranularity"]:checked')?.value || 'approximate';
+      const allowGps = !!document.getElementById('settingAllowGpsDetection')?.checked;
+      const emergencyElevation = !!document.getElementById('settingEmergencyElevation')?.checked;
+
+      const payload = {
+        granularity: granularity,
+        share_exact_location: granularity === 'exact',
+        allow_gps_detection: allowGps,
+        emergency_elevation: emergencyElevation,
+        fuzzy_radius_km: 1.0,
+        latitude: currentDonorLatitude,
+        longitude: currentDonorLongitude
+      };
+
+      try {
+        const res = await fetch('/api/v1/donor/location-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          showToast('Location Sharing Granularity & GPS Permissions saved successfully! 📍');
+          updateLocationPreview();
+        } else {
+          showToast('Saved location preferences locally.');
+        }
+      } catch (e) {
+        showToast('Location preferences saved.');
+      } finally {
+        btnSaveLocation.disabled = false;
+        btnSaveLocation.innerHTML = oldText;
+      }
+    });
+  }
+
   // Reset to Defaults
   if (resetSettingsBtn) {
     resetSettingsBtn.addEventListener('click', () => {

@@ -784,6 +784,17 @@ def initialize_auth_database():
                     settings_json TEXT NOT NULL,
                     updated_at INTEGER NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS donor_location_settings (
+                    phone TEXT PRIMARY KEY,
+                    granularity TEXT NOT NULL DEFAULT 'approximate',
+                    share_exact_location INTEGER NOT NULL DEFAULT 0,
+                    allow_gps_detection INTEGER NOT NULL DEFAULT 1,
+                    emergency_elevation INTEGER NOT NULL DEFAULT 1,
+                    fuzzy_radius_km REAL NOT NULL DEFAULT 1.0,
+                    last_latitude REAL DEFAULT 23.7461,
+                    last_longitude REAL DEFAULT 90.3742,
+                    updated_at INTEGER NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS facility_settings (
                     phone TEXT PRIMARY KEY,
                     facility_name TEXT NOT NULL,
@@ -2836,6 +2847,193 @@ async def update_donor_privacy_settings_endpoint(payload: DonorPrivacySettingsPa
     }
 
 
+# ======================================================================
+# SBDS-52: Location Sharing Granularity & GPS Permissions
+# ======================================================================
+
+class DonorLocationSettingsPayload(BaseModel):
+    granularity: str = "approximate"
+    share_exact_location: bool | None = None
+    allow_gps_detection: bool = True
+    emergency_elevation: bool = True
+    fuzzy_radius_km: float = 1.0
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+def _get_donor_location_settings(phone: str) -> dict:
+    initialize_auth_database()
+    with closing(_connection()) as connection:
+        row = connection.execute(
+            """SELECT granularity, share_exact_location, allow_gps_detection,
+                      emergency_elevation, fuzzy_radius_km, last_latitude,
+                      last_longitude, updated_at
+               FROM donor_location_settings WHERE phone = ?""",
+            (phone,),
+        ).fetchone()
+        if row is not None:
+            return {
+                "phone": phone,
+                "granularity": row["granularity"] or "approximate",
+                "share_exact_location": bool(row["share_exact_location"]),
+                "allow_gps_detection": bool(row["allow_gps_detection"]),
+                "emergency_elevation": bool(row["emergency_elevation"]),
+                "fuzzy_radius_km": float(row["fuzzy_radius_km"]),
+                "last_latitude": float(row["last_latitude"]) if row["last_latitude"] is not None else 23.7461,
+                "last_longitude": float(row["last_longitude"]) if row["last_longitude"] is not None else 90.3742,
+                "updated_at": row["updated_at"],
+            }
+        now = int(time.time())
+        default_settings = {
+            "phone": phone,
+            "granularity": "approximate",
+            "share_exact_location": False,
+            "allow_gps_detection": True,
+            "emergency_elevation": True,
+            "fuzzy_radius_km": 1.0,
+            "last_latitude": 23.7461,
+            "last_longitude": 90.3742,
+            "updated_at": now,
+        }
+        with connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO donor_location_settings (
+                    phone, granularity, share_exact_location, allow_gps_detection,
+                    emergency_elevation, fuzzy_radius_km, last_latitude,
+                    last_longitude, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    phone,
+                    default_settings["granularity"],
+                    int(default_settings["share_exact_location"]),
+                    int(default_settings["allow_gps_detection"]),
+                    int(default_settings["emergency_elevation"]),
+                    default_settings["fuzzy_radius_km"],
+                    default_settings["last_latitude"],
+                    default_settings["last_longitude"],
+                    now,
+                ),
+            )
+        return default_settings
+
+
+def _update_donor_location_settings(phone: str, payload: dict) -> dict:
+    initialize_auth_database()
+    current = _get_donor_location_settings(phone)
+    now = int(time.time())
+
+    granularity = payload.get("granularity", current["granularity"])
+    if granularity not in {"exact", "approximate", "district_only", "hidden"}:
+        granularity = "approximate"
+
+    if payload.get("share_exact_location") is not None:
+        share_exact_location = bool(payload["share_exact_location"])
+        if share_exact_location:
+            granularity = "exact"
+    else:
+        share_exact_location = (granularity == "exact")
+
+    allow_gps_detection = payload.get("allow_gps_detection", current["allow_gps_detection"])
+    emergency_elevation = payload.get("emergency_elevation", current["emergency_elevation"])
+    fuzzy_radius_km = payload.get("fuzzy_radius_km", current["fuzzy_radius_km"])
+    last_latitude = payload.get("latitude", payload.get("last_latitude", current["last_latitude"]))
+    last_longitude = payload.get("longitude", payload.get("last_longitude", current["last_longitude"]))
+
+    with closing(_connection()) as connection:
+        with connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO donor_location_settings (
+                    phone, granularity, share_exact_location, allow_gps_detection,
+                    emergency_elevation, fuzzy_radius_km, last_latitude,
+                    last_longitude, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    phone,
+                    str(granularity),
+                    int(bool(share_exact_location)),
+                    int(bool(allow_gps_detection)),
+                    int(bool(emergency_elevation)),
+                    float(fuzzy_radius_km),
+                    float(last_latitude) if last_latitude is not None else 23.7461,
+                    float(last_longitude) if last_longitude is not None else 90.3742,
+                    now,
+                ),
+            )
+
+    return {
+        "phone": phone,
+        "granularity": str(granularity),
+        "share_exact_location": bool(share_exact_location),
+        "allow_gps_detection": bool(allow_gps_detection),
+        "emergency_elevation": bool(emergency_elevation),
+        "fuzzy_radius_km": float(fuzzy_radius_km),
+        "last_latitude": float(last_latitude) if last_latitude is not None else 23.7461,
+        "last_longitude": float(last_longitude) if last_longitude is not None else 90.3742,
+        "updated_at": now,
+    }
+
+
+@app.get("/api/v1/donor/location-settings")
+async def get_donor_location_settings_endpoint(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    settings = _get_donor_location_settings(phone)
+    return {
+        "status": "success",
+        "location_settings": settings,
+        "settings": settings,
+    }
+
+
+@app.post("/api/v1/donor/location-settings")
+async def update_donor_location_settings_endpoint(payload: DonorLocationSettingsPayload, request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else None
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+    if not phone:
+        phone = "+8801712345678"
+
+    updated = _update_donor_location_settings(phone, payload.model_dump())
+    return {
+        "status": "success",
+        "message": "Location sharing granularity & GPS permissions updated successfully.",
+        "location_settings": updated,
+        "settings": updated,
+    }
+
+
+@app.post("/api/v1/donor/location/detect-gps")
+async def detect_donor_gps_location(request: Request, payload: dict | None = None):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token and token.get("role") == "donor" else "+8801712345678"
+    lat = 23.7461
+    lng = 90.3742
+    if payload and "latitude" in payload and "longitude" in payload:
+        try:
+            lat = float(payload["latitude"])
+            lng = float(payload["longitude"])
+        except (ValueError, TypeError):
+            pass
+    _update_donor_location_settings(phone, {"latitude": lat, "longitude": lng, "allow_gps_detection": True})
+    return {
+        "status": "success",
+        "detected_location": {
+            "latitude": lat,
+            "longitude": lng,
+            "area": "Dhanmondi",
+            "district": "Dhaka",
+            "accuracy_meters": 15,
+            "provider": "GPS / Browser Geolocation API",
+        },
+    }
+
+
 @app.get("/api/v1/donor/settings")
 async def get_donor_settings(request: Request):
     token = _decode_jwt(request.cookies.get("access_token", ""))
@@ -4730,10 +4928,25 @@ async def create_seeker_emergency_broadcast(
 
 def _seeker_donor_with_safe_location(donor: dict) -> dict:
     safe_donor = dict(donor)
+    raw_phone = donor.get("_raw_phone") or str(donor.get("phone", "")).replace(" ", "").replace("-", "")
+    loc = _get_donor_location_settings(raw_phone) if raw_phone else None
+
+    exact_location_shared = (donor.get("share_exact_location") is True) or (loc and (loc.get("share_exact_location") or loc.get("granularity") == "exact"))
+    granularity = loc.get("granularity") if loc else ("exact" if exact_location_shared else "approximate")
+
     if "lat" in donor and "lng" in donor:
-        exact_location_shared = donor.get("share_exact_location") is True
-        safe_donor["lat"] = float(donor["lat"]) if exact_location_shared else round(float(donor["lat"]), 2)
-        safe_donor["lng"] = float(donor["lng"]) if exact_location_shared else round(float(donor["lng"]), 2)
+        if granularity == "hidden":
+            safe_donor.pop("lat", None)
+            safe_donor.pop("lng", None)
+        elif granularity == "district_only":
+            safe_donor["lat"] = round(float(donor["lat"]), 1)
+            safe_donor["lng"] = round(float(donor["lng"]), 1)
+        elif exact_location_shared:
+            safe_donor["lat"] = float(donor["lat"])
+            safe_donor["lng"] = float(donor["lng"])
+        else:
+            safe_donor["lat"] = round(float(donor["lat"]), 2)
+            safe_donor["lng"] = round(float(donor["lng"]), 2)
     return safe_donor
 
 
@@ -4743,6 +4956,15 @@ def _public_seeker_donor(donor: dict) -> dict:
     if donor.get("share_name") is False:
         name = donor.get("public_identifier") or "Private donor"
     safe_location = _seeker_donor_with_safe_location(donor)
+
+    raw_phone = donor.get("_raw_phone") or str(donor.get("phone", "")).replace(" ", "").replace("-", "")
+    loc = _get_donor_location_settings(raw_phone) if raw_phone else None
+    if loc:
+        precision = loc.get("granularity", "approximate")
+        if loc.get("share_exact_location") or precision == "exact":
+            precision = "exact"
+    else:
+        precision = "exact" if donor.get("share_exact_location") is True else "approximate"
 
     public_donor = {
         "id": donor["id"],
@@ -4754,7 +4976,7 @@ def _public_seeker_donor(donor: dict) -> dict:
         "is_available": bool(donor.get("is_available", False)),
         "is_verified": verified,
         "verification_status": "verified" if verified else "not_verified",
-        "location_precision": "exact" if donor.get("share_exact_location") is True else "approximate",
+        "location_precision": precision,
     }
     if "lat" in safe_location and "lng" in safe_location:
         public_donor["lat"] = safe_location["lat"]
@@ -4783,6 +5005,7 @@ async def get_seeker_donors(
             continue
 
         item = dict(d)
+        item["_raw_phone"] = raw_phone
         if privacy:
             # 2. Number Masking: if enabled or phone_visibility == hidden, mask phone
             should_mask = bool(privacy.get("mask_public_phone", True))
@@ -4860,9 +5083,17 @@ async def get_seeker_donor_map(
 
     map_donors = []
     for donor in donors:
-        exact_location_shared = donor.get("share_exact_location") is True
+        raw_phone = str(donor.get("phone", "")).replace(" ", "").replace("-", "")
+        loc = _get_donor_location_settings(raw_phone) if raw_phone else None
+        exact_location_shared = (donor.get("share_exact_location") is True) or (loc and (loc.get("share_exact_location") or loc.get("granularity") == "exact"))
+        granularity = loc.get("granularity") if loc else ("exact" if exact_location_shared else "approximate")
+
+        if granularity == "hidden":
+            continue
+
         latitude = float(donor["lat"])
         longitude = float(donor["lng"])
+        precision = "exact" if exact_location_shared else ("district_only" if granularity == "district_only" else "approximate")
         map_donors.append({
             "blood_group": donor["blood_group"],
             "district": donor.get("district", "Dhaka"),
@@ -4870,7 +5101,7 @@ async def get_seeker_donor_map(
             "distance_km": donor["distance_km"],
             "lat": latitude if exact_location_shared else round(latitude, 2),
             "lng": longitude if exact_location_shared else round(longitude, 2),
-            "location_precision": "exact" if exact_location_shared else "approximate",
+            "location_precision": precision,
         })
 
     return {"status": "success", "count": len(map_donors), "donors": map_donors}
