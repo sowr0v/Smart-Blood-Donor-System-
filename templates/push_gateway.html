@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Web Push Notifications Gateway (FCM) - Smart Blood Donor System" }}</title>
+  <meta name="description" content="This screen manages browser-based push notifications that deliver real-time alerts to users through the web application.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/notifications.css">
+  <link rel="stylesheet" href="/static/css/push_gateway.css">
+</head>
+<body data-page="push-gateway">
+  <!-- Top Global Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/notifications" class="nav-link">In-App Center</a></li>
+          <li><a href="/push-gateway" class="nav-link active">Push Gateway</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 12px;">
+        <!-- In-App Notification Bell Center -->
+        <div class="notification-center-wrap">
+          <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Open In-App Notification Center" onclick="toggleNotificationDrawer()">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-badge-pill" id="notificationBadge" style="display:none;">0</span>
+          </button>
+        </div>
+
+        <a href="{{ dashboard_url or '/admin/dashboard' }}" class="btn btn-sm btn-outline">Back to Dashboard</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Center Dropdown Drawer (SBDS-46) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">View Full Center &rarr;</a>
+      <a href="/push-gateway" class="btn btn-sm btn-primary" style="text-decoration: none;">Push Gateway</a>
+    </div>
+  </div>
+
+  <!-- Main Web Push Gateway Container -->
+  <main class="push-page-wrapper" id="webPushGatewayScreen">
+    
+    <!-- Breadcrumbs -->
+    <nav class="breadcrumb-nav" aria-label="Breadcrumb">
+      <a href="{{ dashboard_url or '/admin/dashboard' }}">Dashboard</a>
+      <span>/</span>
+      <a href="/notifications">Notifications</a>
+      <span>/</span>
+      <span>Web Push Notifications Gateway (FCM)</span>
+    </nav>
+
+    <!-- Screen Header Card -->
+    <section class="screen-header-card">
+      <div class="screen-header-left">
+        <div class="screen-badge-icon" aria-hidden="true">🔔</div>
+        <div>
+          <h1 class="screen-title" id="screenTitle">Web Push Notifications Gateway (FCM)</h1>
+          <p class="screen-subtitle" id="screenDescription">
+            This screen manages browser-based push notifications that deliver real-time alerts to users through the web application.
+          </p>
+        </div>
+      </div>
+      <div class="screen-header-actions">
+        <button type="button" class="btn btn-outline" onclick="requestBrowserPushPermission()">
+          <span>🔔 Test Browser Permission</span>
+        </button>
+        <a href="/notifications" class="btn btn-primary" style="text-decoration: none;">
+          <span>In-App Notification Center &rarr;</span>
+        </a>
+      </div>
+    </section>
+
+    <!-- KPI Metric Cards -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Gateway Status</span>
+          <span class="kpi-icon">⚡</span>
+        </div>
+        <div class="kpi-value" style="color: #10b981;">Online</div>
+        <div class="kpi-status-badge">
+          <span class="kpi-dot"></span>
+          <span>FCM HTTP v1 / WebPush Active</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Authorized Devices</span>
+          <span class="kpi-icon">📱</span>
+        </div>
+        <div class="kpi-value" id="statAuthorizedDevs">{{ stats.authorized_devices or 4 }} Devices</div>
+        <div class="kpi-hint">Desktop & Mobile Subscriptions</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Delivery Success Rate</span>
+          <span class="kpi-icon">🎯</span>
+        </div>
+        <div class="kpi-value" id="statSuccessRate">{{ stats.success_rate or 98.6 }}%</div>
+        <div class="kpi-hint">{{ stats.delivered_count or 42 }} delivered, {{ stats.failed_count or 1 }} handled</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <span class="kpi-label">Total Dispatches</span>
+          <span class="kpi-icon">📡</span>
+        </div>
+        <div class="kpi-value" id="statTotalDispatches">{{ stats.total_sent or 43 }}</div>
+        <div class="kpi-hint">Multi-channel Web Push Alerts</div>
+      </div>
+    </section>
+
+    <!-- Browser Permission Request Banner (Acceptance Criterion 1) -->
+    <section class="permission-banner" id="permissionSection">
+      <div class="perm-left">
+        <div class="perm-icon-bubble">🛡️</div>
+        <div class="perm-content">
+          <h3>Browser Push Notification Permissions</h3>
+          <p id="permBannerDesc">
+            As a user, you can request and authorize push notifications to receive life-critical blood requests and real-time chat messages even when this page is not active.
+          </p>
+        </div>
+      </div>
+      <div class="perm-actions">
+        <span class="badge-perm-status default" id="browserPermissionBadge">DEFAULT</span>
+        <button type="button" class="btn btn-primary" id="btnRequestPermission" onclick="requestBrowserPushPermission()">
+          <span>🔔 Request Push Permission</span>
+        </button>
+        <button type="button" class="btn btn-outline" id="btnRegisterDevice" onclick="registerCurrentBrowserDevice()">
+          <span>📱 Register Current Device</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Two-Column Section: Notification Preferences & Web Push Dispatcher -->
+    <div class="dashboard-columns">
+      
+      <!-- 1. Notification Preferences Manager (Acceptance Criterion 4) -->
+      <section class="content-card" id="preferencesSection">
+        <div class="card-title-bar">
+          <div>
+            <h2 class="card-title">⚙️ Notification Permission & Preferences</h2>
+            <div class="card-subtitle">Control push notification permissions so that you can manage your alert preferences.</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" onclick="saveUserPreferences()">Save Preferences</button>
+        </div>
+
+        <div class="preference-list">
+          <div class="pref-item">
+            <div class="pref-meta">
+              <h4>Master Push Notifications</h4>
+              <p>Master switch to enable or suppress all browser-based web push alerts.</p>
+            </div>
+            <label class="switch" aria-label="Toggle master push alerts">
+              <input type="checkbox" id="prefMasterPush" {{ 'checked' if preferences.push_enabled else '' }}>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-item">
+            <div class="pref-meta">
+              <h4>🚨 Emergency Blood Broadcasts</h4>
+              <p>Life-saving Code Red alerts for matching blood groups within your district.</p>
+            </div>
+            <label class="switch" aria-label="Toggle emergency blood alerts">
+              <input type="checkbox" id="prefEmergency" {{ 'checked' if preferences.emergency_alerts else '' }}>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-item">
+            <div class="pref-meta">
+              <h4>🩸 Blood Request Updates & Matching</h4>
+              <p>Notifications when a compatible patient or donation request is published.</p>
+            </div>
+            <label class="switch" aria-label="Toggle blood request alerts">
+              <input type="checkbox" id="prefRequests" {{ 'checked' if preferences.request_updates else '' }}>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-item">
+            <div class="pref-meta">
+              <h4>💬 Direct Peer Chat Messages</h4>
+              <p>Instant alerts when a donor or recipient sends you a direct message.</p>
+            </div>
+            <label class="switch" aria-label="Toggle chat message alerts">
+              <input type="checkbox" id="prefMessages" {{ 'checked' if preferences.chat_messages else '' }}>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pref-item">
+            <div class="pref-meta">
+              <h4>ℹ️ Platform & Security Announcements</h4>
+              <p>Donor verification status, KYC updates, and account security notices.</p>
+            </div>
+            <label class="switch" aria-label="Toggle system announcements">
+              <input type="checkbox" id="prefSystem" {{ 'checked' if preferences.system_announcements else '' }}>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Web Push Notification Dispatcher (FCM Gateway) -->
+      <section class="content-card" id="dispatchSection">
+        <div class="card-title-bar">
+          <div>
+            <h2 class="card-title">📡 FCM Web Push Notification Dispatcher</h2>
+            <div class="card-subtitle">Broadcast real-time web push alerts to authorized user devices.</div>
+          </div>
+        </div>
+
+        <!-- Sensitive Data Protection Notice (Acceptance Criterion 6) -->
+        <div class="privacy-guard-badge" id="privacyNoticeBadge">
+          <span>🛡️</span>
+          <span><strong>PII & Medical Privacy Guard:</strong> Confidential medical diagnoses, full NID numbers, passwords, and tokens are automatically scrubbed before dispatch.</span>
+        </div>
+
+        <form id="pushDispatchForm" onsubmit="submitPushDispatch(event)">
+          <div class="form-group">
+            <label for="pushAudienceSelect" class="form-label">Target Audience</label>
+            <select id="pushAudienceSelect" class="form-select">
+              <option value="all">All Platform Users (Broadcast)</option>
+              <option value="+8801712345678">Donor (+8801712345678 - Ayesha Rahman)</option>
+              <option value="+8801723456789">Seeker (+8801723456789 - Nabil Hasan)</option>
+              <option value="+8801745678901">System Administrator (+8801745678901)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pushEventTypeSelect" class="form-label">Event Category / Urgency</label>
+            <select id="pushEventTypeSelect" class="form-select">
+              <option value="emergency">🚨 Emergency Alert (Code Red)</option>
+              <option value="request">🩸 Blood Request Update</option>
+              <option value="message">💬 Direct Peer Message</option>
+              <option value="system">ℹ️ System Announcement</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="pushTitleInput" class="form-label">Push Notification Title</label>
+            <input type="text" id="pushTitleInput" class="form-control" placeholder="e.g. Critical Blood Need: A+ at Square Hospital" required>
+          </div>
+
+          <div class="form-group">
+            <label for="pushBodyInput" class="form-label">Notification Body</label>
+            <textarea id="pushBodyInput" class="form-textarea" rows="2" placeholder="e.g. Urgent blood needed for surgery. Tap to view hospital directions." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="pushClickUrlInput" class="form-label">Target Click URL</label>
+            <input type="text" id="pushClickUrlInput" class="form-control" value="/find-blood" placeholder="/find-blood">
+          </div>
+
+          <!-- Live Lockscreen Preview -->
+          <div class="push-preview-container">
+            <div class="preview-header">Live Lockscreen / Desktop Push Preview</div>
+            <div class="lockscreen-card">
+              <div class="lockscreen-icon">🩸</div>
+              <div class="lockscreen-body">
+                <div class="lockscreen-top">
+                  <span class="lockscreen-app">Smart Blood Donor System</span>
+                  <span>Just now</span>
+                </div>
+                <div class="lockscreen-title" id="lockscreenPreviewTitle">Critical Blood Need: A+ at Square Hospital</div>
+                <div class="lockscreen-msg" id="lockscreenPreviewBody">Urgent blood needed for surgery. Tap to view hospital directions.</div>
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="btnSubmitPush" style="width: 100%;">
+            <span>🚀 Dispatch Web Push Alert</span>
+          </button>
+        </form>
+      </section>
+
+    </div>
+
+    <!-- Authorized Devices Management (Acceptance Criterion 2) -->
+    <section class="content-card" id="devicesSection">
+      <div class="card-title-bar">
+        <div>
+          <h2 class="card-title">📱 Authorized Devices & Subscriptions</h2>
+          <div class="card-subtitle">Manage browser subscriptions permitted to receive real-time FCM web push notifications.</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="loadAuthorizedDevices()">🔄 Refresh Devices</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table" id="authorizedDevicesTable">
+          <thead>
+            <tr>
+              <th>Device Type</th>
+              <th>Browser / OS</th>
+              <th>User Phone</th>
+              <th>Authorization Status</th>
+              <th>Endpoint Fingerprint</th>
+              <th>Registered</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="authorizedDevicesTableBody">
+            {% if devices %}
+              {% for d in devices %}
+                <tr>
+                  <td>
+                    <strong>
+                      {% if d.device_type == 'Mobile' %}📱 Mobile{% else %}💻 Desktop{% endif %}
+                    </strong>
+                  </td>
+                  <td>{{ d.browser or 'Chrome' }}</td>
+                  <td><code>{{ d.user_phone }}</code></td>
+                  <td>
+                    <span class="badge-status {{ d.status }}">{{ d.status | upper }}</span>
+                  </td>
+                  <td><code>...{{ d.endpoint_fingerprint or (d.endpoint[-8:] if d.endpoint else '...') }}</code></td>
+                  <td>{{ d.created_at[:16] }}</td>
+                  <td>
+                    {% if d.status == 'authorized' %}
+                      <button type="button" class="btn btn-sm btn-outline" onclick="sendTestPushToDevice('{{ d.user_phone }}')">⚡ Test Push</button>
+                      <button type="button" class="btn btn-sm btn-danger-light" onclick="revokePushDevice({{ d.id }})">Revoke</button>
+                    {% else %}
+                      <span style="color: #94a3b8; font-size: 0.8rem;">Revoked</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="7" style="text-align: center; color: #64748b; padding: 24px;">
+                  No authorized devices registered yet. Click "Request Push Permission" above to register this browser.
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Push Dispatch & Delivery Logs with Failure Handling (Acceptance Criterion 5) -->
+    <section class="content-card" id="logsSection">
+      <div class="card-title-bar">
+        <div>
+          <h2 class="card-title">📋 Push Delivery Audit Logs & Failure Recovery</h2>
+          <div class="card-subtitle">Delivery logs with automatic failed delivery handling, token pruning, and retry capability.</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" onclick="loadPushLogs()">🔄 Refresh Logs</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table" id="pushLogsTable">
+          <thead>
+            <tr>
+              <th>FCM Message ID</th>
+              <th>Recipient</th>
+              <th>Notification</th>
+              <th>Status</th>
+              <th>Delivery / Error Reason</th>
+              <th>PII Privacy Check</th>
+              <th>Timestamp</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="pushLogsTableBody">
+            {% if logs %}
+              {% for l in logs %}
+                <tr>
+                  <td><code>{{ l.fcm_message_id or 'N/A' }}</code></td>
+                  <td><strong>{{ l.recipient_phone }}</strong></td>
+                  <td>
+                    <div style="font-weight: 600;">{{ l.title }}</div>
+                    <div style="font-size: 0.8rem; color: #64748b;">{{ l.body[:65] }}{{ '...' if l.body|length > 65 else '' }}</div>
+                  </td>
+                  <td>
+                    <span class="badge-status {{ l.status }}">{{ l.status | upper }}</span>
+                  </td>
+                  <td>
+                    <span style="font-size: 0.825rem; {{ 'color: #dc2626; font-weight:600;' if l.status == 'failed' else 'color: #059669;' }}">
+                      {{ l.failure_reason or ('Delivered to authorized device' if l.status == 'delivered' else 'Failed') }}
+                    </span>
+                  </td>
+                  <td>
+                    <span style="font-size: 0.75rem; color: #047857; font-weight: 600;">
+                      🛡️ {{ 'Sanitized (No PII)' if l.sensitive_data_scrubbed else 'Clean' }}
+                    </span>
+                  </td>
+                  <td>{{ l.created_at[:16] }}</td>
+                  <td>
+                    {% if l.status == 'failed' %}
+                      <button type="button" class="btn btn-sm btn-outline" onclick="retryFailedPush({{ l.id }})">🔄 Retry</button>
+                    {% else %}
+                      <span style="color: #10b981; font-size: 0.8rem;">✓ Complete</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" style="text-align: center; color: #64748b; padding: 24px;">No push notification dispatches logged yet.</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/js/push_gateway.js"></script>
+  <script src="/static/js/notifications.js"></script>
+</body>
+</html>

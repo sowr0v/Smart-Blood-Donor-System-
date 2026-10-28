@@ -479,7 +479,7 @@ async function requestWebPushSubscription() {
       return;
     }
 
-    const reg = await navigator.serviceWorker.register('/static/js/sw.js');
+    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
     const fakeToken = `fcm_device_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const res = await fetch('/api/v1/notifications/push/subscribe', {
@@ -491,6 +491,7 @@ async function requestWebPushSubscription() {
         p256dh_key: 'sbds_p256dh_key_mock',
         browser: navigator.userAgent.includes('Firefox') ? 'Firefox' : 'Chrome',
         device_type: window.innerWidth > 768 ? 'Desktop' : 'Mobile',
+        permission_status: 'granted',
       }),
     });
 

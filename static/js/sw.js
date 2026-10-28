@@ -1,4 +1,12 @@
 // Service Worker for SBDS Web Push Notifications (SBDS-47)
+self.addEventListener('install', function (event) {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function (event) {
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', function (event) {
   let data = {};
   if (event.data) {
@@ -9,13 +17,23 @@ self.addEventListener('push', function (event) {
     }
   }
 
-  const title = data.title || 'Emergency Blood Alert - SBDS';
+  const notifPayload = data.notification || data;
+  const dataPayload = data.data || {};
+
+  const title = notifPayload.title || 'Emergency Blood Alert - SBDS';
+  const body = notifPayload.body || 'A high-priority notification was dispatched to your device.';
+  const clickUrl = dataPayload.click_url || notifPayload.click_url || '/';
+
   const options = {
-    body: data.body || 'A high-priority notification was dispatched to your device.',
-    icon: '/static/images/drop_icon.png',
-    badge: '/static/images/badge_icon.png',
+    body: body,
+    icon: notifPayload.icon || '/static/images/drop_icon.png',
+    badge: notifPayload.badge || '/static/images/badge_icon.png',
+    tag: dataPayload.fcm_message_id || 'sbds-push-alert',
+    renotify: true,
+    requireInteraction: true,
     data: {
-      url: data.click_url || '/admin/dashboard',
+      url: clickUrl,
+      fcm_message_id: dataPayload.fcm_message_id || '',
     },
     vibrate: [200, 100, 200],
     actions: [
@@ -29,6 +47,8 @@ self.addEventListener('push', function (event) {
 
 self.addEventListener('notificationclick', function (event) {
   event.notification.close();
+  if (event.action === 'close') return;
+
   const urlToOpen = (event.notification.data && event.notification.data.url) || '/';
 
   event.waitUntil(

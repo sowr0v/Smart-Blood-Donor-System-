@@ -126,7 +126,11 @@ def initialize_admin_and_notification_database():
                     p256dh_key TEXT DEFAULT '',
                     browser TEXT DEFAULT 'Chrome',
                     device_type TEXT DEFAULT 'Desktop',
-                    created_at TEXT NOT NULL
+                    status TEXT NOT NULL DEFAULT 'authorized',
+                    permission_status TEXT NOT NULL DEFAULT 'granted',
+                    last_active_at TEXT DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT DEFAULT ''
                 );
                 CREATE TABLE IF NOT EXISTS push_dispatch_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,9 +139,23 @@ def initialize_admin_and_notification_database():
                     title TEXT NOT NULL,
                     body TEXT NOT NULL,
                     click_url TEXT DEFAULT '',
+                    event_type TEXT DEFAULT 'system',
                     status TEXT NOT NULL DEFAULT 'delivered',
+                    failure_reason TEXT DEFAULT '',
                     fcm_message_id TEXT DEFAULT '',
+                    device_endpoint TEXT DEFAULT '',
+                    sensitive_data_scrubbed INTEGER DEFAULT 0,
                     created_at TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS user_push_preferences (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_phone TEXT UNIQUE NOT NULL,
+                    push_enabled INTEGER NOT NULL DEFAULT 1,
+                    emergency_alerts INTEGER NOT NULL DEFAULT 1,
+                    chat_messages INTEGER NOT NULL DEFAULT 1,
+                    request_updates INTEGER NOT NULL DEFAULT 1,
+                    system_announcements INTEGER NOT NULL DEFAULT 1,
+                    updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS sms_dispatch_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,6 +217,27 @@ def initialize_admin_and_notification_database():
                 );
                 """
             )
+
+            # Ensure push_subscriptions and push_dispatch_logs have required columns (SBDS-47)
+            push_sub_cols = {row[1] for row in connection.execute("PRAGMA table_info(push_subscriptions)").fetchall()}
+            if "status" not in push_sub_cols:
+                connection.execute("ALTER TABLE push_subscriptions ADD COLUMN status TEXT DEFAULT 'authorized'")
+            if "permission_status" not in push_sub_cols:
+                connection.execute("ALTER TABLE push_subscriptions ADD COLUMN permission_status TEXT DEFAULT 'granted'")
+            if "last_active_at" not in push_sub_cols:
+                connection.execute("ALTER TABLE push_subscriptions ADD COLUMN last_active_at TEXT DEFAULT ''")
+            if "updated_at" not in push_sub_cols:
+                connection.execute("ALTER TABLE push_subscriptions ADD COLUMN updated_at TEXT DEFAULT ''")
+
+            push_log_cols = {row[1] for row in connection.execute("PRAGMA table_info(push_dispatch_logs)").fetchall()}
+            if "event_type" not in push_log_cols:
+                connection.execute("ALTER TABLE push_dispatch_logs ADD COLUMN event_type TEXT DEFAULT 'system'")
+            if "failure_reason" not in push_log_cols:
+                connection.execute("ALTER TABLE push_dispatch_logs ADD COLUMN failure_reason TEXT DEFAULT ''")
+            if "device_endpoint" not in push_log_cols:
+                connection.execute("ALTER TABLE push_dispatch_logs ADD COLUMN device_endpoint TEXT DEFAULT ''")
+            if "sensitive_data_scrubbed" not in push_log_cols:
+                connection.execute("ALTER TABLE push_dispatch_logs ADD COLUMN sensitive_data_scrubbed INTEGER DEFAULT 0")
 
             # Seed KYC Verifications if empty
             kyc_count = connection.execute("SELECT COUNT(*) FROM donor_kyc_verifications").fetchone()[0]
@@ -335,13 +374,34 @@ def initialize_admin_and_notification_database():
                     ('Admin Manual Broadcast', '+8801799990001', 'A+', 'DMCH Trauma Unit', 'Dhaka', '[SBDS BROADCAST] Urgent shortage of A+ blood in Shahbagh area. Contact donor coordinator.', 'delivered', 'Twilio/SSL Wireless', 'SMS-BD-20261015-88221', '{(now - timedelta(hours=4)).isoformat()}');
                 """)
 
+            # Seed Push Subscriptions and Preferences (SBDS-47)
+            sub_count = connection.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0]
+            if sub_count == 0:
+                connection.executescript(f"""
+                    INSERT INTO push_subscriptions (user_phone, endpoint, auth_key, p256dh_key, browser, device_type, status, permission_status, last_active_at, created_at, updated_at) VALUES
+                    ('+8801712345678', 'https://fcm.googleapis.com/fcm/send/fcm_token_donor_ayesha_chrome_desktop', 'mock_auth_01', 'mock_p256dh_01', 'Chrome 122', 'Desktop', 'authorized', 'granted', '{(now - timedelta(minutes=10)).isoformat()}', '{(now - timedelta(days=5)).isoformat()}', '{(now - timedelta(minutes=10)).isoformat()}'),
+                    ('+8801712345678', 'https://fcm.googleapis.com/fcm/send/fcm_token_donor_ayesha_android_mobile', 'mock_auth_02', 'mock_p256dh_02', 'Chrome Mobile', 'Mobile', 'authorized', 'granted', '{(now - timedelta(hours=1)).isoformat()}', '{(now - timedelta(days=3)).isoformat()}', '{(now - timedelta(hours=1)).isoformat()}'),
+                    ('+8801723456789', 'https://fcm.googleapis.com/fcm/send/fcm_token_seeker_nabil_firefox_laptop', 'mock_auth_03', 'mock_p256dh_03', 'Firefox 123', 'Desktop', 'authorized', 'granted', '{(now - timedelta(minutes=20)).isoformat()}', '{(now - timedelta(days=4)).isoformat()}', '{(now - timedelta(minutes=20)).isoformat()}'),
+                    ('+8801745678901', 'https://fcm.googleapis.com/fcm/send/fcm_token_admin_edge_workstation', 'mock_auth_04', 'mock_p256dh_04', 'Edge 122', 'Desktop', 'authorized', 'granted', '{(now - timedelta(minutes=5)).isoformat()}', '{(now - timedelta(days=7)).isoformat()}', '{(now - timedelta(minutes=5)).isoformat()}');
+                """)
+
+            pref_count = connection.execute("SELECT COUNT(*) FROM user_push_preferences").fetchone()[0]
+            if pref_count == 0:
+                connection.executescript(f"""
+                    INSERT INTO user_push_preferences (user_phone, push_enabled, emergency_alerts, chat_messages, request_updates, system_announcements, updated_at) VALUES
+                    ('+8801712345678', 1, 1, 1, 1, 1, '{(now - timedelta(days=5)).isoformat()}'),
+                    ('+8801723456789', 1, 1, 1, 1, 1, '{(now - timedelta(days=4)).isoformat()}'),
+                    ('+8801745678901', 1, 1, 1, 1, 1, '{(now - timedelta(days=7)).isoformat()}');
+                """)
+
             # Seed Push dispatch logs if empty
             push_count = connection.execute("SELECT COUNT(*) FROM push_dispatch_logs").fetchone()[0]
             if push_count == 0:
                 connection.executescript(f"""
-                    INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, status, fcm_message_id, created_at) VALUES
-                    ('Admin Portal', '+8801712345678', 'Urgent Blood Needed', 'A patient in Farmgate requires A+ blood within 2 hours.', '/find-blood', 'delivered', 'fcm_msg_20261015_00192', '{(now - timedelta(hours=2)).isoformat()}'),
-                    ('System Engine', 'all', 'Blood Inventory Update', 'Platelet stocks low across central blood banks.', '/find-blood', 'delivered', 'fcm_msg_20261015_00193', '{(now - timedelta(hours=6)).isoformat()}');
+                    INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, fcm_message_id, device_endpoint, sensitive_data_scrubbed, created_at) VALUES
+                    ('Admin Portal', '+8801712345678', 'Urgent Blood Needed', 'A patient in Farmgate requires A+ blood within 2 hours.', '/find-blood', 'request', 'delivered', '', 'fcm_msg_20261015_00192', 'https://fcm.googleapis.com/fcm/send/fcm_token_donor_ayesha_chrome_desktop', 1, '{(now - timedelta(hours=2)).isoformat()}'),
+                    ('System Engine', 'all', 'Blood Inventory Update', 'Platelet stocks low across central blood banks.', '/find-blood', 'system', 'delivered', '', 'fcm_msg_20261015_00193', 'https://fcm.googleapis.com/fcm/send/fcm_token_admin_edge_workstation', 0, '{(now - timedelta(hours=6)).isoformat()}'),
+                    ('FCM Gateway', '+8801712345678', 'Old Handset Sync Alert', 'System notification to retired browser endpoint.', '/find-blood', 'system', 'failed', 'device_unregistered', '', 'https://fcm.googleapis.com/fcm/send/fcm_token_expired_dummy_001', 0, '{(now - timedelta(hours=12)).isoformat()}');
                 """)
 
     # 2. Auth database schema updates
@@ -455,7 +515,7 @@ def initialize_admin_and_notification_database():
 
 
 # ---------------------------------------------------------------------------
-# Helper Functions
+# Helper Functions & FCM Web Push Gateway Services (SBDS-47)
 # ---------------------------------------------------------------------------
 
 def log_admin_action(admin_phone: str, admin_name: str, action: str, target: str, details: str, ip_address: str = "127.0.0.1"):
@@ -475,6 +535,299 @@ def log_admin_action(admin_phone: str, admin_name: str, action: str, target: str
         logger.warning(f"Error logging admin action: {exc}")
 
 
+def sanitize_push_payload(
+    title: str,
+    body: str,
+    data: Optional[dict] = None,
+) -> tuple[str, str, dict, bool]:
+    """
+    Sanitizes push notification title, body, and data payload to ensure no unnecessary
+    sensitive personal, credential, or confidential medical information is exposed (SBDS-47).
+    """
+    scrubbed = False
+    clean_title = title or ""
+    clean_body = body or ""
+    clean_data = dict(data or {})
+
+    # 1. Mask NID / National Identification Numbers (e.g. 10 to 17 digits or explicit NID: labels)
+    nid_pattern = re.compile(r'(?:NID[:\s]*|National\s*ID[:\s]*|[#\s])(\d{6,13})(\d{4})\b', re.IGNORECASE)
+    def _mask_nid(m):
+        nonlocal scrubbed
+        scrubbed = True
+        return f"NID: *******{m.group(2)}"
+    clean_body = nid_pattern.sub(_mask_nid, clean_body)
+    clean_title = nid_pattern.sub(_mask_nid, clean_title)
+
+    raw_nid_pattern = re.compile(r'\b(?<!\+880)(?<!\d)\d{10,17}\b')
+    if raw_nid_pattern.search(clean_body):
+        clean_body = raw_nid_pattern.sub(lambda m: f"***{m.group(0)[-4:]}", clean_body)
+        scrubbed = True
+
+    # 2. Redact passwords, OTPs, auth tokens, session tokens, secret keys
+    secret_patterns = [
+        (re.compile(r'(?:password|passwd|pwd)[\s:=]+([^\s,;]+)', re.IGNORECASE), "password: [REDACTED]"),
+        (re.compile(r'(?:token|auth_token|jwt|bearer)[\s:=]+([^\s,;]+)', re.IGNORECASE), "token: [REDACTED]"),
+        (re.compile(r'(?:otp|otp_code|verification\s*code)[\s:=]+(\d{4,8})', re.IGNORECASE), "OTP: [REDACTED]"),
+        (re.compile(r'(?:secret|api_key)[\s:=]+([^\s,;]+)', re.IGNORECASE), "secret: [REDACTED]"),
+    ]
+    for pattern, repl in secret_patterns:
+        if pattern.search(clean_body):
+            clean_body = pattern.sub(repl, clean_body)
+            scrubbed = True
+        if pattern.search(clean_title):
+            clean_title = pattern.sub(repl, clean_title)
+            scrubbed = True
+
+    # 3. Confidential medical diagnosis / stigmatizing health records
+    sensitive_medical_terms = [
+        re.compile(r'\b(?:hiv|aids|human\s*immunodeficiency\s*virus)\b', re.IGNORECASE),
+        re.compile(r'\b(?:hepatitis\s*[b-c]|hep\s*[b-c])\b', re.IGNORECASE),
+        re.compile(r'\b(?:syphilis|gonorrhea|std|vdrl)\b', re.IGNORECASE),
+        re.compile(r'\b(?:confidential\s*diagnosis|psychiatric\s*hold|biopsy\s*malignancy)\b', re.IGNORECASE),
+        re.compile(r'\b(?:carcinoma|terminal\s*cancer|chemotherapy\s*stage\s*\d+)\b', re.IGNORECASE),
+    ]
+    for med_pat in sensitive_medical_terms:
+        if med_pat.search(clean_body):
+            clean_body = med_pat.sub("critical medical requirement", clean_body)
+            scrubbed = True
+        if med_pat.search(clean_title):
+            clean_title = med_pat.sub("Medical Requirement", clean_title)
+            scrubbed = True
+
+    # 4. Truncate excessively long body text to safe lockscreen length (max 240 chars)
+    if len(clean_body) > 240:
+        clean_body = clean_body[:237] + "..."
+        scrubbed = True
+
+    # 5. Clean data dictionary of any sensitive keys
+    sensitive_keys = {'password', 'token', 'auth_token', 'jwt', 'otp', 'secret', 'nid', 'nid_number'}
+    filtered_data = {}
+    for k, v in clean_data.items():
+        if k.lower() in sensitive_keys:
+            filtered_data[k] = "[REDACTED]"
+            scrubbed = True
+        else:
+            filtered_data[k] = v
+
+    return clean_title, clean_body, filtered_data, scrubbed
+
+
+def _normalize_phone_query(phone: Optional[str]) -> Optional[str]:
+    if not phone:
+        return None
+    p = phone.strip()
+    if p.lower() == "all":
+        return "all"
+    if not p.startswith("+"):
+        p = "+" + p
+    return p
+
+
+def dispatch_web_push_notification(
+    recipient_phone: str,
+    title: str,
+    body: str,
+    click_url: str = "/",
+    event_type: str = "system",
+    priority: str = "high",
+    sender: str = "FCM Gateway",
+    simulate_failure: Optional[str] = None,
+    mirror_in_app: bool = True,
+) -> dict:
+    """
+    Dispatches browser-based push notifications via Firebase Cloud Messaging (FCM) gateway.
+    Handles device authorization, user preferences, failed deliveries, and sanitizes sensitive data.
+    """
+    initialize_admin_and_notification_database()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    clean_title, clean_body, clean_data, was_scrubbed = sanitize_push_payload(
+        title, body, {"click_url": click_url, "event_type": event_type, "priority": priority}
+    )
+
+    # 1. Check system-wide FCM master setting
+    with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+        a_conn.row_factory = sqlite3.Row
+        s_row = a_conn.execute("SELECT fcm_enabled FROM admin_settings WHERE id = 1").fetchone()
+        if s_row and not s_row["fcm_enabled"]:
+            return {
+                "status": "disabled",
+                "delivered": 0,
+                "failed": 0,
+                "message": "FCM Push Gateway is disabled in platform settings",
+                "fcm_message_ids": [],
+                "sensitive_data_scrubbed": was_scrubbed,
+            }
+
+    # 2. Check user notification preferences
+    target_phone = _normalize_phone_query(recipient_phone) or "all"
+    if target_phone != "all":
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            pref = u_conn.execute("SELECT * FROM user_push_preferences WHERE user_phone = ?", (target_phone,)).fetchone()
+            if pref:
+                if not pref["push_enabled"]:
+                    u_conn.execute(
+                        """
+                        INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, sensitive_data_scrubbed, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, 'suppressed', 'user_preference_disabled', ?, ?)
+                        """,
+                        (sender, target_phone, clean_title, clean_body, click_url, event_type, 1 if was_scrubbed else 0, now_iso),
+                    )
+                    return {
+                        "status": "suppressed",
+                        "delivered": 0,
+                        "failed": 0,
+                        "fcm_message_ids": [],
+                        "sensitive_data_scrubbed": was_scrubbed,
+                        "reason": "user_preference_disabled",
+                        "message": "User has disabled push notifications in preferences",
+                    }
+                cat_map = {
+                    "emergency": "emergency_alerts",
+                    "request": "request_updates",
+                    "message": "chat_messages",
+                    "system": "system_announcements",
+                    "account": "system_announcements",
+                    "kyc": "request_updates",
+                    "moderation": "system_announcements",
+                }
+                pref_col = cat_map.get(event_type, "system_announcements")
+                if not pref[pref_col]:
+                    u_conn.execute(
+                        """
+                        INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, sensitive_data_scrubbed, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, 'suppressed', ?, ?, ?)
+                        """,
+                        (sender, target_phone, clean_title, clean_body, click_url, event_type, f"category_{pref_col}_disabled", 1 if was_scrubbed else 0, now_iso),
+                    )
+                    return {
+                        "status": "suppressed",
+                        "delivered": 0,
+                        "failed": 0,
+                        "fcm_message_ids": [],
+                        "sensitive_data_scrubbed": was_scrubbed,
+                        "reason": f"category_{pref_col}_disabled",
+                        "message": f"User has opted out of {event_type} push notifications",
+                    }
+
+    # 3. Retrieve authorized devices
+    delivered_count = 0
+    failed_count = 0
+    fcm_ids: list[str] = []
+    delivered_devices: list[dict] = []
+    failed_devices: list[dict] = []
+
+    with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+        u_conn.row_factory = sqlite3.Row
+        with u_conn:
+            if target_phone == "all":
+                devices = u_conn.execute(
+                    "SELECT * FROM push_subscriptions WHERE status = 'authorized' AND permission_status = 'granted'"
+                ).fetchall()
+            else:
+                devices = u_conn.execute(
+                    "SELECT * FROM push_subscriptions WHERE user_phone = ? AND status = 'authorized' AND permission_status = 'granted'",
+                    (target_phone,),
+                ).fetchall()
+
+            if not devices:
+                # No authorized devices found
+                u_conn.execute(
+                    """
+                    INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, sensitive_data_scrubbed, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, 'failed', 'no_authorized_devices', ?, ?)
+                    """,
+                    (sender, target_phone, clean_title, clean_body, click_url, event_type, 1 if was_scrubbed else 0, now_iso),
+                )
+                failed_count = 1
+            else:
+                for dev in devices:
+                    dev_id = dev["id"]
+                    endpoint = dev["endpoint"]
+                    user_ph = dev["user_phone"]
+
+                    is_expired = (
+                        simulate_failure in ("token_expired", "device_unregistered")
+                        or "expired" in endpoint.lower()
+                        or "invalid" in endpoint.lower()
+                    )
+                    is_timeout = (simulate_failure == "network_timeout")
+
+                    if is_expired:
+                        # Acceptance Criterion 5: Failed delivery is handled appropriately:
+                        # Mark expired/stale tokens so they are pruned
+                        u_conn.execute(
+                            "UPDATE push_subscriptions SET status = 'expired', updated_at = ? WHERE id = ?",
+                            (now_iso, dev_id),
+                        )
+                        u_conn.execute(
+                            """
+                            INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, device_endpoint, sensitive_data_scrubbed, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'failed', 'device_unregistered', ?, ?, ?)
+                            """,
+                            (sender, user_ph, clean_title, clean_body, click_url, event_type, endpoint, 1 if was_scrubbed else 0, now_iso),
+                        )
+                        failed_count += 1
+                        failed_devices.append({"device_id": dev_id, "endpoint": endpoint, "reason": "device_unregistered"})
+                    elif is_timeout:
+                        u_conn.execute(
+                            """
+                            INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, device_endpoint, sensitive_data_scrubbed, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'failed', 'network_timeout', ?, ?, ?)
+                            """,
+                            (sender, user_ph, clean_title, clean_body, click_url, event_type, endpoint, 1 if was_scrubbed else 0, now_iso),
+                        )
+                        failed_count += 1
+                        failed_devices.append({"device_id": dev_id, "endpoint": endpoint, "reason": "network_timeout"})
+                    else:
+                        # Successful delivery via FCM gateway
+                        fcm_msg_id = f"fcm_msg_{int(time.time())}_{secrets.token_hex(4)}"
+                        u_conn.execute(
+                            "UPDATE push_subscriptions SET last_active_at = ?, updated_at = ? WHERE id = ?",
+                            (now_iso, now_iso, dev_id),
+                        )
+                        u_conn.execute(
+                            """
+                            INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, event_type, status, failure_reason, fcm_message_id, device_endpoint, sensitive_data_scrubbed, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, 'delivered', '', ?, ?, ?, ?)
+                            """,
+                            (sender, user_ph, clean_title, clean_body, click_url, event_type, fcm_msg_id, endpoint, 1 if was_scrubbed else 0, now_iso),
+                        )
+                        delivered_count += 1
+                        fcm_ids.append(fcm_msg_id)
+                        delivered_devices.append({"device_id": dev_id, "endpoint": endpoint, "fcm_message_id": fcm_msg_id})
+
+    # Mirror in in-app notification center if requested
+    if mirror_in_app:
+        dispatch_in_app_notification(target_phone, clean_title, clean_body, event_type, click_url, priority, send_push=False)
+
+    if not devices:
+        return {
+            "status": "failed",
+            "delivered": 0,
+            "failed": 1,
+            "fcm_message_ids": [],
+            "sensitive_data_scrubbed": was_scrubbed,
+            "failure_reason": "no_authorized_devices",
+            "message": "No active authorized push devices found for recipient",
+            "title": clean_title,
+            "body": clean_body,
+        }
+
+    overall_status = "success" if delivered_count > 0 and failed_count == 0 else ("partial" if delivered_count > 0 else "failed")
+    return {
+        "status": overall_status,
+        "delivered": delivered_count,
+        "failed": failed_count,
+        "fcm_message_ids": fcm_ids,
+        "delivered_devices": delivered_devices,
+        "failed_devices": failed_devices,
+        "sensitive_data_scrubbed": was_scrubbed,
+        "title": clean_title,
+        "body": clean_body,
+    }
+
+
 def dispatch_in_app_notification(
     recipient_phone: str,
     title: str,
@@ -482,8 +835,9 @@ def dispatch_in_app_notification(
     notif_type: str = "system",
     link: str = "",
     priority: str = "normal",
+    send_push: bool = True,
 ):
-    """Inserts an in-app notification record."""
+    """Inserts an in-app notification record and optionally dispatches web push via FCM gateway."""
     now_iso = datetime.now(timezone.utc).isoformat()
     with closing(sqlite3.connect(DATABASE_PATH)) as conn:
         with conn:
@@ -494,7 +848,23 @@ def dispatch_in_app_notification(
                 """,
                 (recipient_phone, title, message, notif_type, link, priority, now_iso),
             )
-            return cursor.lastrowid
+            row_id = cursor.lastrowid
+
+    if send_push:
+        try:
+            dispatch_web_push_notification(
+                recipient_phone=recipient_phone,
+                title=title,
+                body=message,
+                click_url=link or "/",
+                event_type=notif_type,
+                priority=priority,
+                mirror_in_app=False,
+            )
+        except Exception as exc:
+            logger.warning("FCM Web push dispatch from in-app trigger encountered: %s", exc)
+
+    return row_id
 
 
 def _extract_admin_identity(request: Request) -> tuple[str, str]:
@@ -822,12 +1192,28 @@ class PushSubscriptionPayload(BaseModel):
     browser: Optional[str] = "Chrome"
     device_type: Optional[str] = "Desktop"
     user_phone: Optional[str] = None
+    permission_status: Optional[str] = "granted"
+
+class PushPreferencesPayload(BaseModel):
+    phone: Optional[str] = None
+    push_enabled: Optional[bool] = True
+    emergency_alerts: Optional[bool] = True
+    chat_messages: Optional[bool] = True
+    request_updates: Optional[bool] = True
+    system_announcements: Optional[bool] = True
 
 class PushDispatchPayload(BaseModel):
     recipient_phone: str = "all"
     title: str
     body: str
     click_url: Optional[str] = "/admin/dashboard"
+    event_type: Optional[str] = "system"
+    priority: Optional[str] = "high"
+    simulate_failure: Optional[str] = None
+
+class PushDeviceRevokePayload(BaseModel):
+    device_id: Optional[int] = None
+    endpoint: Optional[str] = None
 
 class EmergencySmsDispatchPayload(BaseModel):
     blood_group: str
@@ -1685,6 +2071,18 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                         (new_status, now_iso, admin_name, payload.notes or f"Status updated to {new_status}", request_id),
                     )
 
+        # Notify request owner on moderation approval (triggers in-app & web push)
+        owner_target = req_dict.get("owner_phone") or req_dict.get("contact_phone")
+        if action in ("approve", "resolve", "unflag") and owner_target:
+            dispatch_in_app_notification(
+                owner_target,
+                "Blood Request Approved",
+                f"Your blood request for {req_dict.get('patient_name') or 'patient'} has been approved by admin moderators.",
+                "request",
+                "/seeker/dashboard",
+                "high",
+            )
+
         log_request_moderation_action(
             request_id=request_id,
             action=action,
@@ -1741,6 +2139,18 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                     """,
                     (target_status, mod_status, now_iso, admin_name, payload.reason or f"Status changed to {target_status}", request_id),
                 )
+
+        # Notify request owner on status update (triggers in-app & web push)
+        owner_target = req_dict.get("owner_phone") or req_dict.get("contact_phone")
+        if target_status in ("Active", "Fulfilled") and owner_target:
+            dispatch_in_app_notification(
+                owner_target,
+                f"Blood Request Status: {target_status}",
+                f"Your blood request for {req_dict.get('patient_name') or 'patient'} is now {target_status}.",
+                "request",
+                "/seeker/dashboard",
+                "high",
+            )
 
         log_request_moderation_action(
             request_id=request_id,
@@ -2285,7 +2695,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
         type: Optional[str] = Query(None),
         category: Optional[str] = Query(None),
         q: Optional[str] = Query(None),
-        limit: int = Query(50),
+        limit: int = Query(100),
     ):
         initialize_admin_and_notification_database()
         target_phone = phone.strip() if phone else None
@@ -2411,70 +2821,333 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # -----------------------------------------------------------------------
     # SBDS-47: Web Push Notifications Gateway (FCM)
     # -----------------------------------------------------------------------
-    @app.post("/api/v1/notifications/push/subscribe")
-    async def subscribe_web_push(payload: PushSubscriptionPayload):
+
+    @app.get("/push-gateway", response_class=HTMLResponse)
+    @app.get("/admin/push-gateway", response_class=HTMLResponse)
+    async def serve_push_gateway_page(request: Request):
         initialize_admin_and_notification_database()
-        phone = payload.user_phone.strip() if payload.user_phone else "+8801745678901"
+        user_phone, user_role, user_name = _extract_user_identity(request)
+        target_phone = user_phone or "+8801745678901"
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            # Fetch user devices
+            if user_role == "admin" or not user_role:
+                devices = [dict(r) for r in u_conn.execute("SELECT * FROM push_subscriptions ORDER BY id DESC LIMIT 50").fetchall()]
+            else:
+                devices = [dict(r) for r in u_conn.execute("SELECT * FROM push_subscriptions WHERE user_phone = ? ORDER BY id DESC", (target_phone,)).fetchall()]
+
+            # Fetch user push preferences
+            pref_row = u_conn.execute("SELECT * FROM user_push_preferences WHERE user_phone = ?", (target_phone,)).fetchone()
+            preferences = dict(pref_row) if pref_row else {
+                "push_enabled": 1,
+                "emergency_alerts": 1,
+                "chat_messages": 1,
+                "request_updates": 1,
+                "system_announcements": 1,
+            }
+
+            # Fetch recent logs
+            logs = [dict(r) for r in u_conn.execute("SELECT * FROM push_dispatch_logs ORDER BY id DESC LIMIT 50").fetchall()]
+
+            # Telemetry stats
+            total_devs = u_conn.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0]
+            auth_devs = u_conn.execute("SELECT COUNT(*) FROM push_subscriptions WHERE status = 'authorized'").fetchone()[0]
+            total_sent = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs").fetchone()[0]
+            delivered_cnt = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs WHERE status = 'delivered'").fetchone()[0]
+            failed_cnt = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs WHERE status = 'failed'").fetchone()[0]
+            success_rate = round((delivered_cnt / max(1, delivered_cnt + failed_cnt)) * 100, 1)
+
+        dashboard_url = "/admin/dashboard"
+        if user_role == "donor":
+            dashboard_url = "/donor/dashboard"
+        elif user_role == "seeker":
+            dashboard_url = "/seeker/dashboard"
+        elif user_role in ("hospital", "bank", "blood_bank"):
+            dashboard_url = "/hospital/dashboard"
+
+        return templates.TemplateResponse(
+            request=request,
+            name="push_gateway.html",
+            context={
+                "request": request,
+                "user": {"phone": target_phone, "role": user_role or "admin", "name": user_name or "System Admin"},
+                "dashboard_url": dashboard_url,
+                "devices": devices,
+                "preferences": preferences,
+                "logs": logs,
+                "stats": {
+                    "total_devices": total_devs,
+                    "authorized_devices": auth_devs,
+                    "total_sent": total_sent,
+                    "delivered_count": delivered_cnt,
+                    "failed_count": failed_cnt,
+                    "success_rate": success_rate,
+                },
+                "title": "Web Push Notifications Gateway (FCM) - Smart Blood Donor System",
+            },
+        )
+
+    @app.get("/firebase-messaging-sw.js", include_in_schema=False)
+    async def serve_firebase_sw():
+        sw_file = BASE_DIR / "static" / "js" / "firebase-messaging-sw.js"
+        if not sw_file.exists():
+            sw_file = BASE_DIR / "static" / "js" / "sw.js"
+        content = sw_file.read_text(encoding="utf-8") if sw_file.exists() else "// SW"
+        return Response(content=content, media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
+
+    @app.get("/sw.js", include_in_schema=False)
+    async def serve_root_sw():
+        sw_file = BASE_DIR / "static" / "js" / "sw.js"
+        content = sw_file.read_text(encoding="utf-8") if sw_file.exists() else "// SW"
+        return Response(content=content, media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
+
+    @app.post("/api/v1/notifications/push/subscribe")
+    async def subscribe_web_push(payload: PushSubscriptionPayload, request: Request):
+        initialize_admin_and_notification_database()
+        user_phone, _, _ = _extract_user_identity(request)
+        phone = _normalize_phone_query(payload.user_phone) or user_phone or "+8801745678901"
         now_iso = datetime.now(timezone.utc).isoformat()
+        perm_status = (payload.permission_status or "granted").strip().lower()
 
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
-                u_conn.execute(
-                    """
-                    INSERT INTO push_subscriptions (user_phone, endpoint, auth_key, p256dh_key, browser, device_type, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (phone, payload.endpoint, payload.auth_key or "", payload.p256dh_key or "", payload.browser or "Chrome", payload.device_type or "Desktop", now_iso),
-                )
-        return {"status": "success", "message": "Push notification gateway subscription active"}
+                existing = u_conn.execute("SELECT id FROM push_subscriptions WHERE endpoint = ?", (payload.endpoint,)).fetchone()
+                if existing:
+                    u_conn.execute(
+                        """
+                        UPDATE push_subscriptions
+                        SET user_phone = ?, auth_key = ?, p256dh_key = ?, browser = ?, device_type = ?, status = 'authorized', permission_status = ?, last_active_at = ?, updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (phone, payload.auth_key or "", payload.p256dh_key or "", payload.browser or "Chrome", payload.device_type or "Desktop", perm_status, now_iso, now_iso, existing[0]),
+                    )
+                    device_id = existing[0]
+                else:
+                    cursor = u_conn.execute(
+                        """
+                        INSERT INTO push_subscriptions (user_phone, endpoint, auth_key, p256dh_key, browser, device_type, status, permission_status, last_active_at, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, 'authorized', ?, ?, ?, ?)
+                        """,
+                        (phone, payload.endpoint, payload.auth_key or "", payload.p256dh_key or "", payload.browser or "Chrome", payload.device_type or "Desktop", perm_status, now_iso, now_iso, now_iso),
+                    )
+                    device_id = cursor.lastrowid
+
+        return {
+            "status": "success",
+            "message": "Push notification gateway subscription active",
+            "device_id": device_id,
+            "permission_status": perm_status,
+            "user_phone": phone,
+        }
 
     @app.post("/api/v1/notifications/push/unsubscribe")
     async def unsubscribe_web_push(payload: PushSubscriptionPayload):
         initialize_admin_and_notification_database()
+        now_iso = datetime.now(timezone.utc).isoformat()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
-                u_conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (payload.endpoint,))
-        return {"status": "success", "message": "Push subscription removed"}
+                u_conn.execute(
+                    "UPDATE push_subscriptions SET status = 'revoked', updated_at = ? WHERE endpoint = ?",
+                    (now_iso, payload.endpoint),
+                )
+        return {"status": "success", "message": "Push subscription revoked"}
+
+    @app.get("/api/v1/notifications/push/preferences")
+    async def get_push_preferences(request: Request, phone: Optional[str] = Query(None)):
+        initialize_admin_and_notification_database()
+        user_phone, _, _ = _extract_user_identity(request)
+        target_phone = _normalize_phone_query(phone) or user_phone or "+8801745678901"
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            row = u_conn.execute("SELECT * FROM user_push_preferences WHERE user_phone = ?", (target_phone,)).fetchone()
+            if row:
+                prefs = dict(row)
+            else:
+                prefs = {
+                    "user_phone": target_phone,
+                    "push_enabled": 1,
+                    "emergency_alerts": 1,
+                    "chat_messages": 1,
+                    "request_updates": 1,
+                    "system_announcements": 1,
+                }
+        return {"status": "success", "preferences": prefs}
+
+    @app.post("/api/v1/notifications/push/preferences")
+    async def update_push_preferences(payload: PushPreferencesPayload, request: Request):
+        initialize_admin_and_notification_database()
+        user_phone, _, _ = _extract_user_identity(request)
+        target_phone = _normalize_phone_query(payload.phone) or user_phone or "+8801745678901"
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            with u_conn:
+                existing = u_conn.execute("SELECT id FROM user_push_preferences WHERE user_phone = ?", (target_phone,)).fetchone()
+                if existing:
+                    u_conn.execute(
+                        """
+                        UPDATE user_push_preferences
+                        SET push_enabled = ?, emergency_alerts = ?, chat_messages = ?, request_updates = ?, system_announcements = ?, updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            1 if payload.push_enabled else 0,
+                            1 if payload.emergency_alerts else 0,
+                            1 if payload.chat_messages else 0,
+                            1 if payload.request_updates else 0,
+                            1 if payload.system_announcements else 0,
+                            now_iso,
+                            existing[0],
+                        ),
+                    )
+                else:
+                    u_conn.execute(
+                        """
+                        INSERT INTO user_push_preferences (user_phone, push_enabled, emergency_alerts, chat_messages, request_updates, system_announcements, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            target_phone,
+                            1 if payload.push_enabled else 0,
+                            1 if payload.emergency_alerts else 0,
+                            1 if payload.chat_messages else 0,
+                            1 if payload.request_updates else 0,
+                            1 if payload.system_announcements else 0,
+                            now_iso,
+                        ),
+                    )
+        return {"status": "success", "message": "Notification preferences updated successfully", "user_phone": target_phone}
+
+    @app.get("/api/v1/notifications/push/devices")
+    async def get_authorized_push_devices(request: Request, phone: Optional[str] = Query(None)):
+        initialize_admin_and_notification_database()
+        user_phone, user_role, _ = _extract_user_identity(request)
+        norm_phone = _normalize_phone_query(phone)
+        target_phone = norm_phone or user_phone or "+8801745678901"
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            if (user_role == "admin" or not user_role) and (not norm_phone or norm_phone == "all"):
+                rows = u_conn.execute("SELECT * FROM push_subscriptions ORDER BY id DESC").fetchall()
+            else:
+                rows = u_conn.execute("SELECT * FROM push_subscriptions WHERE user_phone = ? ORDER BY id DESC", (target_phone,)).fetchall()
+
+        devices = [dict(r) for r in rows]
+        for d in devices:
+            ep = d.get("endpoint", "")
+            d["endpoint_fingerprint"] = ep[-8:] if len(ep) >= 8 else ep
+        return {"status": "success", "devices": devices, "total": len(devices)}
+
+    @app.delete("/api/v1/notifications/push/devices/{device_id}")
+    async def revoke_push_device(device_id: int):
+        initialize_admin_and_notification_database()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            with u_conn:
+                cursor = u_conn.execute("UPDATE push_subscriptions SET status = 'revoked', updated_at = ? WHERE id = ?", (now_iso, device_id))
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Device subscription not found")
+        return {"status": "success", "message": "Push notification device authorization revoked", "device_id": device_id}
 
     @app.post("/api/v1/notifications/push/send")
     async def send_web_push_notification(payload: PushDispatchPayload):
         initialize_admin_and_notification_database()
-        now_iso = datetime.now(timezone.utc).isoformat()
-        fcm_id = f"fcm_msg_{int(time.time())}_{secrets.token_hex(4)}"
-
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            with u_conn:
-                u_conn.execute(
-                    """
-                    INSERT INTO push_dispatch_logs (sender, recipient_phone, title, body, click_url, status, fcm_message_id, created_at)
-                    VALUES ('Admin FCM Gateway', ?, ?, ?, ?, 'delivered', ?, ?)
-                    """,
-                    (payload.recipient_phone, payload.title, payload.body, payload.click_url or "/", fcm_id, now_iso),
-                )
-
-        # Also insert in-app notification mirror
-        dispatch_in_app_notification(
-            payload.recipient_phone,
-            payload.title,
-            payload.body,
-            "system",
-            payload.click_url or "/",
-            "high",
+        result = dispatch_web_push_notification(
+            recipient_phone=payload.recipient_phone.strip(),
+            title=payload.title.strip(),
+            body=payload.body.strip(),
+            click_url=payload.click_url or "/admin/dashboard",
+            event_type=payload.event_type or "system",
+            priority=payload.priority or "high",
+            sender="Admin FCM Gateway",
+            simulate_failure=payload.simulate_failure,
+            mirror_in_app=True,
         )
-
         return {
-            "status": "success",
-            "message": "Web push notification queued and dispatched via FCM gateway",
-            "fcm_message_id": fcm_id,
+            "status": result["status"],
+            "message": "Web push notification processed via FCM gateway",
+            "delivered": result.get("delivered", 0),
+            "failed": result.get("failed", 0),
+            "fcm_message_ids": result.get("fcm_message_ids", []),
+            "sensitive_data_scrubbed": result.get("sensitive_data_scrubbed", False),
+            "details": result,
         }
 
-    @app.get("/api/v1/notifications/push/logs")
-    async def get_push_dispatch_logs():
+    @app.post("/api/v1/notifications/push/retry/{log_id}")
+    async def retry_failed_push_notification(log_id: int):
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             u_conn.row_factory = sqlite3.Row
-            rows = [dict(r) for r in u_conn.execute("SELECT * FROM push_dispatch_logs ORDER BY id DESC LIMIT 50").fetchall()]
-        return {"status": "success", "logs": rows}
+            log_item = u_conn.execute("SELECT * FROM push_dispatch_logs WHERE id = ?", (log_id,)).fetchone()
+            if not log_item:
+                raise HTTPException(status_code=404, detail="Push dispatch log not found")
+
+            # Retry dispatch
+            result = dispatch_web_push_notification(
+                recipient_phone=log_item["recipient_phone"],
+                title=log_item["title"],
+                body=log_item["body"],
+                click_url=log_item["click_url"] or "/",
+                event_type=log_item["event_type"] or "system",
+                sender="FCM Gateway (Retry)",
+                mirror_in_app=False,
+            )
+            return {
+                "status": "success",
+                "message": "Push notification retry dispatched",
+                "original_log_id": log_id,
+                "retry_result": result,
+            }
+
+    @app.get("/api/v1/notifications/push/logs")
+    async def get_push_dispatch_logs(
+        status: Optional[str] = Query(None),
+        recipient: Optional[str] = Query(None),
+        limit: int = Query(50),
+    ):
+        initialize_admin_and_notification_database()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+            sql = "SELECT * FROM push_dispatch_logs"
+            clauses = []
+            params: list[Any] = []
+            if status and status.strip().lower() != "all":
+                clauses.append("status = ?")
+                params.append(status.strip().lower())
+            if recipient and recipient.strip():
+                clauses.append("recipient_phone = ?")
+                params.append(recipient.strip())
+            if clauses:
+                sql += " WHERE " + " AND ".join(clauses)
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+
+            rows = [dict(r) for r in u_conn.execute(sql, params).fetchall()]
+        return {"status": "success", "logs": rows, "total": len(rows)}
+
+    @app.get("/api/v1/notifications/push/stats")
+    async def get_push_gateway_stats():
+        initialize_admin_and_notification_database()
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            total_devs = u_conn.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0]
+            auth_devs = u_conn.execute("SELECT COUNT(*) FROM push_subscriptions WHERE status = 'authorized'").fetchone()[0]
+            total_dispatches = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs").fetchone()[0]
+            delivered = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs WHERE status = 'delivered'").fetchone()[0]
+            failed = u_conn.execute("SELECT COUNT(*) FROM push_dispatch_logs WHERE status = 'failed'").fetchone()[0]
+            rate = round((delivered / max(1, delivered + failed)) * 100, 1)
+        return {
+            "status": "success",
+            "stats": {
+                "total_devices": total_devs,
+                "authorized_devices": auth_devs,
+                "total_dispatches": total_dispatches,
+                "delivered": delivered,
+                "failed": failed,
+                "success_rate_percent": rate,
+            },
+        }
 
     # -----------------------------------------------------------------------
     # SBDS-48: Critical Emergency SMS Notification Dispatch
