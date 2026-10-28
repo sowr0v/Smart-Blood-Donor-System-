@@ -278,6 +278,142 @@
 
       <!-- 4. Requests Moderation & Duplicate Detection (SBDS-42) -->
       <section class="admin-section" id="section-requests">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Blood Requests Moderation &amp; Duplicate Detection</h1>
+            <p class="section-subtext">Review recipient blood requests, flag suspicious or inappropriate content, analyze multi-factor duplicate indicators, and moderate broadcasts across Bangladesh.</p>
+          </div>
+          <div class="header-action-group">
+            <button type="button" class="btn btn-outline btn-sm" onclick="exportModerationRequestsCSV()" title="Export CSV Report">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Export CSV</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="refreshModerationBtn" onclick="loadModerationRequests(true)">
+              <svg id="refreshModerationIcon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Refresh Queue</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Moderation KPI Summary Cards -->
+        <div class="kpi-grid-4 mb-3">
+          <div class="kpi-card" id="card-mod-total">
+            <div class="kpi-icon-wrap icon-blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Blood Requests</span>
+              <strong class="kpi-value" id="modKpiTotalRequestsVal">0</strong>
+              <span class="kpi-subtext" id="modKpiTotalSubtext">Across Bangladesh</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="card-mod-flagged">
+            <div class="kpi-icon-wrap icon-yellow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Flagged / Suspicious</span>
+              <strong class="kpi-value text-warning" id="modKpiFlaggedVal">0</strong>
+              <span class="kpi-subtext" id="modKpiFlaggedSubtext">Requires moderation review</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="card-mod-duplicates">
+            <div class="kpi-icon-wrap icon-red">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">High-Risk Duplicates</span>
+              <strong class="kpi-value text-danger" id="modKpiDuplicatesVal">0</strong>
+              <span class="kpi-subtext" id="modKpiDuplicatesSubtext">Match score &ge; 70%</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="card-mod-approved">
+            <div class="kpi-icon-wrap icon-green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Active Approved</span>
+              <strong class="kpi-value text-success" id="modKpiApprovedVal">0</strong>
+              <span class="kpi-subtext" id="modKpiApprovedSubtext">Broadcasting to donors</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar Card -->
+        <div class="admin-card mb-3">
+          <div class="toolbar-flex-row">
+            <div class="search-input-wrap flex-1">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="moderationSearchInput" placeholder="Search by patient, hospital, contact phone, or area..." oninput="handleModerationSearch(this.value)">
+            </div>
+            <div class="filter-controls-group">
+              <div class="filter-group">
+                <label for="moderationStatusFilter" class="filter-label">Status:</label>
+                <select id="moderationStatusFilter" class="admin-select" onchange="handleModerationFiltersChange()">
+                  <option value="all">All Moderation States</option>
+                  <option value="approved">Approved</option>
+                  <option value="flagged">Flagged / Suspicious</option>
+                  <option value="duplicate">Marked Duplicate</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="moderationUrgencyFilter" class="filter-label">Urgency:</label>
+                <select id="moderationUrgencyFilter" class="admin-select" onchange="handleModerationFiltersChange()">
+                  <option value="all">All Urgencies</option>
+                  <option value="critical">Critical SOS</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="standard">Standard</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="moderationRiskFilter" class="filter-label">Duplicate Risk:</label>
+                <select id="moderationRiskFilter" class="admin-select" onchange="handleModerationFiltersChange()">
+                  <option value="all">All Risk Levels</option>
+                  <option value="high">High Risk (&ge;70%)</option>
+                  <option value="medium">Possible Dup (35-69%)</option>
+                  <option value="low">Unique (&lt;35%)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Moderation Requests Table -->
+        <div class="admin-card">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Blood Requests Review Queue</h2>
+              <span class="card-subtext" id="moderationCountText">Loading requests...</span>
+            </div>
+            <div class="action-buttons-wrap">
+              <span class="tag-status">Auto-heuristic detection active</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Req ID</th>
+                  <th>Patient / Requester</th>
+                  <th>Hospital &amp; Location</th>
+                  <th>Blood Group</th>
+                  <th>Units</th>
+                  <th>Urgency</th>
+                  <th>Duplicate Risk</th>
+                  <th>Mod Status</th>
+                  <th>Req Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="moderationRequestsTableBody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- 5. Blood Stock Oversight & Heatmap (SBDS-43) -->
@@ -526,6 +662,55 @@
       </div>
       <div class="modal-footer" id="duplicateModalFooter">
         <button type="button" class="btn btn-secondary" onclick="closeDuplicateModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Update Modal (SBDS-42) -->
+  <div class="admin-modal" id="statusUpdateModal" aria-hidden="true">
+    <div class="admin-modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Update Request Status</h3>
+        <button type="button" class="btn-close" onclick="closeStatusUpdateModal()">✕</button>
+      </div>
+      <form id="statusUpdateForm" onsubmit="submitRequestStatusUpdate(event)">
+        <div class="modal-body">
+          <input type="hidden" id="statusUpdateReqId">
+          <p class="modal-desc" id="statusUpdateReqSummary">Select new lifecycle status for this blood request.</p>
+          <div class="form-group">
+            <label for="newStatusSelect" class="form-label">New Status</label>
+            <select id="newStatusSelect" class="admin-select full-width" required>
+              <option value="Active">Active (Broadcasting)</option>
+              <option value="Closed">Closed</option>
+              <option value="Fulfilled">Fulfilled</option>
+              <option value="Flagged">Flagged</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="statusUpdateNotes" class="form-label">Moderator Rationale / Notes</label>
+            <textarea id="statusUpdateNotes" class="admin-textarea full-width" rows="3" placeholder="Explain the rationale for updating this request status..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="closeStatusUpdateModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Status Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Request Moderation History & Audit Trail Modal (SBDS-42) -->
+  <div class="admin-modal" id="requestHistoryModal" aria-hidden="true">
+    <div class="admin-modal-dialog modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title">📜 Request Moderation History &amp; Audit Trail</h3>
+        <button type="button" class="btn-close" onclick="closeRequestHistoryModal()">✕</button>
+      </div>
+      <div class="modal-body" id="requestHistoryModalContent">
+        <div class="loading-spinner-row">Loading audit records...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeRequestHistoryModal()">Close</button>
       </div>
     </div>
   </div>

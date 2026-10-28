@@ -800,26 +800,74 @@ async function submitKycDecision(action) {
 // -----------------------------------------------------------------------------
 // 4. SBDS-42: Blood Requests Moderation & Duplicate Detection
 // -----------------------------------------------------------------------------
-async function loadModerationRequests() {
+let moderationSearchTimeout = null;
+
+async function loadModerationRequests(showToast = false) {
+  const icon = document.getElementById('refreshModerationIcon');
+  if (icon) icon.classList.add('spin-anim');
+
   try {
-    const res = await fetch('/api/v1/admin/requests/moderation');
+    const status = document.getElementById('moderationStatusFilter')?.value || 'all';
+    const urgency = document.getElementById('moderationUrgencyFilter')?.value || 'all';
+    const risk = document.getElementById('moderationRiskFilter')?.value || 'all';
+    const search = document.getElementById('moderationSearchInput')?.value || '';
+
+    const params = new URLSearchParams({ status, urgency, risk_level: risk });
+    if (search.trim()) params.append('search', search.trim());
+
+    const res = await fetch(`/api/v1/admin/requests/moderation?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to load moderation requests');
     const data = await res.json();
     if (data.status !== 'success') return;
 
     moderationRequestsCache = data.requests || [];
+    const stats = data.stats || {};
 
+    // 1. Update KPI Summary Cards
+    const totalEl = document.getElementById('modKpiTotalRequestsVal');
+    if (totalEl) totalEl.textContent = stats.total_requests ?? moderationRequestsCache.length;
+
+    const flaggedEl = document.getElementById('modKpiFlaggedVal');
+    if (flaggedEl) flaggedEl.textContent = stats.flagged_count ?? 0;
+
+    const dupEl = document.getElementById('modKpiDuplicatesVal');
+    if (dupEl) dupEl.textContent = stats.high_risk_count ?? 0;
+
+    const appEl = document.getElementById('modKpiApprovedVal');
+    if (appEl) appEl.textContent = stats.approved_count ?? 0;
+
+    const countText = document.getElementById('moderationCountText');
+    if (countText) {
+      countText.textContent = `Showing ${moderationRequestsCache.length} of ${stats.total_requests ?? moderationRequestsCache.length} blood requests`;
+    }
+
+    // 2. Update Sidebar Navigation Badge
     const dupBadge = document.getElementById('navDuplicateBadge');
     if (dupBadge) {
-      const dupCount = moderationRequestsCache.filter(r => (r.duplicate_risk || 0) >= 65).length;
+      const dupCount = stats.high_risk_count ?? moderationRequestsCache.filter(r => (r.duplicate_risk || 0) >= 65).length;
       dupBadge.textContent = dupCount > 0 ? `${dupCount} Dup` : 'Dup';
-      dupBadge.style.display = dupCount > 0 ? 'inline-block' : 'inline-block';
+      dupBadge.style.display = 'inline-block';
     }
 
     renderModerationRequestsTable(moderationRequestsCache);
+    if (showToast) showAdminToast('Blood requests moderation queue updated.', 'success');
   } catch (err) {
     console.error('Error loading moderation requests:', err);
+    if (showToast) showAdminToast('Failed to load requests moderation queue.', 'danger');
+  } finally {
+    if (icon) icon.classList.remove('spin-anim');
   }
+}
+
+function handleModerationSearch(query) {
+  clearTimeout(moderationSearchTimeout);
+  moderationSearchTimeout = setTimeout(() => {
+    loadModerationRequests();
+  }, 250);
+}
+
+function handleModerationFiltersChange() {
+  loadModerationRequests();
 }
 
 function renderModerationRequestsTable(requests) {
@@ -827,61 +875,91 @@ function renderModerationRequestsTable(requests) {
   if (!tbody) return;
 
   if (!requests || requests.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No blood requests pending moderation.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-muted">No blood requests match current filters.</td></tr>';
     return;
   }
 
   tbody.innerHTML = requests.map(r => {
-    // Urgency
-    const urgencyBadge = r.is_emergency
+    // Urgency badge
+    const isEmergency = r.is_emergency === 1 || String(r.urgency_level || '').toLowerCase().includes('critical') || String(r.urgency_level || '').toLowerCase().includes('red');
+    const urgencyBadge = isEmergency
       ? '<span class="badge badge-danger pulse">🚨 CRITICAL SOS</span>'
-      : '<span class="badge badge-warning">Urgent</span>';
+      : (String(r.urgency_level || '').toLowerCase().includes('urgent')
+          ? '<span class="badge badge-warning">Urgent</span>'
+          : '<span class="badge badge-outline">Standard</span>');
 
-    // Duplicate risk score styling
+    // Duplicate risk score styling & indicator
     const score = Math.round(r.duplicate_risk || 0);
-    let riskBadge = `<span class="badge badge-success">${score}% Unique</span>`;
+    let riskBadge = `<span class="badge badge-success">✓ ${score}% Unique</span>`;
     if (score >= 70) {
-      riskBadge = `<span class="badge badge-danger font-bold">${score}% High Duplicate Risk</span>`;
+      riskBadge = `<span class="badge badge-danger font-bold">🚨 ${score}% High Risk</span>`;
     } else if (score >= 35) {
-      riskBadge = `<span class="badge badge-warning">${score}% Possible Dup</span>`;
+      riskBadge = `<span class="badge badge-warning font-bold">⚠️ ${score}% Possible Dup</span>`;
     }
 
-    // Status
-    let statusBadge = `<span class="badge badge-outline">${r.moderation_status || 'approved'}</span>`;
+    // Moderation status badge
+    let statusBadge = `<span class="badge badge-success-soft">${r.moderation_status || 'approved'}</span>`;
     if (r.moderation_status === 'flagged') {
-      statusBadge = '<span class="badge badge-danger">Flagged</span>';
+      statusBadge = '<span class="badge badge-danger">🚩 Flagged</span>';
+    } else if (r.moderation_status === 'duplicate') {
+      statusBadge = `<span class="badge badge-warning">Duplicate #${r.duplicate_of_id || ''}</span>`;
     }
+
+    // Suspicious content alert chip
+    const suspChip = r.is_suspicious
+      ? `<span class="badge badge-danger-soft mt-1" title="${(r.suspicious_signals || []).join('; ')}">⚠️ Suspicious Content</span>`
+      : '';
+
+    // Request lifecycle status badge
+    const reqStatusBadge = `<span class="badge badge-outline">${escapeHtml(r.status || 'Active')}</span>`;
 
     return `
-      <tr>
+      <tr id="req-row-${r.id}">
         <td><code>#${r.id}</code></td>
         <td>
           <div class="user-cell-meta">
-            <strong>${escapeHtml(r.hospital_name || 'Hospital')}</strong>
-            <span class="user-sub-id">${r.patient_name ? 'Patient: ' + escapeHtml(r.patient_name) : 'Phone: ' + (r.contact_phone || 'N/A')}</span>
+            <strong>${escapeHtml(r.patient_name || 'Patient (Unspecified)')}</strong>
+            <span class="user-sub-id">📞 ${escapeHtml(r.contact_phone || 'No Phone')}</span>
+            ${suspChip}
           </div>
         </td>
-        <td><span class="badge badge-blood">${r.blood_group}</span></td>
-        <td>${escapeHtml(r.area ? `${r.area}, ${r.district}` : r.district || 'Dhaka')}</td>
+        <td>
+          <div class="user-cell-meta">
+            <strong>${escapeHtml(r.hospital_name || 'Hospital')}</strong>
+            <span class="user-sub-id">📍 ${escapeHtml(r.area ? `${r.area}, ${r.district}` : (r.district || 'Dhaka'))}</span>
+          </div>
+        </td>
+        <td><span class="badge badge-blood">${escapeHtml(r.blood_group || '')}</span></td>
+        <td><strong>${r.units || 1}</strong> Bag(s)</td>
         <td>${urgencyBadge}</td>
         <td>
-          <button type="button" class="btn btn-xs btn-link-clean" onclick="inspectDuplicateRequest(${r.id})" title="Click to view candidate breakdown">
-            ${riskBadge} 🔍
+          <button type="button" class="btn btn-xs btn-link-clean" onclick="inspectDuplicateRequest(${r.id})" title="Click to view heuristic similarity analysis">
+            ${riskBadge}
           </button>
         </td>
         <td>${statusBadge}</td>
+        <td>${reqStatusBadge}</td>
         <td>
           <div class="table-actions">
             ${r.moderation_status !== 'approved'
               ? `<button type="button" class="btn btn-xs btn-success" onclick="resolveRequestModeration(${r.id}, 'approve')">Approve</button>`
-              : `<button type="button" class="btn btn-xs btn-warning-soft" onclick="resolveRequestModeration(${r.id}, 'flag')">Flag</button>`
+              : `<button type="button" class="btn btn-xs btn-warning-soft" onclick="promptFlagRequest(${r.id})">Flag</button>`
             }
-            <button type="button" class="btn btn-xs btn-danger-soft" onclick="resolveRequestModeration(${r.id}, 'close')">Close</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick="openStatusUpdateModal(${r.id}, '${escapeHtml(r.status || 'Active')}')">Status</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick="openRequestHistoryModal(${r.id})" title="View Moderation Trail">📜</button>
+            <button type="button" class="btn btn-xs btn-secondary" onclick="inspectDuplicateRequest(${r.id})" title="Compare Duplicates">🔍</button>
           </div>
         </td>
       </tr>
     `;
   }).join('');
+}
+
+function promptFlagRequest(reqId) {
+  const reason = prompt('Enter justification or notes for flagging this blood request:', 'Suspicious or duplicate request pending moderation');
+  if (reason !== null) {
+    resolveRequestModeration(reqId, 'flag', null, reason);
+  }
 }
 
 async function inspectDuplicateRequest(reqId) {
@@ -909,23 +987,23 @@ async function inspectDuplicateRequest(reqId) {
       candidateCardsHtml = candidates.map(c => `
         <div class="dup-candidate-card">
           <div class="dup-candidate-head">
-            <strong>Matching Request #${c.request_id}</strong>
-            <span class="badge badge-danger font-bold">${Math.round(c.risk_score)}% Similarity Match</span>
+            <strong>Matching Blood Request #${c.request_id}</strong>
+            <span class="badge ${c.risk_score >= 70 ? 'badge-danger' : 'badge-warning'} font-bold">${Math.round(c.risk_score)}% Similarity Match</span>
           </div>
           <div class="dup-candidate-details">
             <div><strong>Hospital:</strong> ${escapeHtml(c.hospital_name || '')}</div>
-            <div><strong>Blood Group:</strong> ${c.blood_group}</div>
-            <div><strong>Contact:</strong> ${c.contact_phone || '—'}</div>
+            <div><strong>Blood Group:</strong> <span class="badge badge-blood">${escapeHtml(c.blood_group || '')}</span></div>
+            <div><strong>Contact:</strong> ${escapeHtml(c.contact_phone || '—')}</div>
             <div><strong>Patient:</strong> ${escapeHtml(c.patient_name || '—')}</div>
           </div>
           <div class="dup-reasons-list">
-            <span class="reasons-label">Algorithm Signal Triggers:</span>
+            <span class="reasons-label"><strong>Algorithm Signal Triggers:</strong></span>
             <ul>
               ${(c.reasons || []).map(r => `<li>⚠️ ${escapeHtml(r)}</li>`).join('')}
             </ul>
           </div>
           <div class="dup-card-actions">
-            <button type="button" class="btn btn-xs btn-danger" onclick="resolveRequestModeration(${target.id}, 'duplicate', ${c.request_id})">
+            <button type="button" class="btn btn-xs btn-danger" onclick="resolveRequestModeration(${target.id}, 'duplicate', ${c.request_id}, 'Marked as duplicate of #${c.request_id}')">
               Mark #${target.id} as Duplicate of #${c.request_id}
             </button>
           </div>
@@ -933,18 +1011,29 @@ async function inspectDuplicateRequest(reqId) {
       `).join('');
     }
 
+    const suspiciousNotice = data.is_suspicious
+      ? `<div class="analytics-alert-banner mb-3" style="margin-bottom:12px;">
+           <div class="alert-icon-pulse">⚠️</div>
+           <div class="alert-banner-text"><strong>Suspicious Content Warning:</strong> ${(data.suspicious_signals || []).join(', ')}</div>
+         </div>`
+      : '';
+
     container.innerHTML = `
+      ${suspiciousNotice}
       <div class="dup-target-summary mb-3">
-        <h4>Inspecting Request #${target.id}</h4>
+        <h4>Inspecting Request #${target.id}: ${escapeHtml(target.patient_name || 'Patient')}</h4>
         <div class="dup-target-pills">
           <span class="badge badge-blood">${target.blood_group}</span>
-          <span class="badge badge-outline">${escapeHtml(target.hospital_name)}</span>
-          <span class="badge badge-outline">${escapeHtml(target.district || 'Dhaka')}</span>
-          <span class="badge badge-outline">Phone: ${target.contact_phone}</span>
+          <span class="badge badge-outline">🏥 ${escapeHtml(target.hospital_name)}</span>
+          <span class="badge badge-outline">📍 ${escapeHtml(target.area ? `${target.area}, ${target.district}` : (target.district || 'Dhaka'))}</span>
+          <span class="badge badge-outline">📞 ${escapeHtml(target.contact_phone || '')}</span>
+          <span class="badge badge-outline">Units: ${target.units || 1}</span>
+          <span class="badge badge-outline">Status: ${target.status || 'Active'}</span>
         </div>
-        <p class="mt-2 text-sm text-muted">Multi-factor heuristic evaluation comparing phone numbers, identical patient names, hospital locations, and request frequencies within the last 48 hours.</p>
+        <p class="mt-2 text-sm text-muted">Automated multi-factor evaluation comparing contact numbers, patient names, hospital locations, and request frequencies within the platform.</p>
       </div>
       <div class="dup-candidates-wrap">
+        <h5 class="mb-2">Duplicate Detection Matches (${candidates.length} candidate${candidates.length === 1 ? '' : 's'})</h5>
         ${candidateCardsHtml}
       </div>
     `;
@@ -952,8 +1041,10 @@ async function inspectDuplicateRequest(reqId) {
     if (footer) {
       footer.innerHTML = `
         <button type="button" class="btn btn-secondary" onclick="closeDuplicateModal()">Close</button>
-        <button type="button" class="btn btn-success" onclick="resolveRequestModeration(${target.id}, 'approve')">Clear & Approve Broadcast</button>
-        <button type="button" class="btn btn-danger" onclick="resolveRequestModeration(${target.id}, 'flag')">Flag for Fraud Inspection</button>
+        <button type="button" class="btn btn-outline" onclick="openRequestHistoryModal(${target.id})">📜 Action Trail</button>
+        <button type="button" class="btn btn-outline" onclick="openStatusUpdateModal(${target.id}, '${escapeHtml(target.status || 'Active')}')">Update Status</button>
+        <button type="button" class="btn btn-danger" onclick="resolveRequestModeration(${target.id}, 'flag', null, 'Flagged from inspection modal')">Flag Suspicious</button>
+        <button type="button" class="btn btn-success" onclick="resolveRequestModeration(${target.id}, 'approve', null, 'Approved from inspection modal')">Clear &amp; Approve</button>
       `;
     }
 
@@ -976,17 +1067,21 @@ function closeDuplicateModal() {
   }
 }
 
-async function resolveRequestModeration(reqId, action, duplicateOfId = null) {
+async function resolveRequestModeration(reqId, action, duplicateOfId = null, notes = '') {
   try {
     const res = await fetch(`/api/v1/admin/requests/${reqId}/moderate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, duplicate_of_id: duplicateOfId, notes: `Admin console action: ${action}` }),
+      body: JSON.stringify({
+        action,
+        duplicate_of_id: duplicateOfId,
+        notes: notes || `Admin action: ${action}`,
+      }),
     });
 
     const data = await res.json();
     if (res.ok && data.status === 'success') {
-      showAdminToast(`Request #${reqId} marked as ${action}.`, 'success');
+      showAdminToast(`Request #${reqId} successfully moderated (${action}).`, 'success');
       closeDuplicateModal();
       loadModerationRequests();
       loadAnalyticsData();
@@ -996,6 +1091,149 @@ async function resolveRequestModeration(reqId, action, duplicateOfId = null) {
   } catch (err) {
     console.error('Error resolving request moderation:', err);
     showAdminToast('Network error while updating request.', 'danger');
+  }
+}
+
+function openStatusUpdateModal(reqId, currentStatus) {
+  const modal = document.getElementById('statusUpdateModal');
+  const reqIdInput = document.getElementById('statusUpdateReqId');
+  const summary = document.getElementById('statusUpdateReqSummary');
+  const select = document.getElementById('newStatusSelect');
+  const notes = document.getElementById('statusUpdateNotes');
+
+  if (reqIdInput) reqIdInput.value = reqId;
+  if (summary) summary.textContent = `Updating lifecycle status for Blood Request #${reqId}`;
+  if (select) select.value = currentStatus || 'Active';
+  if (notes) notes.value = '';
+
+  if (modal) {
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeStatusUpdateModal() {
+  const modal = document.getElementById('statusUpdateModal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+async function submitRequestStatusUpdate(event) {
+  event.preventDefault();
+  const reqId = document.getElementById('statusUpdateReqId')?.value;
+  const status = document.getElementById('newStatusSelect')?.value;
+  const reason = document.getElementById('statusUpdateNotes')?.value || '';
+
+  if (!reqId || !status) return;
+
+  try {
+    const res = await fetch(`/api/v1/admin/requests/${reqId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, reason }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === 'success') {
+      showAdminToast(`Request #${reqId} status changed to ${status}.`, 'success');
+      closeStatusUpdateModal();
+      loadModerationRequests();
+      loadAnalyticsData();
+    } else {
+      showAdminToast(data.detail || 'Could not update status.', 'danger');
+    }
+  } catch (err) {
+    console.error('Error updating request status:', err);
+    showAdminToast('Network error while updating status.', 'danger');
+  }
+}
+
+async function openRequestHistoryModal(reqId) {
+  const modal = document.getElementById('requestHistoryModal');
+  const content = document.getElementById('requestHistoryModalContent');
+  if (!modal || !content) return;
+
+  content.innerHTML = '<div class="loading-spinner-row">Loading moderation history records...</div>';
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden', 'false');
+
+  try {
+    const res = await fetch(`/api/v1/admin/requests/${reqId}/history`);
+    if (!res.ok) throw new Error('Failed to load history');
+    const data = await res.json();
+    const records = data.history || [];
+
+    if (records.length === 0) {
+      content.innerHTML = `
+        <div class="dup-safe-notice">
+          <p>No moderation actions have been recorded for Request #${reqId} yet.</p>
+        </div>
+      `;
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="history-timeline">
+        ${records.map(r => `
+          <div class="history-item">
+            <div class="history-time">${formatDatePretty(r.created_at)}</div>
+            <div class="history-body">
+              <div class="history-title">
+                <span class="badge badge-primary-soft">${escapeHtml(r.action)}</span>
+                by <strong>${escapeHtml(r.admin_name || 'System Admin')}</strong>
+                ${r.new_status ? `&rarr; Status: <code>${escapeHtml(r.new_status)}</code>` : ''}
+              </div>
+              <div class="history-notes">${escapeHtml(r.notes || 'No explanation provided')}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } catch (err) {
+    console.error('Error loading request history:', err);
+    content.innerHTML = '<p class="text-danger">Could not load action history records.</p>';
+  }
+}
+
+function closeRequestHistoryModal() {
+  const modal = document.getElementById('requestHistoryModal');
+  if (modal) {
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function exportModerationRequestsCSV() {
+  if (!moderationRequestsCache || moderationRequestsCache.length === 0) {
+    showAdminToast('No blood requests available to export.', 'warning');
+    return;
+  }
+
+  let csv = 'Req ID,Patient,Contact Phone,Hospital,District,Area,Blood Group,Units,Urgency,Duplicate Risk (%),Duplicate Label,Moderation Status,Request Status\n';
+  moderationRequestsCache.forEach(r => {
+    csv += `"${r.id}","${escapeHtml(r.patient_name || '')}","${r.contact_phone || ''}","${escapeHtml(r.hospital_name || '')}","${r.district || ''}","${r.area || ''}","${r.blood_group || ''}",${r.units || 1},"${r.is_emergency ? 'Critical' : 'Standard'}",${r.duplicate_risk || 0},"${r.duplicate_label || ''}","${r.moderation_status || ''}","${r.status || ''}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `sbds_blood_requests_moderation_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showAdminToast('Moderation queue exported to CSV.', 'success');
+}
+
+function formatDatePretty(iso) {
+  if (!iso) return 'Just now';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + d.toLocaleDateString();
+  } catch {
+    return iso;
   }
 }
 

@@ -2517,6 +2517,16 @@ async def admin_dashboard(request: Request):
     return response
 
 
+@app.get("/admin/requests")
+@app.get("/admin/moderation")
+async def admin_requests_screen(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    is_demo = request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1" or request.query_params.get("admin") == "1"
+    if (not token or token.get("role") != "admin") and not is_demo:
+        return RedirectResponse(url="/admin/login?next=/admin/dashboard%23requests", status_code=303)
+    return RedirectResponse(url="/admin/dashboard#requests", status_code=303)
+
+
 
 @app.get("/logout")
 async def logout(request: Request):

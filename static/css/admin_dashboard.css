@@ -1143,6 +1143,128 @@ input:checked + .slider:before {
   padding: 6px 0;
 }
 
+/* Toolbar & Moderation Filter Controls (SBDS-42) */
+.toolbar-flex-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--admin-text-muted);
+  white-space: nowrap;
+}
+
+/* Duplicate Candidates Inspection & Cards */
+.dup-target-summary {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.dup-target-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.dup-candidate-card {
+  background: var(--admin-card-bg);
+  border: 1.5px solid var(--admin-border);
+  border-left: 4px solid #ef4444;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.dup-candidate-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.dup-candidate-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  font-size: 0.85rem;
+  margin-bottom: 10px;
+}
+
+.dup-card-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dup-safe-notice {
+  text-align: center;
+  padding: 30px 20px;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px dashed rgba(16, 185, 129, 0.3);
+  border-radius: 12px;
+}
+
+/* Action History Timeline */
+.history-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.02);
+  border-left: 3px solid #2563eb;
+  border-radius: 6px;
+}
+
+.history-time {
+  font-size: 0.74rem;
+  color: var(--admin-text-muted);
+  width: 90px;
+  flex-shrink: 0;
+}
+
+.history-body {
+  flex: 1;
+}
+
+.history-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.history-notes {
+  font-size: 0.78rem;
+  color: var(--admin-text-muted);
+}
+
 /* Duplicate Candidates Inspection */
 .dup-compare-box {
   background: rgba(239, 68, 68, 0.05);
