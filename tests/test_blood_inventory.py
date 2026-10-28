@@ -537,6 +537,19 @@ class FacilityBloodInventoryTests(unittest.TestCase):
                         (facility_phone,),
                     )
 
+    def test_admin_stock_dashboard_includes_leaflet_map_assets_and_container(self):
+        response = self.client.get("/admin/dashboard?preview=1#stock")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="stock-map" style="height: 400px;"></div>', response.text)
+        self.assertIn(
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+            response.text,
+        )
+        self.assertIn(
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+            response.text,
+        )
+
     def test_low_stock_threshold_is_validated(self):
         for invalid_threshold in (-1, 51, 1.5, "5"):
             with self.subTest(threshold=invalid_threshold):

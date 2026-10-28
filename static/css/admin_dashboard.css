@@ -1534,10 +1534,10 @@ input:checked + .slider:before {
   background: rgba(16, 185, 129, 0.4);
 }
 
-.admin-blood-stock-map {
+#stock-map {
   z-index: 0;
   width: 100%;
-  min-height: 360px;
+  height: 400px;
   border: 1px solid var(--admin-border);
   border-radius: 12px;
   background: #e2e8f0;
@@ -1655,7 +1655,7 @@ input:checked + .slider:before {
   .stock-overview-card { padding: 14px; }
   .stock-overview-card .card-header-clean { flex-direction: column; }
   .stock-blood-groups-grid { grid-template-columns: 1fr 1fr; }
-  .admin-blood-stock-map { min-height: 300px; }
+  #stock-map { height: 300px; }
 }
 
 .alert-icon-pulse {

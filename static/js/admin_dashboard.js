@@ -1412,9 +1412,12 @@ async function loadInventoryHeatmap() {
   const statusEl = document.getElementById('stockOverviewStatus');
   try {
     const [summaryRes, heatRes, facRes] = await Promise.all([
-      fetch('/api/v1/admin/inventory/summary'),
-      fetch('/api/v1/admin/inventory/heatmap'),
-      fetch(`/api/v1/admin/inventory/facilities?district=${encodeURIComponent(currentDistrictFilter)}`),
+      fetch('/api/v1/admin/inventory/summary', { credentials: 'same-origin', cache: 'no-store' }),
+      fetch('/api/v1/admin/inventory/heatmap', { credentials: 'same-origin', cache: 'no-store' }),
+      fetch(`/api/v1/admin/inventory/facilities?district=${encodeURIComponent(currentDistrictFilter)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      }),
     ]);
     if (!summaryRes.ok || !heatRes.ok || !facRes.ok) {
       throw new Error('Unable to load authorized facility inventory data.');
@@ -1430,7 +1433,13 @@ async function loadInventoryHeatmap() {
     renderBloodGroupOverview(summary.groups || []);
     renderHeatmapGrid(heatmapDataCache);
     renderFacilitiesTable(facilitiesCache);
-    renderFacilityAvailabilityMap(facilitiesCache, heatmapDataCache);
+    try {
+      renderFacilityAvailabilityMap(facilitiesCache, heatmapDataCache);
+    } catch (mapError) {
+      console.error('Error rendering facility availability map:', mapError);
+      const mapStatus = document.getElementById('stockMapStatus');
+      if (mapStatus) mapStatus.textContent = 'Map could not be rendered; facility stock data is still available below.';
+    }
 
     const totalEl = document.getElementById('stockTotalUnitsVal');
     if (totalEl) totalEl.textContent = `${summary.total_units || 0} units`;
@@ -1579,13 +1588,17 @@ function renderFacilitiesTable(facilities) {
 
 function renderFacilityAvailabilityMap(facilities, heatmap) {
   const status = document.getElementById('stockMapStatus');
+  const mapContainer = document.getElementById('stock-map');
+  if (!mapContainer) {
+    throw new Error('Facility availability map container was not found.');
+  }
   if (typeof L === 'undefined') {
     if (status) status.textContent = 'The interactive map library is unavailable. Use the regional heatmap below.';
     return;
   }
 
   if (!adminBloodStockMap) {
-    adminBloodStockMap = L.map('adminBloodStockMap').setView([23.685, 90.3563], 7);
+    adminBloodStockMap = L.map(mapContainer).setView([23.685, 90.3563], 7);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 18,
