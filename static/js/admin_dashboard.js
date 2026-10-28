@@ -671,14 +671,20 @@ async function loadKycQueue(status = 'pending', buttonEl = null) {
     const data = await res.json();
     if (data.status !== 'success') return;
 
-    kycCache = data.kyc_requests || [];
+    kycCache = data.kyc_requests || data.queue || [];
 
-    // Update pending count badges
+    // Update pending and approved count badges
+    const pendingNum = data.pending_count ?? (data.counts ? data.counts.pending : 0);
+    const approvedNum = data.approved_count ?? (data.counts ? data.counts.approved : 0);
+
     const pBadge = document.getElementById('kycPendingCountBadge');
-    if (pBadge) pBadge.textContent = `${data.pending_count || 0} Pending Review`;
+    if (pBadge) pBadge.textContent = `${pendingNum} Pending Review`;
+
+    const aBadge = document.getElementById('kycApprovedCountBadge');
+    if (aBadge) aBadge.textContent = `${approvedNum} Approved`;
 
     const navBadge = document.getElementById('navKycPendingBadge');
-    if (navBadge) navBadge.textContent = data.pending_count || 0;
+    if (navBadge) navBadge.textContent = pendingNum;
 
     renderKycTable(kycCache);
   } catch (err) {
@@ -726,17 +732,31 @@ async function openKycReviewModal(kycId) {
     const res = await fetch(`/api/v1/admin/kyc/${kycId}`);
     if (!res.ok) throw new Error('Failed to load KYC item');
     const data = await res.json();
-    currentKycItem = data.kyc;
+    currentKycItem = data.kyc || data.record;
+    if (!currentKycItem) return;
 
-    document.getElementById('kycModalTitle').textContent = `Review Document: ${currentKycItem.donor_name}`;
-    document.getElementById('kycDonorName').textContent = currentKycItem.donor_name;
-    document.getElementById('kycDonorPhone').textContent = currentKycItem.donor_phone;
-    document.getElementById('kycBloodGroup').textContent = currentKycItem.blood_group;
-    document.getElementById('kycDocType').textContent = currentKycItem.document_type || 'National ID (NID)';
-    document.getElementById('kycNidNumber').textContent = currentKycItem.nid_number;
-    document.getElementById('kycSubmissionDate').textContent = (currentKycItem.submitted_at || '').substring(0, 16).replace('T', ' ');
+    const modalTitle = document.getElementById('kycModalTitle');
+    if (modalTitle) modalTitle.textContent = `Review Document: ${currentKycItem.donor_name}`;
 
-    const preview = document.getElementById('kycDocPreview');
+    const donorName = document.getElementById('kycDonorName') || document.getElementById('kycDonorNameVal');
+    if (donorName) donorName.textContent = currentKycItem.donor_name;
+
+    const donorPhone = document.getElementById('kycDonorPhone') || document.getElementById('kycDonorPhoneVal');
+    if (donorPhone) donorPhone.textContent = currentKycItem.donor_phone;
+
+    const bloodGroup = document.getElementById('kycBloodGroup') || document.getElementById('kycBloodGroupVal');
+    if (bloodGroup) bloodGroup.textContent = currentKycItem.blood_group;
+
+    const docType = document.getElementById('kycDocType') || document.getElementById('kycDocTypeLabel');
+    if (docType) docType.textContent = currentKycItem.document_type || 'National ID (NID)';
+
+    const nidNumber = document.getElementById('kycNidNumber') || document.getElementById('kycNidVal');
+    if (nidNumber) nidNumber.textContent = currentKycItem.nid_number;
+
+    const subDate = document.getElementById('kycSubmissionDate') || document.getElementById('kycSubmittedAtVal');
+    if (subDate) subDate.textContent = (currentKycItem.submitted_at || '').substring(0, 16).replace('T', ' ');
+
+    const preview = document.getElementById('kycDocPreview') || document.getElementById('kycDocPreviewBox');
     if (preview) {
       if (currentKycItem.document_url) {
         preview.innerHTML = `<img src="${currentKycItem.document_url}" alt="ID Document Preview" class="kyc-preview-img" onerror="this.onerror=null; this.src='/static/images/sample_nid_1.jpg';">`;
