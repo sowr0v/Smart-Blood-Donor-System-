@@ -1275,7 +1275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         radius_km: parseInt(radiusRangeInput?.value || '15', 10),
         donation_types: selectedTypes,
         preferred_zones: selectedZones,
-        phone_visibility: document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden',
+        phone_visibility: !document.getElementById('settingMaskPublicPhone')?.checked ? 'public' : (document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden'),
         allow_hospital_calls: !!document.getElementById('settingAllowHospitalCall')?.checked,
         mask_public_phone: !!document.getElementById('settingMaskPublicPhone')?.checked,
         public_directory: !!document.getElementById('settingPublicDirectory')?.checked,
@@ -1363,7 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
         public_directory: !!document.getElementById('settingPublicDirectory')?.checked,
         show_badges: !!document.getElementById('settingShowBadges')?.checked,
         share_direct_contact: !!document.getElementById('settingShareDirectContact')?.checked,
-        phone_visibility: document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden'
+        phone_visibility: !document.getElementById('settingMaskPublicPhone')?.checked ? 'public' : (document.getElementById('settingAllowHospitalCall')?.checked ? 'hospital_only' : 'hidden')
       };
 
       try {

@@ -3472,7 +3472,45 @@ async def get_seeker_donors(
     available_only: bool = False,
     query: str | None = None,
 ):
-    donors = list(SEEKER_MOCK_DONORS)
+    donors = []
+    for d in SEEKER_MOCK_DONORS:
+        raw_phone = d.get("phone", "").replace(" ", "").replace("-", "")
+        # Check if donor has personalized privacy settings stored in DB
+        privacy = _get_donor_privacy_settings(raw_phone) if raw_phone else None
+        
+        # 1. Directory Visibility: if donor turned off public directory, exclude
+        if privacy and not privacy.get("public_directory", True):
+            continue
+
+        item = dict(d)
+        if privacy:
+            # 2. Number Masking: if enabled or phone_visibility == hidden, mask phone
+            should_mask = bool(privacy.get("mask_public_phone", True))
+            if privacy.get("phone_visibility") == "public":
+                should_mask = False
+            elif privacy.get("phone_visibility") == "hidden":
+                should_mask = True
+
+            if should_mask:
+                ph = item.get("phone", "")
+                if ph and len(ph) >= 10:
+                    item["phone"] = ph[:6] + "****" + ph[-4:]
+                    item["formatted_phone"] = item["phone"]
+                item["phone_masked"] = True
+            else:
+                item["phone_masked"] = False
+            
+            # 3. Badges Visibility: if disabled, keep badges generic
+            if not privacy.get("show_badges", True):
+                item["badge_tier"] = "Verified Donor"
+                item["badges_hidden"] = True
+
+            # 4. Direct contact consent
+            item["share_direct_contact"] = bool(privacy.get("share_direct_contact", False))
+            item["allow_hospital_calls"] = bool(privacy.get("allow_hospital_calls", True))
+
+        donors.append(item)
+
     if blood_group:
         bg = blood_group.strip().replace(" ", "+").upper()
         donors = [d for d in donors if d["blood_group"] == bg]
@@ -3491,7 +3529,32 @@ async def get_seeker_donor_detail(donor_id: str):
     donor = next((d for d in SEEKER_MOCK_DONORS if d["id"] == donor_id), None)
     if not donor:
         donor = SEEKER_MOCK_DONORS[0]
-    return {"status": "success", "donor": donor}
+    
+    item = dict(donor)
+    raw_phone = item.get("phone", "").replace(" ", "").replace("-", "")
+    privacy = _get_donor_privacy_settings(raw_phone) if raw_phone else None
+    if privacy:
+        should_mask = bool(privacy.get("mask_public_phone", True))
+        if privacy.get("phone_visibility") == "public":
+            should_mask = False
+        elif privacy.get("phone_visibility") == "hidden":
+            should_mask = True
+
+        if should_mask:
+            ph = item.get("phone", "")
+            if ph and len(ph) >= 10:
+                item["phone"] = ph[:6] + "****" + ph[-4:]
+                item["formatted_phone"] = item["phone"]
+            item["phone_masked"] = True
+        else:
+            item["phone_masked"] = False
+        if not privacy.get("show_badges", True):
+            item["badge_tier"] = "Verified Donor"
+            item["badges_hidden"] = True
+        item["share_direct_contact"] = bool(privacy.get("share_direct_contact", False))
+        item["allow_hospital_calls"] = bool(privacy.get("allow_hospital_calls", True))
+
+    return {"status": "success", "donor": item}
 
 
 @app.post("/api/v1/seeker/contact/log")
