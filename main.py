@@ -3356,9 +3356,10 @@ def _chat_available_donors() -> list[dict]:
                WHERE users.role = 'donor' AND COALESCE(profiles.is_available, 1) = 1"""
         ).fetchall()
 
+    mock_id_by_phone = {d["phone"]: d["id"] for d in SEEKER_MOCK_DONORS if d.get("id")}
     donors_by_phone = {
         row["phone"]: {
-            "id": _chat_donor_identifier(row["phone"]),
+            "id": mock_id_by_phone.get(row["phone"], _chat_donor_identifier(row["phone"])),
             "name": row["name"],
             "blood_group": row["blood_group"],
             "district": row["district"],
