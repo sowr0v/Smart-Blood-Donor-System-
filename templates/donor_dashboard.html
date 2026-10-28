@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/donor_dashboard.css">
+  <link rel="stylesheet" href="/static/css/notifications.css">
 </head>
 <body>
   <!-- Global Top Navbar -->
@@ -35,6 +36,17 @@
       </nav>
 
       <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <!-- In-App Notification Bell Center (SBDS-46) -->
+        <div class="notification-center-wrap">
+          <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Open In-App Notification Center" onclick="toggleNotificationDrawer()">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-badge-pill" id="notificationBadge" style="display: none;">0</span>
+          </button>
+        </div>
+
         <button class="theme-toggle-btn" aria-label="Toggle Dark Mode"></button>
         <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
       </div>
@@ -59,6 +71,41 @@
       </div>
     </div>
   </header>
+
+  <!-- Notification Center Dropdown Drawer (SBDS-46) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge" style="display: none;">0 unread</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">
+        <span>View Full Center &rarr;</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-primary" onclick="requestWebPushSubscription()">
+        <span>Enable Push</span>
+      </button>
+    </div>
+  </div>
+
 
   <!-- Main Donor App Shell -->
   <div class="donor-dashboard-wrapper">
@@ -99,6 +146,17 @@
           </svg>
           <span class="nav-item-title">Personal Dashboard</span>
         </button>
+
+        
+        <!-- Notifications Center Link (SBDS-46) -->
+        <a href="/notifications" class="donor-nav-item" id="nav-item-notifications" style="text-decoration: none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="nav-item-title">Notifications</span>
+          <span class="notif-badge-pill nav-badge" id="donorNavNotifBadge" style="position: static; margin-left: auto; display: none;">0</span>
+        </a>
 
         <div class="sidebar-section-title" style="margin-top: 10px;">Donor Operations</div>
 
@@ -565,6 +623,41 @@
           <h1 id="donor-request-flow-title">Accept or decline a blood request</h1>
           <p>Choose how you can help. The seeker will be notified of your response.</p>
         </header>
+
+  <!-- Notification Center Dropdown Drawer (SBDS-46) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge" style="display: none;">0 unread</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">
+        <span>View Full Center &rarr;</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-primary" onclick="requestWebPushSubscription()">
+        <span>Enable Push</span>
+      </button>
+    </div>
+  </div>
+
         <p class="donor-request-flow-status" id="donor-request-flow-status" role="status" aria-live="polite">Loading active requests...</p>
         <div class="donor-request-flow-list" id="donor-request-flow-list" aria-live="polite"></div>
       </section>
@@ -576,6 +669,41 @@
           <h1 id="donor-request-details-title">Blood Request Details &amp; Directions</h1>
           <p>Review the hospital and request information, then open directions to the donation location.</p>
         </header>
+
+  <!-- Notification Center Dropdown Drawer (SBDS-46) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge" style="display: none;">0 unread</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">
+        <span>View Full Center &rarr;</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-primary" onclick="requestWebPushSubscription()">
+        <span>Enable Push</span>
+      </button>
+    </div>
+  </div>
+
 
         <p class="donor-request-details-status" id="donor-request-details-status" role="status" aria-live="polite">
           Loading active emergency requests...
@@ -865,6 +993,41 @@
           <h1 id="donor-reviews-title">Donor Reviews</h1>
           <p>See how recipients and hospital teams describe their donation experience with you.</p>
         </header>
+
+  <!-- Notification Center Dropdown Drawer (SBDS-46) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge" style="display: none;">0 unread</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">
+        <span>View Full Center &rarr;</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-primary" onclick="requestWebPushSubscription()">
+        <span>Enable Push</span>
+      </button>
+    </div>
+  </div>
+
 
         <p class="donor-reviews-sample-notice">Preview content: these sample reviews are shown until recipient review records are connected.</p>
 
@@ -1280,5 +1443,6 @@
   <!-- Scripts -->
   <script src="/static/js/main.js"></script>
   <script src="/static/js/donor_dashboard.js"></script>
+  <script src="/static/js/notifications.js"></script>
 </body>
 </html>

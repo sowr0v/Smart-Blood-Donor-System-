@@ -1127,6 +1127,18 @@ def request_password_recovery(payload: PhoneRequest):
             challenge_id = cursor.lastrowid
     try:
         send_recovery_sms(phone, code)
+        try:
+            from admin_portal import dispatch_in_app_notification
+            dispatch_in_app_notification(
+                recipient_phone=phone,
+                title="Security Alert: Password Reset Requested",
+                message="A verification OTP for password recovery was requested for your account.",
+                notif_type="account",
+                link="/password-recovery",
+                priority="high",
+            )
+        except Exception:
+            pass
     except (OSError, urllib.error.URLError, TimeoutError):
         logger.exception("Password recovery SMS delivery failed")
         with closing(_connection()) as connection:
@@ -1716,6 +1728,19 @@ async def login_submit(
         destination = _safe_local_path(next_url) or "/admin/dashboard"
     else:
         destination = _safe_local_path(next_url) or ROLE_DASHBOARDS.get(assigned_role, "/")
+
+    try:
+        from admin_portal import dispatch_in_app_notification
+        dispatch_in_app_notification(
+            recipient_phone=normalized_phone,
+            title="Account Activity: Successful Login",
+            message=f"Signed in as {assigned_role.title()} from web console.",
+            notif_type="account",
+            link=destination,
+            priority="normal",
+        )
+    except Exception:
+        pass
 
     response = RedirectResponse(url=destination, status_code=303)
     response.set_cookie(
@@ -3483,6 +3508,21 @@ async def send_live_chat_message(
     user = _chat_user(request, role)
     thread = _chat_thread(thread_id, user)
     message = await _chat_save_message(thread, user, payload.text)
+    try:
+        from admin_portal import dispatch_in_app_notification
+        peer_phone = _chat_peer_phone(thread, user["phone"])
+        sender_name = user.get("name", "User")
+        chat_link = "/donor/dashboard#chat" if role == "seeker" else "/seeker/dashboard#chat"
+        dispatch_in_app_notification(
+            recipient_phone=peer_phone,
+            title=f"New Message from {sender_name}",
+            message=payload.text[:120],
+            notif_type="message",
+            link=chat_link,
+            priority="normal",
+        )
+    except Exception:
+        pass
     return {"status": "success", "sent": message}
 
 
@@ -4376,6 +4416,27 @@ async def create_seeker_blood_request(payload: SeekerBloodRequestCreate, request
             )
             new_id = cursor.lastrowid
 
+    try:
+        from admin_portal import dispatch_in_app_notification
+        dispatch_in_app_notification(
+            recipient_phone="all",
+            title=f"New Blood Request: {group} ({payload.units} units)",
+            message=f"{payload.hospital_name.strip()} ({payload.area.strip()}) requires {payload.units} unit(s) of {group} blood.",
+            notif_type="request",
+            link="/find-blood",
+            priority="normal",
+        )
+        dispatch_in_app_notification(
+            recipient_phone=token["sub"],
+            title="Blood Request Published",
+            message=f"Your request #{new_id} for {payload.units} unit(s) of {group} was published successfully.",
+            notif_type="request",
+            link="/seeker/dashboard",
+            priority="normal",
+        )
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "message": "Blood request created successfully",
@@ -4503,6 +4564,28 @@ async def create_seeker_emergency_broadcast(
             notification["status"] = "partial" if notification["sent"] else "failed"
         else:
             notification["status"] = "sent" if notification["sent"] else "no_matches"
+
+    try:
+        from admin_portal import dispatch_in_app_notification
+        for donor_phone in matching_donors:
+            dispatch_in_app_notification(
+                recipient_phone=donor_phone,
+                title=f"🚨 URGENT: {group} Blood Match Needed",
+                message=f"Emergency: {payload.units} units of {group} needed at {payload.hospital_name.strip()} ({payload.urgency_level}).",
+                notif_type="emergency",
+                link="/find-blood",
+                priority="critical",
+            )
+        dispatch_in_app_notification(
+            recipient_phone="all",
+            title=f"Emergency Blood Request: {group}",
+            message=f"{payload.hospital_name.strip()} urgently requires {payload.units} unit(s) of {group} blood ({payload.urgency_level}).",
+            notif_type="emergency",
+            link="/find-blood",
+            priority="critical",
+        )
+    except Exception:
+        pass
 
     return {
         "status": "success",

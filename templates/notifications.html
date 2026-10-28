@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "In-App Notification Center - Smart Blood Donor System" }}</title>
+  <meta name="description" content="Centralized location to view system notifications, blood request alerts, chat messages, and manage read status.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/notifications.css">
+</head>
+<body data-page="notification-center">
+  <!-- Top Global Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 12px;">
+        <!-- In-App Notification Bell Center -->
+        <div class="notification-center-wrap">
+          <button type="button" class="notif-bell-btn" id="notifBellBtn" aria-label="Open In-App Notification Center" onclick="toggleNotificationDrawer()">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-badge-pill" id="notificationBadge" style="{{ 'display:inline-block;' if unread_count > 0 else 'display:none;' }}">{{ unread_count }}</span>
+          </button>
+        </div>
+
+        <a href="{{ dashboard_url }}" class="btn btn-outline" style="padding: 7px 14px; font-size: 0.88rem;">Back to Dashboard</a>
+        <button type="button" class="theme-toggle-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode"></button>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 14px; font-size: 0.88rem;">Logout</a>
+      </div>
+
+      <button class="hamburger-btn" id="hamburger-btn" aria-label="Toggle Mobile Menu" aria-expanded="false">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Drawer for global nav -->
+    <div class="mobile-drawer" id="mobile-drawer">
+      <ul class="mobile-nav-links">
+        <li><a href="/" class="mobile-nav-link">Home</a></li>
+        <li><a href="/find-blood" class="mobile-nav-link">Urgent Requests</a></li>
+        <li><a href="{{ dashboard_url }}" class="mobile-nav-link">My Dashboard</a></li>
+        <li><a href="/notifications" class="mobile-nav-link active">Notifications</a></li>
+        <li><a href="/about" class="mobile-nav-link">About</a></li>
+        <li><a href="/contact" class="mobile-nav-link">Contact</a></li>
+      </ul>
+      <div class="mobile-auth-actions">
+        <a href="/logout" class="btn btn-outline btn-full">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Center Dropdown Drawer (Accessible everywhere) -->
+  <div class="notification-drawer" id="notificationDrawer" aria-hidden="true">
+    <div class="notif-drawer-header">
+      <div class="notif-drawer-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span>Notifications Center</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge" style="{{ 'display:inline-block;' if unread_count > 0 else 'display:none;' }}">{{ unread_count }} unread</span>
+      </div>
+      <div class="notif-drawer-actions">
+        <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
+        <button type="button" class="btn-close-drawer" onclick="toggleNotificationDrawer()" aria-label="Close">✕</button>
+      </div>
+    </div>
+
+    <div class="notif-drawer-tabs">
+      <button type="button" class="notif-tab active" data-tab="all" onclick="switchNotifTab('all')">All</button>
+      <button type="button" class="notif-tab" data-tab="unread" onclick="switchNotifTab('unread')">Unread</button>
+      <button type="button" class="notif-tab" data-tab="critical" onclick="switchNotifTab('critical')">Critical Alerts</button>
+    </div>
+
+    <div class="notif-drawer-list" id="notificationList">
+      <div class="notif-loading">Loading notifications...</div>
+    </div>
+
+    <div class="notif-drawer-footer">
+      <a href="/notifications" class="btn btn-sm btn-outline" style="text-decoration: none;">
+        <span>View Full Center &rarr;</span>
+      </a>
+      <button type="button" class="btn btn-sm btn-primary" onclick="requestWebPushSubscription()">
+        <span>Enable Push Alerts</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Dedicated Main Notification Center Page Layout -->
+  <main class="notifications-page-wrapper" id="notificationCenterScreen">
+    <div class="notifications-page-container">
+      
+      <!-- Screen Header -->
+      <section class="notif-screen-header">
+        <div class="notif-header-left">
+          <div class="notif-screen-badge-icon">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="notif-screen-title">In-App Notification Center</h1>
+            <p class="notif-screen-subtitle">Centralized hub for blood requests, messages, account activities, and system alerts.</p>
+          </div>
+        </div>
+
+        <div class="notif-header-actions">
+          <span class="screen-unread-badge-pill" id="screenUnreadBadge" style="{{ 'display:inline-flex;' if unread_count > 0 else 'display:none;' }}">
+            <span class="unread-pulse-dot"></span>
+            <span id="screenUnreadCountText">{{ unread_count }}</span> Unread
+          </span>
+          <button type="button" class="btn btn-outline notif-mark-all-btn" id="markAllScreenBtn" onclick="markAllNotificationsRead()">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Mark All as Read</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Category Filter Bar and Live Search -->
+      <section class="notif-controls-bar">
+        <div class="notif-filter-chips" role="tablist" aria-label="Notification Filters">
+          <button type="button" class="notif-filter-chip active" data-filter="all" onclick="filterScreenNotifications('all')">
+            <span>All</span>
+            <span class="chip-count" id="chipCountAll">{{ total_count }}</span>
+          </button>
+          <button type="button" class="notif-filter-chip" data-filter="unread" onclick="filterScreenNotifications('unread')">
+            <span>Unread</span>
+            <span class="chip-count unread-chip-count" id="chipCountUnread">{{ unread_count }}</span>
+          </button>
+          <button type="button" class="notif-filter-chip" data-filter="request" onclick="filterScreenNotifications('request')">
+            <span>🩸 Blood Requests</span>
+          </button>
+          <button type="button" class="notif-filter-chip" data-filter="message" onclick="filterScreenNotifications('message')">
+            <span>💬 Messages</span>
+          </button>
+          <button type="button" class="notif-filter-chip" data-filter="account" onclick="filterScreenNotifications('account')">
+            <span>👤 Account Activities</span>
+          </button>
+          <button type="button" class="notif-filter-chip" data-filter="emergency" onclick="filterScreenNotifications('emergency')">
+            <span>🚨 Emergency & System</span>
+          </button>
+        </div>
+
+        <div class="notif-search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="text" class="notif-search-input" id="notifSearchInput" placeholder="Filter by title, keywords, or location..." oninput="handleSearchNotifications(this.value)" aria-label="Search Notifications">
+        </div>
+      </section>
+
+      <!-- Main Notifications List -->
+      <section class="notif-cards-container" id="fullNotificationList" aria-live="polite">
+        {% if notifications and notifications|length > 0 %}
+          {% for item in notifications %}
+            {% set is_unread = not item.is_read %}
+            <div class="notif-card {{ 'unread' if is_unread else 'read' }}"
+                 id="notif-card-{{ item.id }}"
+                 data-id="{{ item.id }}"
+                 data-type="{{ item.type }}"
+                 data-read="{{ '0' if is_unread else '1' }}"
+                 data-priority="{{ item.priority }}"
+                 onclick="handleNotificationClick({{ item.id }}, '{{ item.link or '' }}')">
+              
+              <!-- Unread visual indicator -->
+              {% if is_unread %}
+                <span class="notif-unread-indicator-dot" title="Unread notification" aria-label="Unread"></span>
+              {% endif %}
+
+              <!-- Category Icon -->
+              <div class="notif-card-icon {{ item.type or 'system' }}">
+                {% if item.type == 'request' %}
+                  🩸
+                {% elif item.type == 'message' %}
+                  💬
+                {% elif item.type == 'account' %}
+                  👤
+                {% elif item.type == 'emergency' or item.priority == 'critical' %}
+                  🚨
+                {% elif item.type == 'kyc' %}
+                  📄
+                {% elif item.type == 'moderation' %}
+                  ⚠️
+                {% else %}
+                  ℹ️
+                {% endif %}
+              </div>
+
+              <!-- Main Card Body -->
+              <div class="notif-card-body">
+                <div class="notif-card-topbar">
+                  <div class="notif-tags-wrap">
+                    <span class="notif-category-badge {{ item.type or 'system' }}">
+                      {{ item.type|replace('_', ' ')|upper }}
+                    </span>
+                    {% if is_unread %}
+                      <span class="notif-unread-pill-badge">UNREAD</span>
+                    {% endif %}
+                    {% if item.priority == 'critical' or item.priority == 'high' %}
+                      <span class="notif-priority-badge {{ item.priority }}">{{ item.priority|upper }}</span>
+                    {% endif %}
+                  </div>
+                  
+                  <!-- Timestamp -->
+                  <div class="notif-card-timestamp" title="{{ item.created_at }}">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span class="notif-time-text" data-time="{{ item.created_at }}">{{ item.created_at }}</span>
+                  </div>
+                </div>
+
+                <h3 class="notif-card-title">{{ item.title }}</h3>
+                <p class="notif-card-message">{{ item.message }}</p>
+
+                <!-- Actions Strip -->
+                <div class="notif-card-actions" onclick="event.stopPropagation()">
+                  {% if item.link and item.link != '#' %}
+                    <a href="{{ item.link }}" class="btn-notif-action" onclick="handleNotificationClick({{ item.id }}, '{{ item.link }}'); return false;">
+                      <span>Take Action</span>
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </a>
+                  {% endif %}
+
+                  {% if is_unread %}
+                    <button type="button" class="btn-notif-mark-read" onclick="markSingleNotificationRead({{ item.id }}, event)">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      <span>Mark Read</span>
+                    </button>
+                  {% endif %}
+
+                  <button type="button" class="btn-notif-dismiss" onclick="deleteNotification({{ item.id }}, event)" title="Dismiss notification">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/>
+                      <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="notif-empty-state">
+            <div class="empty-icon-wrap">🔔</div>
+            <h3>No notifications yet</h3>
+            <p>You are all caught up! New blood requests, chat messages, and account activities will appear here.</p>
+          </div>
+        {% endif %}
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Global Footer -->
+  {% include 'partials/public_footer.html' ignore missing %}
+
+  <!-- Core Scripts -->
+  <script src="/static/js/notifications.js"></script>
+  <script>
+    // Theme toggle helper
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('sbds-theme', target); } catch (e) {}
+    }
+    (function () {
+      try {
+        const saved = localStorage.getItem('sbds-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+      } catch (e) {}
+    })();
+  </script>
+</body>
+</html>

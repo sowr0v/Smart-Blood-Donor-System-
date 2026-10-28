@@ -294,7 +294,35 @@ def initialize_admin_and_notification_database():
                     ('+8801745678901', 'New Donor KYC Pending Verification', 'Tanvir Ahmed (+8801735070125) submitted National ID card for official verification.', 'kyc', '#kyc', 0, 'high', '{(now - timedelta(hours=2)).isoformat()}'),
                     ('+8801745678901', 'Potential Duplicate Request Flagged', 'Request #2 at Square Hospital shares contact number with recent post. Duplicate risk score: 75%.', 'moderation', '#requests', 0, 'high', '{(now - timedelta(hours=3)).isoformat()}'),
                     ('+8801745678901', 'High Priority Moderation Report Filed', 'Dhaka General Hospital reported suspected commercial blood solicitation by user +8801788887777.', 'moderation', '#reports', 0, 'high', '{(now - timedelta(hours=5)).isoformat()}'),
-                    ('all', 'Emergency Blood Drive at DMCH', 'Trauma center emergency blood drive underway. Eligible donors please check nearby request bulletin.', 'system', '/find-blood', 1, 'normal', '{(now - timedelta(days=1)).isoformat()}');
+                    ('all', 'Emergency Blood Drive at DMCH', 'Trauma center emergency blood drive underway. Eligible donors please check nearby request bulletin.', 'system', '/find-blood', 1, 'normal', '{(now - timedelta(days=1)).isoformat()}'),
+                    ('+8801712345678', 'Urgent A+ Blood Request Nearby', 'Square Hospital ICU urgently needs 2 units of A+ blood. You are a compatible match within 3 km.', 'request', '/find-blood', 0, 'critical', '{(now - timedelta(minutes=15)).isoformat()}'),
+                    ('+8801712345678', 'New Message from Seeker Nabil', 'Please confirm if you are available to donate today at Square Hospital.', 'message', '/donor/dashboard#chat', 0, 'high', '{(now - timedelta(hours=1)).isoformat()}'),
+                    ('+8801712345678', 'Account Activity: Successful Login', 'Signed in to Smart Blood Donor System from Dhaka via Chrome on Windows.', 'account', '/donor/dashboard', 1, 'normal', '{(now - timedelta(hours=4)).isoformat()}'),
+                    ('+8801712345678', 'Donor Profile Verified - Gold Tier', 'Your donor credentials have been verified by Dhaka Central Blood Bank.', 'account', '/donor/dashboard', 1, 'normal', '{(now - timedelta(days=2)).isoformat()}'),
+                    ('+8801723456789', 'Donor Response Received', 'Ayesha Rahman accepted your request for A+ blood at Square Hospital.', 'request', '/seeker/dashboard', 0, 'high', '{(now - timedelta(minutes=25)).isoformat()}'),
+                    ('+8801723456789', 'New Message from Ayesha Rahman', 'I am on my way to Square Hospital blood bank now.', 'message', '/seeker/dashboard#chat', 0, 'normal', '{(now - timedelta(hours=2)).isoformat()}'),
+                    ('+8801723456789', 'Emergency Blood Request Published', 'Your emergency request #req-001 for A+ blood was published to nearby donors.', 'request', '/find-blood', 1, 'normal', '{(now - timedelta(hours=5)).isoformat()}'),
+                    ('+8801723456789', 'Account Security Alert', 'Password recovery verification was accessed for your registered phone.', 'account', '/password-recovery', 1, 'high', '{(now - timedelta(days=1)).isoformat()}');
+                """)
+
+            donor_notif_count = connection.execute("SELECT COUNT(*) FROM app_notifications WHERE recipient_phone = '+8801712345678'").fetchone()[0]
+            if donor_notif_count == 0:
+                connection.executescript(f"""
+                    INSERT INTO app_notifications (recipient_phone, title, message, type, link, is_read, priority, created_at) VALUES
+                    ('+8801712345678', 'Urgent A+ Blood Request Nearby', 'Square Hospital ICU urgently needs 2 units of A+ blood. You are a compatible match within 3 km.', 'request', '/find-blood', 0, 'critical', '{(now - timedelta(minutes=15)).isoformat()}'),
+                    ('+8801712345678', 'New Message from Seeker Nabil', 'Please confirm if you are available to donate today at Square Hospital.', 'message', '/donor/dashboard#chat', 0, 'high', '{(now - timedelta(hours=1)).isoformat()}'),
+                    ('+8801712345678', 'Account Activity: Successful Login', 'Signed in to Smart Blood Donor System from Dhaka via Chrome on Windows.', 'account', '/donor/dashboard', 1, 'normal', '{(now - timedelta(hours=4)).isoformat()}'),
+                    ('+8801712345678', 'Donor Profile Verified - Gold Tier', 'Your donor credentials have been verified by Dhaka Central Blood Bank.', 'account', '/donor/dashboard', 1, 'normal', '{(now - timedelta(days=2)).isoformat()}');
+                """)
+
+            seeker_notif_count = connection.execute("SELECT COUNT(*) FROM app_notifications WHERE recipient_phone = '+8801723456789'").fetchone()[0]
+            if seeker_notif_count == 0:
+                connection.executescript(f"""
+                    INSERT INTO app_notifications (recipient_phone, title, message, type, link, is_read, priority, created_at) VALUES
+                    ('+8801723456789', 'Donor Response Received', 'Ayesha Rahman accepted your request for A+ blood at Square Hospital.', 'request', '/seeker/dashboard', 0, 'high', '{(now - timedelta(minutes=25)).isoformat()}'),
+                    ('+8801723456789', 'New Message from Ayesha Rahman', 'I am on my way to Square Hospital blood bank now.', 'message', '/seeker/dashboard#chat', 0, 'normal', '{(now - timedelta(hours=2)).isoformat()}'),
+                    ('+8801723456789', 'Emergency Blood Request Published', 'Your emergency request #req-001 for A+ blood was published to nearby donors.', 'request', '/find-blood', 1, 'normal', '{(now - timedelta(hours=5)).isoformat()}'),
+                    ('+8801723456789', 'Account Security Alert', 'Password recovery verification was accessed for your registered phone.', 'account', '/password-recovery', 1, 'high', '{(now - timedelta(days=1)).isoformat()}');
                 """)
 
             # Seed SMS logs if empty
@@ -486,6 +514,43 @@ def _extract_admin_identity(request: Request) -> tuple[str, str]:
         except Exception:
             pass
     return "+8801745678901", "System Admin"
+
+def _extract_user_identity(request: Request) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Extracts acting user (phone, role, name) from session cookies or JWT."""
+    token = request.cookies.get("access_token", "")
+    if token:
+        try:
+            import main
+            decoded = main._decode_jwt(token)
+            if decoded:
+                phone = decoded.get("sub", "")
+                role = decoded.get("role", "donor")
+                user = main._get_user_by_phone(phone) if phone else None
+                if not user and phone:
+                    user = getattr(main, "USERS", {}).get(phone)
+                name = user.get("name", "User") if user else "User"
+                return phone or None, role, name
+        except Exception:
+            pass
+    session_token = request.cookies.get("sbds_session")
+    if session_token:
+        try:
+            token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+            now = int(time.time())
+            with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+                row = connection.execute(
+                    """SELECT users.phone, users.role, users.name
+                       FROM auth_sessions AS sessions
+                       JOIN auth_users AS users ON users.id = sessions.user_id
+                       WHERE sessions.token_hash = ? AND sessions.expires_at > ?""",
+                    (token_hash, now),
+                ).fetchone()
+                if row:
+                    return row[0], row[1], row[2]
+        except Exception:
+            pass
+    return None, None, None
+
 
 
 def log_request_moderation_action(
@@ -2160,10 +2225,12 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # -----------------------------------------------------------------------
     # SBDS-46: In-App Notification Center & Read Badges
     # -----------------------------------------------------------------------
-    @app.get("/api/v1/notifications")
-    async def get_user_notifications(phone: Optional[str] = Query(None)):
+    @app.get("/notifications", response_class=HTMLResponse)
+    @app.get("/notification-center", response_class=HTMLResponse)
+    async def serve_notifications_page(request: Request):
         initialize_admin_and_notification_database()
-        target_phone = phone.strip() if phone else "+8801745678901"
+        user_phone, user_role, user_name = _extract_user_identity(request)
+        target_phone = user_phone or "+8801745678901"
 
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             u_conn.row_factory = sqlite3.Row
@@ -2171,7 +2238,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                 """
                 SELECT * FROM app_notifications
                 WHERE recipient_phone = ? OR recipient_phone = 'all'
-                ORDER BY id DESC LIMIT 50
+                ORDER BY id DESC LIMIT 100
                 """,
                 (target_phone,),
             ).fetchall()
@@ -2184,8 +2251,97 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                 (target_phone,),
             ).fetchone()[0]
 
+        dashboard_url = "/admin/dashboard"
+        if user_role == "donor":
+            dashboard_url = "/donor/dashboard"
+        elif user_role == "seeker":
+            dashboard_url = "/seeker/dashboard"
+        elif user_role in ("hospital", "bank", "blood_bank"):
+            dashboard_url = "/hospital/dashboard"
+        elif not user_role:
+            dashboard_url = "/"
+
+        notifications = [dict(r) for r in rows]
+
+        return templates.TemplateResponse(
+            request=request,
+            name="notifications.html",
+            context={
+                "request": request,
+                "user": {"phone": target_phone, "role": user_role or "guest", "name": user_name or "User"},
+                "dashboard_url": dashboard_url,
+                "notifications": notifications,
+                "unread_count": unread_cnt,
+                "total_count": len(notifications),
+                "title": "In-App Notification Center - Smart Blood Donor System",
+            },
+        )
+
+    @app.get("/api/v1/notifications")
+    async def get_user_notifications(
+        request: Request,
+        phone: Optional[str] = Query(None),
+        status: Optional[str] = Query(None),
+        type: Optional[str] = Query(None),
+        category: Optional[str] = Query(None),
+        q: Optional[str] = Query(None),
+        limit: int = Query(50),
+    ):
+        initialize_admin_and_notification_database()
+        target_phone = phone.strip() if phone else None
+        if not target_phone:
+            user_phone, _, _ = _extract_user_identity(request)
+            target_phone = user_phone or "+8801745678901"
+        elif target_phone != "all" and not target_phone.startswith("+"):
+            target_phone = "+" + target_phone
+
+        query_type = type or category
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            u_conn.row_factory = sqlite3.Row
+
+            sql = """
+                SELECT * FROM app_notifications
+                WHERE (recipient_phone = ? OR recipient_phone = 'all')
+            """
+            params: list[Any] = [target_phone]
+
+            if status:
+                st = status.strip().lower()
+                if st in ("unread", "0"):
+                    sql += " AND is_read = 0"
+                elif st in ("read", "1"):
+                    sql += " AND is_read = 1"
+
+            if query_type and query_type.strip().lower() != "all":
+                qt = query_type.strip().lower()
+                if qt in ("critical", "emergency"):
+                    sql += " AND (priority = 'critical' OR type = 'emergency')"
+                else:
+                    sql += " AND type = ?"
+                    params.append(qt)
+
+            if q and q.strip():
+                sql += " AND (title LIKE ? OR message LIKE ?)"
+                kw = f"%{q.strip()}%"
+                params.extend([kw, kw])
+
+            sql += " ORDER BY id DESC LIMIT ?"
+            params.append(limit)
+
+            rows = u_conn.execute(sql, params).fetchall()
+
+            unread_cnt = u_conn.execute(
+                """
+                SELECT COUNT(*) FROM app_notifications
+                WHERE (recipient_phone = ? OR recipient_phone = 'all') AND is_read = 0
+                """,
+                (target_phone,),
+            ).fetchone()[0]
+
             return {
                 "status": "success",
+                "recipient_phone": target_phone,
                 "unread_count": unread_cnt,
                 "total": len(rows),
                 "notifications": [dict(r) for r in rows],
@@ -2196,28 +2352,48 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
-                u_conn.execute("UPDATE app_notifications SET is_read = 1 WHERE id = ?", (notif_id,))
-        return {"status": "success", "message": "Notification marked as read"}
+                cursor = u_conn.execute("UPDATE app_notifications SET is_read = 1 WHERE id = ?", (notif_id,))
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Notification not found")
+        return {"status": "success", "message": "Notification marked as read", "id": notif_id, "is_read": 1}
 
-    @app.post("/api/v1/notifications/mark-all-read")
-    async def mark_all_notifications_read(phone: Optional[str] = Query(None)):
+    @app.post("/api/v1/notifications/{notif_id}/unread")
+    async def mark_notification_unread(notif_id: int):
         initialize_admin_and_notification_database()
-        target_phone = phone.strip() if phone else "+8801745678901"
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
-                u_conn.execute(
+                cursor = u_conn.execute("UPDATE app_notifications SET is_read = 0 WHERE id = ?", (notif_id,))
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Notification not found")
+        return {"status": "success", "message": "Notification marked as unread", "id": notif_id, "is_read": 0}
+
+    @app.post("/api/v1/notifications/mark-all-read")
+    async def mark_all_notifications_read(request: Request, phone: Optional[str] = Query(None)):
+        initialize_admin_and_notification_database()
+        target_phone = phone.strip() if phone else None
+        if not target_phone:
+            user_phone, _, _ = _extract_user_identity(request)
+            target_phone = user_phone or "+8801745678901"
+        elif target_phone != "all" and not target_phone.startswith("+"):
+            target_phone = "+" + target_phone
+
+        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+            with u_conn:
+                cursor = u_conn.execute(
                     "UPDATE app_notifications SET is_read = 1 WHERE recipient_phone = ? OR recipient_phone = 'all'",
                     (target_phone,),
                 )
-        return {"status": "success", "message": "All notifications marked as read"}
+        return {"status": "success", "message": "All notifications marked as read", "updated_count": cursor.rowcount}
 
     @app.delete("/api/v1/notifications/{notif_id}")
     async def delete_notification(notif_id: int):
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             with u_conn:
-                u_conn.execute("DELETE FROM app_notifications WHERE id = ?", (notif_id,))
-        return {"status": "success", "message": "Notification dismissed"}
+                cursor = u_conn.execute("DELETE FROM app_notifications WHERE id = ?", (notif_id,))
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Notification not found")
+        return {"status": "success", "message": "Notification dismissed", "id": notif_id}
 
     @app.post("/api/v1/notifications/send")
     async def send_in_app_notification(payload: SendNotificationPayload):
