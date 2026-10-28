@@ -2517,6 +2517,16 @@ async def admin_dashboard(request: Request):
     return response
 
 
+@app.get("/admin/requests")
+@app.get("/admin/moderation")
+async def admin_requests_screen(request: Request):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    is_demo = request.query_params.get("preview") == "1" or request.query_params.get("demo") == "1" or request.query_params.get("admin") == "1"
+    if (not token or token.get("role") != "admin") and not is_demo:
+        return RedirectResponse(url="/admin/login?next=/admin/dashboard%23requests", status_code=303)
+    return RedirectResponse(url="/admin/dashboard#requests", status_code=303)
+
+
 
 @app.get("/logout")
 async def logout(request: Request):
@@ -3346,9 +3356,10 @@ def _chat_available_donors() -> list[dict]:
                WHERE users.role = 'donor' AND COALESCE(profiles.is_available, 1) = 1"""
         ).fetchall()
 
+    mock_id_by_phone = {d["phone"]: d["id"] for d in SEEKER_MOCK_DONORS if d.get("id")}
     donors_by_phone = {
         row["phone"]: {
-            "id": _chat_donor_identifier(row["phone"]),
+            "id": mock_id_by_phone.get(row["phone"], _chat_donor_identifier(row["phone"])),
             "name": row["name"],
             "blood_group": row["blood_group"],
             "district": row["district"],
