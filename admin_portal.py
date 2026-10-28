@@ -13,7 +13,9 @@ Tickets Implemented:
 - SBDS-48: Critical Emergency SMS Notification Dispatch
 """
 
+import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -383,6 +385,35 @@ def initialize_admin_and_notification_database():
                     ('+8801745678901', 'System Admin', 'EMERGENCY_SMS_BROADCAST', 'O- Donors (Dhaka)', 'Dispatched life-critical emergency broadcast for Square Hospital ICU', '127.0.0.1', '{(now - timedelta(hours=1)).isoformat()}');
                 """)
 
+            # Ensure target_phone column in admin_audit_logs
+            audit_cols = {row[1] for row in connection.execute("PRAGMA table_info(admin_audit_logs)").fetchall()}
+            if "target_phone" not in audit_cols:
+                try:
+                    connection.execute("ALTER TABLE admin_audit_logs ADD COLUMN target_phone TEXT DEFAULT ''")
+                except Exception:
+                    pass
+
+            # Seed default demo accounts in auth_users table
+            seed_accounts = [
+                ("+8801712345678", "secret123", "donor", "Ayesha Rahman", "O+", "Dhaka", "active", 1),
+                ("+8801723456789", "match123", "seeker", "Nabil Hasan", "A+", "Dhaka", "active", 0),
+                ("+8801734567890", "hospital123", "hospital", "Dhaka General Hospital", "B+", "Dhaka", "active", 1),
+                ("+8801734567891", "bloodbank123", "bank", "Red Crescent Blood Bank", "AB+", "Dhaka", "active", 1),
+            ]
+            for s_phone, s_pw, s_role, s_name, s_bg, s_dist, s_st, s_v in seed_accounts:
+                exists = connection.execute("SELECT id FROM auth_users WHERE phone = ?", (s_phone,)).fetchone()
+                if not exists:
+                    salt = secrets.token_bytes(16)
+                    digest = hashlib.pbkdf2_hmac("sha256", s_pw.encode(), salt, 100_000)
+                    pw_hash = f"{salt.hex()}${digest.hex()}"
+                    connection.execute(
+                        """
+                        INSERT INTO auth_users (phone, password_hash, created_at, updated_at, role, name, blood_group, district, status, is_verified)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (s_phone, pw_hash, int(time.time()), int(time.time()), s_role, s_name, s_bg, s_dist, s_st, s_v),
+                    )
+
             # Ensure default admin user in auth_users table
             admin_user = connection.execute(
                 "SELECT id FROM auth_users WHERE phone = ?", ("+8801745678901",)
@@ -436,15 +467,28 @@ def log_admin_action(admin_phone: str, admin_name: str, action: str, target: str
         now_iso = datetime.now(timezone.utc).isoformat()
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as conn:
             with conn:
-                conn.execute(
-                    """
-                    INSERT INTO admin_audit_logs (admin_phone, admin_name, action, target, details, ip_address, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (admin_phone, admin_name, action, target, details, ip_address, now_iso),
-                )
+                cols = {row[1] for row in conn.execute("PRAGMA table_info(admin_audit_logs)").fetchall()}
+                if "target_phone" in cols:
+                    conn.execute(
+                        """
+                        INSERT INTO admin_audit_logs (admin_phone, admin_name, action, target, target_phone, details, ip_address, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (admin_phone, admin_name, action, target, target, details, ip_address, now_iso),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO admin_audit_logs (admin_phone, admin_name, action, target, details, ip_address, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (admin_phone, admin_name, action, target, details, ip_address, now_iso),
+                    )
     except Exception as exc:
         logger.warning(f"Error logging admin action: {exc}")
+
+def _log_admin_action(admin_phone: str, target_phone: str, action: str, details: str):
+    log_admin_action(admin_phone, "System Admin", action, target_phone, details)
 
 
 def dispatch_in_app_notification(
@@ -668,16 +712,122 @@ def calculate_duplicate_risk(
     return max_risk, risk_label, candidates[:5]
 
 
+JWT_SECRET = os.environ.get("JWT_SECRET") or "sbds_super_secure_persistent_secret_key_2026"
+
+def normalize_phone_number(phone: str) -> str:
+    cleaned = re.sub(r"[\s()-]", "", phone)
+    if cleaned.startswith("00880"):
+        cleaned = "+" + cleaned[2:]
+    elif cleaned.startswith("880"):
+        cleaned = "+" + cleaned
+    elif re.fullmatch(r"01[3-9]\d{8}", cleaned):
+        cleaned = "+880" + cleaned[1:]
+    return cleaned
+
+def _require_admin(request: Request) -> dict:
+    """Validate that the requesting user is authenticated and possesses the 'admin' role."""
+    token_str = request.cookies.get("access_token", "")
+    if not token_str and "authorization" in request.headers:
+        auth_hdr = request.headers["authorization"]
+        if auth_hdr.startswith("Bearer "):
+            token_str = auth_hdr.split(" ", 1)[1].strip()
+
+    payload = None
+    if token_str:
+        try:
+            parts = token_str.split(".")
+            if len(parts) == 3:
+                encoded_header, encoded_payload, encoded_signature = parts
+                signing_input = f"{encoded_header}.{encoded_payload}".encode("utf-8")
+                expected_sig = hmac.new(JWT_SECRET.encode("utf-8"), signing_input, hashlib.sha256).digest()
+                sig = base64.urlsafe_b64decode(encoded_signature + "=" * (-len(encoded_signature) % 4))
+                if hmac.compare_digest(sig, expected_sig):
+                    data = json.loads(base64.urlsafe_b64decode(encoded_payload + "=" * (-len(encoded_payload) % 4)))
+                    if data.get("exp", 0) > int(time.time()):
+                        payload = data
+        except Exception:
+            payload = None
+
+    user_record = None
+    if not payload:
+        session_token = request.cookies.get("session_token", "") or request.cookies.get("auth_session", "")
+        if session_token:
+            token_hash = hashlib.sha256(session_token.encode()).hexdigest()
+            now = int(time.time())
+            with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+                a_conn.row_factory = sqlite3.Row
+                sess = a_conn.execute(
+                    "SELECT user_id FROM auth_sessions WHERE token_hash = ? AND expires_at > ?",
+                    (token_hash, now),
+                ).fetchone()
+                if sess:
+                    user_record = a_conn.execute(
+                        "SELECT * FROM auth_users WHERE id = ?", (sess["user_id"],)
+                    ).fetchone()
+
+    if payload:
+        phone = payload.get("sub", "")
+        role = (payload.get("role") or "").lower()
+        name = "System Admin"
+        user_id = 1
+        with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+            a_conn.row_factory = sqlite3.Row
+            row = a_conn.execute("SELECT * FROM auth_users WHERE phone = ?", (phone,)).fetchone()
+            if row:
+                user_record = row
+                role = (row["role"] or role).lower()
+                name = row["name"] or name
+                user_id = row["id"]
+        if role != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Administrative privileges required. Access denied."
+            )
+        return {
+            "phone": phone or "+8801745678901",
+            "role": "admin",
+            "name": name,
+            "id": user_id,
+        }
+
+    if user_record:
+        role = (user_record["role"] or "").lower()
+        if role != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Administrative privileges required. Access denied."
+            )
+        return {
+            "phone": user_record["phone"],
+            "role": "admin",
+            "name": user_record["name"],
+            "id": user_record["id"],
+        }
+
+    raise HTTPException(
+        status_code=401,
+        detail="Sign in as an administrator to access administrative controls."
+    )
+
 # ---------------------------------------------------------------------------
 # Pydantic Payload Models
 # ---------------------------------------------------------------------------
 
 class UserRoleUpdatePayload(BaseModel):
     role: str = Field(..., description="Target role: donor, seeker, hospital, bank, admin")
+    reason: Optional[str] = "Admin role adjustment"
 
 class UserStatusUpdatePayload(BaseModel):
-    status: str = Field(..., description="active, suspended, banned")
-    reason: Optional[str] = ""
+    status: str = Field(..., description="active, suspended, banned, inactive")
+    reason: Optional[str] = "Admin status adjustment"
+
+class AdminCreateUserPayload(BaseModel):
+    phone: str
+    name: str
+    role: str = "donor"
+    blood_group: Optional[str] = "A+"
+    status: Optional[str] = "active"
+    password: str = "Secret123456"
 
 class UserProfileAdminUpdatePayload(BaseModel):
     name: Optional[str] = None
@@ -962,12 +1112,14 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # -----------------------------------------------------------------------
     @app.get("/api/v1/admin/users")
     async def get_admin_users(
+        request: Request,
         query: str = Query("", description="Search by name, phone, or blood group"),
         role: str = Query("all", description="Filter by role: donor, seeker, hospital, bank, admin"),
-        status: str = Query("all", description="Filter by status: active, suspended, banned"),
+        status: str = Query("all", description="Filter by status: active, suspended, banned, inactive"),
         page: int = Query(1, ge=1),
         limit: int = Query(50, ge=1, le=100),
     ):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
             a_conn.row_factory = sqlite3.Row
@@ -980,16 +1132,18 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                 sql += " AND (name LIKE ? OR phone LIKE ? OR blood_group LIKE ? OR district LIKE ?)"
                 params.extend([clean_q, clean_q, clean_q, clean_q])
 
-            if role != "all":
-                if role in {"hospital", "bank", "blood_bank"}:
+            if role != "all" and role.strip():
+                clean_role = role.strip().lower()
+                if clean_role in {"hospital", "bank", "blood_bank"}:
                     sql += " AND role IN ('hospital', 'bank', 'blood_bank')"
                 else:
                     sql += " AND role = ?"
-                    params.append(role)
+                    params.append(clean_role)
 
-            if status != "all":
+            if status != "all" and status.strip():
+                clean_status = status.strip().lower()
                 sql += " AND status = ?"
-                params.append(status)
+                params.append(clean_status)
 
             sql += " ORDER BY id DESC"
             rows = a_conn.execute(sql, params).fetchall()
@@ -1013,8 +1167,11 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             paginated = users[start : start + limit]
 
             active_cnt = sum(1 for u in users if u["status"] == "active")
-            suspended_cnt = sum(1 for u in users if u["status"] == "suspended")
+            suspended_cnt = sum(1 for u in users if u["status"] in {"suspended", "inactive", "banned"})
             banned_cnt = sum(1 for u in users if u["status"] == "banned")
+            donor_cnt = sum(1 for u in users if u["role"] == "donor")
+            seeker_cnt = sum(1 for u in users if u["role"] == "seeker")
+            inst_cnt = sum(1 for u in users if u["role"] in {"hospital", "bank", "blood_bank"})
 
             return {
                 "status": "success",
@@ -1024,133 +1181,307 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                 "active_count": active_cnt,
                 "suspended_count": suspended_cnt,
                 "banned_count": banned_cnt,
+                "metrics": {
+                    "total_users": total,
+                    "active_count": active_cnt,
+                    "suspended_count": suspended_cnt,
+                    "banned_count": banned_cnt,
+                    "donor_count": donor_cnt,
+                    "seeker_count": seeker_cnt,
+                    "institutional_count": inst_cnt,
+                },
                 "users": paginated,
             }
 
-    @app.get("/api/v1/admin/users/{phone}")
-    async def get_admin_user_detail(phone: str):
+    @app.get("/api/v1/admin/users/{phone:path}")
+    async def get_admin_user_detail(phone: str, request: Request):
+        _require_admin(request)
         initialize_admin_and_notification_database()
         clean_phone = phone.strip()
+        norm_phone = normalize_phone_number(clean_phone)
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
             a_conn.row_factory = sqlite3.Row
-            row = a_conn.execute("SELECT * FROM auth_users WHERE phone = ?", (clean_phone,)).fetchone()
+            row = a_conn.execute("SELECT * FROM auth_users WHERE phone = ? OR phone = ?", (clean_phone, norm_phone)).fetchone()
             if not row:
-                raise HTTPException(status_code=404, detail="User not found")
+                raise HTTPException(status_code=404, detail="User account not found.")
 
             user_data = dict(row)
-            # Fetch recent audit logs for this user
-            logs = a_conn.execute(
-                "SELECT * FROM admin_audit_logs WHERE target = ? ORDER BY id DESC LIMIT 10",
-                (clean_phone,),
-            ).fetchall()
+            cols = {r[1] for r in a_conn.execute("PRAGMA table_info(admin_audit_logs)").fetchall()}
+            if "target_phone" in cols:
+                logs = a_conn.execute(
+                    "SELECT * FROM admin_audit_logs WHERE target = ? OR target = ? OR target_phone = ? OR target_phone = ? ORDER BY id DESC LIMIT 20",
+                    (clean_phone, norm_phone, clean_phone, norm_phone),
+                ).fetchall()
+            else:
+                logs = a_conn.execute(
+                    "SELECT * FROM admin_audit_logs WHERE target = ? OR target = ? ORDER BY id DESC LIMIT 20",
+                    (clean_phone, norm_phone),
+                ).fetchall()
 
-        # Fetch donation / request metrics for this user
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             u_conn.row_factory = sqlite3.Row
             donations = u_conn.execute(
-                "SELECT COUNT(*) FROM donor_donation_history WHERE donor_phone = ?", (clean_phone,)
+                "SELECT COUNT(*) FROM donor_donation_history WHERE donor_phone = ? OR donor_phone = ?", (clean_phone, norm_phone)
             ).fetchone()[0]
             requests_posted = u_conn.execute(
-                "SELECT COUNT(*) FROM blood_requests WHERE contact_phone = ?", (clean_phone,)
+                "SELECT COUNT(*) FROM blood_requests WHERE contact_phone = ? OR contact_phone = ?", (clean_phone, norm_phone)
             ).fetchone()[0]
             kyc = u_conn.execute(
-                "SELECT * FROM donor_kyc_verifications WHERE donor_phone = ? ORDER BY id DESC LIMIT 1",
-                (clean_phone,),
+                "SELECT * FROM donor_kyc_verifications WHERE donor_phone = ? OR donor_phone = ? ORDER BY id DESC LIMIT 1",
+                (clean_phone, norm_phone),
             ).fetchone()
+
+        audit_list = []
+        for l in logs:
+            ld = dict(l)
+            ld["target_phone"] = ld.get("target_phone") or ld.get("target") or clean_phone
+            audit_list.append(ld)
+
+        sanitized_user = {
+            "id": user_data["id"],
+            "phone": user_data["phone"],
+            "name": user_data["name"] or ("Blood Seeker" if user_data["role"] == "seeker" else "Blood Donor"),
+            "role": user_data["role"],
+            "blood_group": user_data["blood_group"],
+            "district": user_data.get("district", "Dhaka"),
+            "status": user_data.get("status", "active"),
+            "is_verified": bool(user_data.get("is_verified", 0)),
+            "donations_count": donations,
+            "requests_posted_count": requests_posted,
+            "kyc_status": kyc["status"] if kyc else "unsubmitted",
+            "audit_logs": audit_list,
+        }
 
         return {
             "status": "success",
-            "user": {
-                "id": user_data["id"],
-                "phone": user_data["phone"],
-                "name": user_data["name"],
-                "role": user_data["role"],
-                "blood_group": user_data["blood_group"],
-                "district": user_data.get("district", "Dhaka"),
-                "status": user_data.get("status", "active"),
-                "is_verified": bool(user_data.get("is_verified", 0)),
-                "donations_count": donations,
-                "requests_posted_count": requests_posted,
-                "kyc_status": kyc["status"] if kyc else "unsubmitted",
-                "audit_logs": [dict(l) for l in logs],
-            },
+            "user": sanitized_user,
+            "audit_history": audit_list,
+            "audit_logs": audit_list,
         }
 
-    @app.post("/api/v1/admin/users/{phone}/role")
+    @app.put("/api/v1/admin/users/{phone:path}/role")
+    @app.post("/api/v1/admin/users/{phone:path}/role")
     async def update_user_role(phone: str, payload: UserRoleUpdatePayload, request: Request):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
         clean_phone = phone.strip()
+        norm_phone = normalize_phone_number(clean_phone)
+        admin_phone = admin.get("phone", "+8801745678901")
+
         target_role = payload.role.strip().lower()
-        if target_role not in {"donor", "seeker", "hospital", "bank", "blood_bank", "admin"}:
-            raise HTTPException(status_code=422, detail="Invalid role specified")
+        allowed_roles = {"admin", "hospital", "bank", "blood_bank", "donor", "seeker"}
+        if target_role not in allowed_roles:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid role '{payload.role}'. Must be one of: {', '.join(sorted(allowed_roles))}"
+            )
+
+        # Self-demotion prevention
+        if (clean_phone == admin_phone or norm_phone == normalize_phone_number(admin_phone)) and target_role != "admin":
+            raise HTTPException(status_code=400, detail="Administrators cannot demote their own account.")
 
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+            a_conn.row_factory = sqlite3.Row
             with a_conn:
-                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ?", (clean_phone,)).fetchone()
+                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ? OR phone = ?", (clean_phone, norm_phone)).fetchone()
                 if not user:
-                    raise HTTPException(status_code=404, detail="User not found")
+                    raise HTTPException(status_code=404, detail="User account not found.")
+
+                old_role = user["role"]
+                actual_phone = user["phone"]
                 a_conn.execute(
-                    "UPDATE auth_users SET role = ?, updated_at = ? WHERE phone = ?",
-                    (target_role, int(time.time()), clean_phone),
+                    "UPDATE auth_users SET role = ?, updated_at = ? WHERE id = ?",
+                    (target_role, int(time.time()), user["id"]),
                 )
 
+        try:
+            import main
+            for p in (clean_phone, norm_phone, actual_phone):
+                if p in main.USERS:
+                    main.USERS[p]["role"] = target_role
+        except Exception:
+            pass
+
+        reason_text = payload.reason.strip() if payload.reason else "Admin role update"
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
-            "USER_ROLE_CHANGE",
-            clean_phone,
-            f"Changed user role to '{target_role}'",
+            admin_phone,
+            admin.get("name", "System Admin"),
+            "ROLE_MODIFIED",
+            actual_phone,
+            f"Changed user role from '{old_role}' to '{target_role}'. Reason: {reason_text}",
             request.client.host if request.client else "127.0.0.1",
         )
         dispatch_in_app_notification(
-            clean_phone,
+            actual_phone,
             "Role Updated",
             f"Your platform role has been updated to {target_role.title()}.",
             "system",
             "/",
             "normal",
         )
-        return {"status": "success", "message": f"User role successfully changed to {target_role}"}
+        return {
+            "status": "success",
+            "message": f"User role successfully changed to {target_role}",
+            "user": {
+                "phone": actual_phone,
+                "role": target_role,
+                "previous_role": old_role,
+            },
+        }
 
-    @app.post("/api/v1/admin/users/{phone}/status")
+    @app.put("/api/v1/admin/users/{phone:path}/status")
+    @app.post("/api/v1/admin/users/{phone:path}/status")
     async def update_user_status(phone: str, payload: UserStatusUpdatePayload, request: Request):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
         clean_phone = phone.strip()
+        norm_phone = normalize_phone_number(clean_phone)
+        admin_phone = admin.get("phone", "+8801745678901")
+
         target_status = payload.status.strip().lower()
-        if target_status not in {"active", "suspended", "banned"}:
-            raise HTTPException(status_code=422, detail="Invalid status specified")
+        allowed_statuses = {"active", "suspended", "banned", "inactive"}
+        if target_status not in allowed_statuses:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid status '{payload.status}'. Must be one of: {', '.join(sorted(allowed_statuses))}"
+            )
+
+        # Self-suspension prevention
+        if (clean_phone == admin_phone or norm_phone == normalize_phone_number(admin_phone)) and target_status in {"suspended", "banned", "inactive", "disabled"}:
+            raise HTTPException(status_code=400, detail="Administrators cannot suspend their own account.")
 
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+            a_conn.row_factory = sqlite3.Row
             with a_conn:
-                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ?", (clean_phone,)).fetchone()
+                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ? OR phone = ?", (clean_phone, norm_phone)).fetchone()
                 if not user:
-                    raise HTTPException(status_code=404, detail="User not found")
-                a_conn.execute(
-                    "UPDATE auth_users SET status = ?, updated_at = ? WHERE phone = ?",
-                    (target_status, int(time.time()), clean_phone),
-                )
+                    raise HTTPException(status_code=404, detail="User account not found.")
 
+                old_status = user["status"] or "active"
+                actual_phone = user["phone"]
+                a_conn.execute(
+                    "UPDATE auth_users SET status = ?, updated_at = ? WHERE id = ?",
+                    (target_status, int(time.time()), user["id"]),
+                )
+                if target_status in {"suspended", "banned", "inactive"}:
+                    a_conn.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user["id"],))
+
+        try:
+            import main
+            for p in (clean_phone, norm_phone, actual_phone):
+                if p in main.USERS:
+                    main.USERS[p]["status"] = target_status
+        except Exception:
+            pass
+
+        reason_text = payload.reason.strip() if payload.reason else "Admin status update"
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
-            "USER_STATUS_CHANGE",
-            clean_phone,
-            f"Changed status to '{target_status}'. Reason: {payload.reason or 'Administrative review'}",
+            admin_phone,
+            admin.get("name", "System Admin"),
+            "STATUS_CHANGED",
+            actual_phone,
+            f"Account status changed from '{old_status}' to '{target_status}'. Reason: {reason_text}",
             request.client.host if request.client else "127.0.0.1",
         )
-        return {"status": "success", "message": f"User account has been set to {target_status}"}
+        return {
+            "status": "success",
+            "message": f"Account status successfully changed to '{target_status}'.",
+            "user": {
+                "phone": actual_phone,
+                "status": target_status,
+                "previous_status": old_status,
+            },
+        }
 
-    @app.put("/api/v1/admin/users/{phone}")
-    async def update_user_profile_admin(phone: str, payload: UserProfileAdminUpdatePayload, request: Request):
+    @app.post("/api/v1/admin/users")
+    async def admin_create_user(
+        payload: AdminCreateUserPayload,
+        request: Request,
+    ):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
-        clean_phone = phone.strip()
+        raw_phone = payload.phone.strip()
+        norm_phone = normalize_phone_number(raw_phone)
+        role = payload.role.strip().lower()
+        if role not in {"admin", "hospital", "bank", "donor", "seeker"}:
+            raise HTTPException(status_code=422, detail="Invalid role specified.")
 
+        status = payload.status.strip().lower() if payload.status else "active"
+        if status not in {"active", "suspended", "inactive"}:
+            status = "active"
+
+        now = int(time.time())
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
             with a_conn:
-                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ?", (clean_phone,)).fetchone()
+                existing = a_conn.execute(
+                    "SELECT id FROM auth_users WHERE phone = ? OR phone = ?",
+                    (raw_phone, norm_phone),
+                ).fetchone()
+                if existing:
+                    raise HTTPException(status_code=409, detail="A user with this phone number already exists.")
+
+                salt = secrets.token_bytes(16)
+                digest = hashlib.pbkdf2_hmac("sha256", payload.password.encode("utf-8"), salt, 100_000)
+                pw_hash = f"{salt.hex()}${digest.hex()}"
+
+                a_conn.execute(
+                    """
+                    INSERT INTO auth_users (phone, password_hash, role, name, blood_group, district, status, is_verified, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, 'Dhaka', ?, 0, ?, ?)
+                    """,
+                    (norm_phone, pw_hash, role, payload.name.strip(), payload.blood_group or "A+", status, now, now),
+                )
+
+        try:
+            import main
+            main.USERS[norm_phone] = {
+                "phone": norm_phone,
+                "name": payload.name.strip(),
+                "role": role,
+                "status": status,
+                "blood_group": payload.blood_group or "A+",
+                "password": payload.password,
+            }
+        except Exception:
+            pass
+
+        log_admin_action(
+            admin.get("phone", "+8801745678901"),
+            admin.get("name", "System Admin"),
+            "USER_CREATED",
+            norm_phone,
+            f"Created user '{payload.name}' with role '{role}' and status '{status}'",
+            request.client.host if request.client else "127.0.0.1",
+        )
+
+        return {
+            "status": "success",
+            "message": f"User {norm_phone} successfully registered.",
+            "user": {
+                "phone": norm_phone,
+                "name": payload.name.strip(),
+                "role": role,
+                "status": status,
+                "blood_group": payload.blood_group,
+            },
+        }
+
+    @app.put("/api/v1/admin/users/{phone:path}")
+    @app.post("/api/v1/admin/users/{phone:path}/update")
+    async def update_user_profile_admin(phone: str, payload: UserProfileAdminUpdatePayload, request: Request):
+        admin = _require_admin(request)
+        initialize_admin_and_notification_database()
+        clean_phone = phone.strip()
+        norm_phone = normalize_phone_number(clean_phone)
+
+        with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+            a_conn.row_factory = sqlite3.Row
+            with a_conn:
+                user = a_conn.execute("SELECT * FROM auth_users WHERE phone = ? OR phone = ?", (clean_phone, norm_phone)).fetchone()
                 if not user:
                     raise HTTPException(status_code=404, detail="User not found")
 
+                actual_phone = user["phone"]
                 updates = []
                 params: list[Any] = []
                 if payload.name is not None:
@@ -1162,47 +1493,51 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                 if payload.district is not None:
                     updates.append("district = ?")
                     params.append(payload.district.strip())
-                if payload.status is not None and payload.status in {"active", "suspended", "banned"}:
+                if payload.status is not None and payload.status in {"active", "suspended", "banned", "inactive"}:
                     updates.append("status = ?")
                     params.append(payload.status)
 
                 if updates:
                     updates.append("updated_at = ?")
                     params.append(int(time.time()))
-                    params.append(clean_phone)
+                    params.append(user["id"])
                     a_conn.execute(
-                        f"UPDATE auth_users SET {', '.join(updates)} WHERE phone = ?",
+                        f"UPDATE auth_users SET {', '.join(updates)} WHERE id = ?",
                         params,
                     )
 
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
+            admin.get("phone", "+8801745678901"),
+            admin.get("name", "System Admin"),
             "USER_PROFILE_UPDATED",
-            clean_phone,
-            f"Admin updated profile details for {clean_phone}",
+            actual_phone,
+            f"Admin updated profile details for {actual_phone}",
             request.client.host if request.client else "127.0.0.1",
         )
         return {"status": "success", "message": "User details successfully updated"}
 
-    @app.delete("/api/v1/admin/users/{phone}")
+    @app.delete("/api/v1/admin/users/{phone:path}")
     async def delete_user_admin(phone: str, request: Request):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
         clean_phone = phone.strip()
+        norm_phone = normalize_phone_number(clean_phone)
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+            a_conn.row_factory = sqlite3.Row
             with a_conn:
-                user = a_conn.execute("SELECT id FROM auth_users WHERE phone = ?", (clean_phone,)).fetchone()
+                user = a_conn.execute("SELECT id, phone FROM auth_users WHERE phone = ? OR phone = ?", (clean_phone, norm_phone)).fetchone()
                 if not user:
                     raise HTTPException(status_code=404, detail="User not found")
-                a_conn.execute("DELETE FROM auth_users WHERE phone = ?", (clean_phone,))
-                a_conn.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user[0],))
+                actual_phone = user["phone"]
+                a_conn.execute("DELETE FROM auth_users WHERE id = ?", (user["id"],))
+                a_conn.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user["id"],))
 
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
+            admin.get("phone", "+8801745678901"),
+            admin.get("name", "System Admin"),
             "USER_DELETED",
-            clean_phone,
-            f"Permanently removed user account {clean_phone}",
+            actual_phone,
+            f"Permanently removed user account {actual_phone}",
             request.client.host if request.client else "127.0.0.1",
         )
         return {"status": "success", "message": "User account permanently removed"}
@@ -2131,10 +2466,12 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
 
     @app.get("/api/v1/admin/audit-logs")
     async def get_admin_audit_logs(
+        request: Request,
         action: str = Query("all"),
         search: str = Query(""),
         limit: int = Query(50, ge=1, le=100),
     ):
+        _require_admin(request)
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
             a_conn.row_factory = sqlite3.Row
@@ -2150,9 +2487,15 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             sql += " ORDER BY id DESC LIMIT ?"
             params.append(limit)
 
-            rows = [dict(r) for r in a_conn.execute(sql, params).fetchall()]
+            rows = a_conn.execute(sql, params).fetchall()
 
-        return {"status": "success", "logs": rows}
+        logs = []
+        for r in rows:
+            rd = dict(r)
+            rd["target_phone"] = rd.get("target_phone") or rd.get("target") or ""
+            logs.append(rd)
+
+        return {"status": "success", "logs": logs, "total": len(logs)}
 
     @app.get("/api/v1/admin/audit-logs/export")
     async def export_audit_logs():

@@ -1584,3 +1584,84 @@ input:checked + .slider:before {
     break-inside: avoid;
   }
 }
+
+
+/* ================= SBDS-40 User Management & Role Control Additions ================= */
+.btn-xs {
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+
+.btn-warning-soft {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+.btn-warning-soft:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.btn-success-soft {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.btn-success-soft:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.badge-pill {
+  border-radius: 9999px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+}
+
+.badge-outline {
+  background: transparent;
+  border: 1px solid var(--admin-border);
+  color: var(--admin-text-main);
+}
+
+.badge-purple {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.badge-blood {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-weight: 800;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.76rem;
+}
+
+.user-cell-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-cell-meta strong {
+  font-size: 0.88rem;
+  color: var(--admin-text-main);
+}
+
+.user-sub-id {
+  font-size: 0.7rem;
+  color: var(--admin-text-muted);
+}
+
+.dossier-stat-box {
+  background: var(--admin-card-bg);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}

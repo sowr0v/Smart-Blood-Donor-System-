@@ -378,18 +378,28 @@ def _save_blood_stock_threshold(blood_group: str, threshold: int) -> None:
 
 
 def _require_admin(request: Request) -> dict:
-    token = _decode_jwt(request.cookies.get("access_token", ""))
-    if not token:
+    """Validate that the requesting user is authenticated and possesses the 'admin' role."""
+    token_str = request.cookies.get("access_token", "")
+    if not token_str and "Authorization" in request.headers:
+        auth_hdr = request.headers["Authorization"]
+        if auth_hdr.startswith("Bearer "):
+            token_str = auth_hdr.split(" ", 1)[1].strip()
+    token = _decode_jwt(token_str)
+    user = _get_current_user(request) if "_get_current_user" in globals() else None
+    if not user and token and token.get("sub"):
+        user = _get_user_by_phone(token.get("sub"))
+    if not user and not token:
         raise HTTPException(
             status_code=401,
-            detail="Sign in as an administrator to manage blood stock thresholds.",
+            detail="Sign in as an administrator to access administrative controls."
         )
-    if token.get("role") != "admin":
+    role = ((user.get("role") if user else "") or (token.get("role") if token else "") or "").lower()
+    if role != "admin":
         raise HTTPException(
             status_code=403,
-            detail="Only administrators can manage blood stock thresholds.",
+            detail="Administrative privileges required. Access denied."
         )
-    return token
+    return user or {"phone": token.get("sub", "+8801745678901"), "role": "admin", "name": "System Admin"}
 
 
 def _get_facility_inventory_users() -> list[tuple[str, dict]]:
@@ -460,11 +470,11 @@ ROLE_DASHBOARDS = {
     "admin": "/admin/dashboard",
 }
 USERS = {
-    "+8801712345678": {"password": "secret123", "role": "donor", "name": "Ayesha Rahman"},
-    "+8801723456789": {"password": "match123", "role": "seeker", "name": "Nabil Hasan"},
-    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam"},
-    "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed"},
-    "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin"},
+    "+8801712345678": {"password": "secret123", "role": "donor", "name": "Ayesha Rahman", "status": "active", "phone": "+8801712345678"},
+    "+8801723456789": {"password": "match123", "role": "seeker", "name": "Nabil Hasan", "status": "active", "phone": "+8801723456789"},
+    "+8801734567890": {"password": "hospital123", "role": "hospital", "name": "Dhaka General Hospital", "manager_name": "Dr. Rafiqul Islam", "status": "active", "phone": "+8801734567890"},
+    "+8801734567891": {"password": "bloodbank123", "role": "bank", "name": "Red Crescent Blood Bank", "manager_name": "Farhana Ahmed", "status": "active", "phone": "+8801734567891"},
+    "+8801745678901": {"password": "admin123", "role": "admin", "name": "System Admin", "status": "active", "phone": "+8801745678901"},
 }
 CHAT_DEMO_ACCOUNTS = {
     "+8801712345678": "donor",
@@ -890,6 +900,7 @@ def _get_user_by_phone(phone: str) -> dict | None:
         if row:
             role = row["role"] or "donor"
             user_data = {
+                "id": row["id"] if "id" in row.keys() else None,
                 "password": "",
                 "password_hash": row["password_hash"],
                 "role": role,
@@ -899,6 +910,8 @@ def _get_user_by_phone(phone: str) -> dict | None:
                 "govt_reg": row["govt_reg"] if "govt_reg" in row.keys() else "",
                 "manager_name": row["manager_name"] if "manager_name" in row.keys() else "",
                 "address": row["address"] if "address" in row.keys() else "",
+                "status": (row["status"] if "status" in row.keys() else "") or "active",
+                "phone": phone,
             }
             USERS[phone] = user_data
             return user_data
@@ -1018,7 +1031,7 @@ def login(payload: LoginRequest, request: Request, response: Response):
 
     with closing(_connection()) as connection:
         user = connection.execute(
-            "SELECT id, password_hash, role, name FROM auth_users WHERE phone = ?", (phone,)
+            "SELECT id, password_hash, role, name, status FROM auth_users WHERE phone = ?", (phone,)
         ).fetchone()
 
         if not user and phone in USERS:
@@ -1045,6 +1058,10 @@ def login(payload: LoginRequest, request: Request, response: Response):
 
         if not user or not is_valid_pw:
             raise HTTPException(status_code=401, detail="Phone number or password is incorrect.")
+
+        user_status = (user["status"] if "status" in user.keys() and user["status"] else "") or (USERS.get(phone, {}).get("status", "active"))
+        if user_status in {"suspended", "inactive", "disabled", "banned"}:
+            raise HTTPException(status_code=403, detail="Account has been suspended or deactivated.")
 
         user_role = (user["role"] if "role" in user.keys() and user["role"] else "") or ("admin" if phone == "+8801745678901" else "donor")
         token = secrets.token_urlsafe(32)
@@ -1728,6 +1745,14 @@ async def login_submit(
     if not valid_password:
         return await _render_login_page(
             request, error="Invalid credentials", admin_console=is_admin_console,
+            next_url=_safe_local_path(next_url) or "",
+        )
+
+    user_status = (user.get("status") if user else "") or (USERS.get(normalized_phone, {}).get("status", "active"))
+    if user_status in {"suspended", "inactive", "disabled", "banned"}:
+        return await _render_login_page(
+            request, error="Your account has been suspended or deactivated. Contact system administrator.",
+            admin_console=is_admin_console,
             next_url=_safe_local_path(next_url) or "",
         )
 
