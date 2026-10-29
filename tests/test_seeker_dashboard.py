@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import (
     BLOOD_GROUPS,
@@ -585,25 +585,60 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertTrue(data["sent"]["sent_at"])
 
     def test_seeker_settings_save_and_fetch(self):
-        save_resp = self.client.post(
-            "/api/v1/seeker/settings",
-            json={
-                "full_name": "Nabil Hasan Updated",
-                "phone": "+8801723456789",
-                "default_hospital": "United Hospital",
-                "sms_alerts": True,
-                "push_alerts": True,
-                "audio_siren": True,
-                "default_radius": "20",
-            },
-        )
-        self.assertEqual(save_resp.status_code, 200)
-        self.assertEqual(save_resp.json()["settings"]["default_hospital"], "United Hospital")
+        with TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "auth.db"
+            phone = "+8801999000099"
+            with patch("main.AUTH_DATABASE_PATH", database_path):
+                initialize_auth_database()
+                with closing(sqlite3.connect(database_path)) as connection:
+                    with connection:
+                        connection.execute(
+                            """INSERT INTO auth_users (
+                                   phone, password_hash, created_at, updated_at, role, name,
+                                   email, district, address, status
+                               ) VALUES (?, 'unused', 1700000000, 1700000000, 'seeker',
+                                   'Nabil Hasan', '', 'Dhaka', 'Dhaka', 'active')""",
+                            (phone,),
+                        )
 
-        token = _generate_jwt("+8801723456789", "seeker")
-        get_resp = self.client.get("/api/v1/seeker/settings", cookies={"access_token": token})
-        self.assertEqual(get_resp.status_code, 200)
-        self.assertEqual(get_resp.json()["settings"]["full_name"], "Nabil Hasan Updated")
+                self.assertEqual(
+                    self.client.get("/api/v1/seeker/settings").status_code,
+                    401,
+                )
+                token = _generate_jwt(phone, "seeker")
+                self.client.cookies.set("access_token", token)
+                save_resp = self.client.post(
+                    "/api/v1/seeker/settings",
+                    json={
+                        "full_name": "Nabil Hasan Updated",
+                        "phone": "+8801711111111",
+                        "default_hospital": "United Hospital",
+                        "sms_alerts": True,
+                        "push_alerts": True,
+                        "audio_siren": True,
+                        "default_radius": "20",
+                    },
+                )
+                self.assertEqual(save_resp.status_code, 200)
+                self.assertEqual(
+                    save_resp.json()["settings"]["default_hospital"],
+                    "United Hospital",
+                )
+                self.assertEqual(save_resp.json()["settings"]["phone"], phone)
+                self.assertEqual(save_resp.json()["settings"]["full_name"], "Nabil Hasan")
+
+                get_resp = self.client.get(
+                    "/api/v1/seeker/settings",
+                )
+                self.assertEqual(get_resp.status_code, 200)
+                self.assertEqual(get_resp.json()["settings"]["full_name"], "Nabil Hasan")
+                self.assertEqual(get_resp.json()["settings"]["phone"], phone)
+                with closing(sqlite3.connect(database_path)) as connection:
+                    stored_name = connection.execute(
+                        "SELECT name FROM auth_users WHERE phone = ?",
+                        (phone,),
+                    ).fetchone()[0]
+                self.assertEqual(stored_name, "Nabil Hasan")
 
     def test_seeker_registration_route_preselects_seeker(self):
         response = self.client.get("/auth/register?role=seeker")

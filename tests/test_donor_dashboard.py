@@ -1,7 +1,7 @@
 import unittest
 from contextlib import closing
 import uuid
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import app, _generate_jwt
 
