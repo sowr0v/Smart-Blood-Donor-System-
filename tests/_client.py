@@ -1,7 +1,7 @@
 from typing import Any
 
 from fastapi.testclient import TestClient as FastAPITestClient
-from httpx2 import Cookies
+from httpx import Cookies
 
 
 class TestClient(FastAPITestClient):

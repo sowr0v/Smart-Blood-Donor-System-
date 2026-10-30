@@ -104,6 +104,8 @@ Hospital and blood bank dashboards display facility-specific quantities for all 
 
 Administrators define a minimum stock threshold from 0 to 50 units separately for each blood group in the Admin Console. `GET /api/v1/admin/blood-stock-thresholds` returns the configured thresholds, and `PUT /api/v1/admin/blood-stock-thresholds/{blood_group}` updates one threshold with `{"threshold": 5}`; both endpoints require an administrator session. Stock changes and threshold updates automatically reconcile active alerts, which appear with each blood group's status and threshold on facility dashboards. Alerts resolve when stock rises above the corresponding minimum. `GET /api/v1/facility/inventory/alerts` returns the signed-in facility's alert history and current status. Administrators can monitor aggregated facility alerts through `GET /api/v1/admin/facility/inventory/alerts`; only authenticated administrators can access that cross-facility view. Authenticated seekers can use `GET /api/v1/seeker/inventory/alerts` to see a privacy-safe notice only when an active request's blood group is low at one or more facilities; the response does not disclose facility identities or stock quantities.
 
+The Admin Console's **Blood Stock & Geographic Availability Overview** aggregates the live facility inventory matrix at `GET /api/v1/admin/inventory/summary`, shows regional availability at `/api/v1/admin/inventory/heatmap`, and uses `/api/v1/admin/inventory/facilities` for its facility table and map. These endpoints require an administrator session and return no facility phone numbers or contact details. Map markers use only valid coordinates saved in each facility's settings; facilities without coordinates remain visible in the table and regional totals but are omitted from the map. The map uses Leaflet with OpenStreetMap tiles.
+
 ### Authentication Flow
 
 ```text
@@ -258,6 +260,8 @@ The notification system keeps users informed about important activities.
 * Chat Notification
 * Account Notification
 * System Notification
+
+Donors and seekers can manage In-App Chat, SMS, phone call, WhatsApp, and push notification preferences in their dashboard settings. Routine alert frequency can be set to immediate, hourly, daily, or weekly, with separate controls for matching requests, chats, donation reminders, and account updates. Critical emergency alerts are always enabled and remain immediate. Donor phone-call and WhatsApp channels require public phone visibility and explicit direct-contact consent; preferences are stored per account role in `auth.db` through `GET` and `PUT /api/v1/account/communication-preferences`.
 
 ---
 

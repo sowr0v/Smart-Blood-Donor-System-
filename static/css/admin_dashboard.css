@@ -1404,6 +1404,260 @@ input:checked + .slider:before {
   border-color: rgba(239, 68, 68, 0.45);
 }
 
+.stock-overview-status {
+  min-height: 1.4em;
+  margin: 0 0 14px;
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+}
+
+.stock-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.stock-overview-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+}
+
+.stock-overview-stat strong {
+  color: var(--admin-text-main);
+  font-size: 1.5rem;
+}
+
+.stock-stat-label {
+  color: var(--admin-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stock-overview-card {
+  margin-bottom: 18px;
+  padding: 20px;
+}
+
+.stock-overview-card .card-header-clean {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.stock-overview-card .section-subtext {
+  margin: 5px 0 0;
+}
+
+.stock-blood-groups-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.stock-group-card {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-bg);
+}
+
+.stock-group-card.low {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.stock-group-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.stock-group-card header strong {
+  color: var(--admin-primary);
+  font-size: 1rem;
+}
+
+.stock-group-card > strong {
+  display: block;
+  margin-top: 12px;
+  color: var(--admin-text-main);
+  font-size: 1.35rem;
+}
+
+.stock-group-card p {
+  margin: 4px 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.75rem;
+}
+
+.stock-division-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.stock-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0;
+  color: var(--admin-text-muted);
+  font-size: 0.76rem;
+}
+
+.stock-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-map-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.stock-map-dot.adequate { background: #10b981; }
+.stock-map-dot.low { background: #ef4444; }
+.stock-map-dot.regional {
+  border: 2px dashed #047857;
+  background: rgba(16, 185, 129, 0.4);
+}
+
+#stock-map {
+  z-index: 0;
+  width: 100%;
+  height: 400px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: #e2e8f0;
+}
+
+.stock-map-status {
+  margin: 10px 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.78rem;
+}
+
+.stock-facilities-table {
+  min-width: 1120px;
+}
+
+.stock-facilities-table th,
+.stock-facilities-table td {
+  white-space: nowrap;
+}
+
+.stock-facilities-table td.stock-zero {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.stock-facilities-table td.stock-low {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.heatmap-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-card-bg);
+  color: var(--admin-text-main);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.heatmap-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--admin-shadow-md);
+}
+
+.heatmap-card.warning {
+  border-color: rgba(245, 158, 11, 0.6);
+}
+
+.heatmap-card.critical {
+  border-color: rgba(239, 68, 68, 0.65);
+}
+
+.heat-card-header,
+.heat-metrics-row,
+.heat-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.heat-score-badge {
+  padding: 3px 7px;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.heat-metrics-row,
+.heat-rare-groups {
+  color: var(--admin-text-muted);
+  font-size: 0.76rem;
+}
+
+.heat-rare-groups {
+  display: flex;
+  gap: 8px;
+}
+
+.rare-chip {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--admin-bg);
+}
+
+.rare-chip.crit {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.heat-card-footer {
+  border-top: 1px solid var(--admin-border);
+  padding-top: 9px;
+  font-size: 0.78rem;
+}
+
+.heatmap-card:focus-visible {
+  outline: 3px solid var(--admin-info);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1100px) {
+  .stock-blood-groups-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .stock-overview-stats { grid-template-columns: 1fr; }
+  .stock-overview-card { padding: 14px; }
+  .stock-overview-card .card-header-clean { flex-direction: column; }
+  .stock-blood-groups-grid { grid-template-columns: 1fr 1fr; }
+  #stock-map { height: 300px; }
+}
+
 .alert-icon-pulse {
   width: 36px;
   height: 36px;
