@@ -239,6 +239,8 @@ function initLiveTicker() {
           // Update and duplicate for infinite scroll
           tickerTrack.innerHTML =
             updatedHTML + updatedHTML;
+        } else {
+          tickerTrack.innerHTML = '<span class="ticker-item"><strong class="blood-group">0</strong> No live emergency activity recorded currently (0)</span>';
         }
       }
 
@@ -993,7 +995,7 @@ document.addEventListener("DOMContentLoaded", () => {
         submit.disabled = true;
 
         try {
-          await postRecovery(
+          const reqRes = await postRecovery(
             "/api/v1/auth/password-recovery/request",
             {
               phone: recoveryPhone,
@@ -1002,8 +1004,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
           showRecoveryStep(
             "code",
-            "Enter the six-digit code sent to your registered phone."
+            reqRes && reqRes.demo_code
+              ? `Verification code: ${reqRes.demo_code} (Auto-generated for demo)`
+              : "Enter the six-digit code sent to your registered phone."
           );
+
+          if (reqRes && reqRes.demo_code) {
+            const codeInput = recoveryCodeForm.querySelector("input[name='code']");
+            if (codeInput) codeInput.value = reqRes.demo_code;
+          }
 
         } catch (error) {
           showRecoveryError(error);
@@ -1406,7 +1415,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
             if (progress < 1) {
 
-              if (target >= 1000) {
+              if (target === 0) {
+                element.textContent = finalDisplay;
+              } else if (target >= 1000) {
 
                 const currentK =
                   currentValue /
@@ -1425,7 +1436,7 @@ document.addEventListener("DOMContentLoaded", () => {
               } else {
 
                 element.textContent =
-                  `${currentValue}%`;
+                  `${currentValue}`;
               }
 
               requestAnimationFrame(

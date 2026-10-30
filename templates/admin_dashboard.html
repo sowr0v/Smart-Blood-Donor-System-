@@ -90,7 +90,7 @@
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
-            <span class="notif-badge-pill" id="notificationBadge">3</span>
+            <span class="notif-badge-pill" id="notificationBadge">0</span>
           </button>
         </div>
 
@@ -119,7 +119,7 @@
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
         <span>Notifications Center</span>
-        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge">3 unread</span>
+        <span class="badge badge-pill badge-primary" id="notifDrawerUnreadBadge">0 unread</span>
       </div>
       <div class="notif-drawer-actions">
         <button type="button" class="btn-text-action" onclick="markAllNotificationsRead()">Mark all read</button>
@@ -203,7 +203,7 @@
             <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
           </svg>
           <span>Donor KYC Queue</span>
-          <span class="nav-badge alert" id="navKycPendingBadge">2</span>
+          <span class="nav-badge alert" id="navKycPendingBadge">0</span>
         </button>
 
         <!-- 4. Requests Moderation & Duplicate Detection (SBDS-42) -->
@@ -234,7 +234,7 @@
             <line x1="4" y1="22" x2="4" y2="15"/>
           </svg>
           <span>Flagged Reports</span>
-          <span class="nav-badge danger" id="navReportsBadge">2</span>
+          <span class="nav-badge danger" id="navReportsBadge">0</span>
         </button>
 
         <div class="admin-nav-section-title">SYSTEM & SECURITY</div>
@@ -253,7 +253,7 @@
       <div class="admin-sidebar-footer">
         <div class="server-metric-item">
           <span class="metric-label">SMS Gateway:</span>
-          <span class="metric-val text-success">Healthy (8.4k)</span>
+          <span class="metric-val text-success">Operational</span>
         </div>
         <div class="server-metric-item">
           <span class="metric-label">FCM Gateway:</span>
@@ -267,6 +267,217 @@
 
       <!-- 1. Master Analytics (SBDS-39): Platform Master Analytics -->
       <section class="admin-section active" id="section-analytics">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Platform Master Analytics</h1>
+            <p class="section-subtext">Real-time health, donation volume, emergency SOS triggers, and blood inventory oversight across Bangladesh.</p>
+          </div>
+          <div class="header-action-group">
+            <div class="filter-pills analytics-time-pills">
+              <button type="button" class="pill-btn active" data-range="7d" onclick="filterAnalyticsTimeRange('7d')">7 Days</button>
+              <button type="button" class="pill-btn" data-range="24h" onclick="filterAnalyticsTimeRange('24h')">24 Hours</button>
+              <button type="button" class="pill-btn" data-range="30d" onclick="filterAnalyticsTimeRange('30d')">30 Days</button>
+              <button type="button" class="pill-btn" data-range="all" onclick="filterAnalyticsTimeRange('all')">All-Time</button>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="exportAnalyticsCSV()" title="Export CSV Report">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              <span>Export CSV</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="printAnalyticsBrief()" title="Print Executive Brief">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+              <span>Print Brief</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="refreshAnalyticsBtn" onclick="loadAnalyticsData(true)">
+              <svg id="refreshAnalyticsIcon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Refresh Metrics</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Critical Deficit Alert Banner -->
+        <div class="analytics-alert-banner" id="analyticsDeficitBanner" style="display: none;">
+          <div class="alert-icon-pulse">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <div class="alert-banner-text">
+            <strong>Critical Regional Blood Stock Deficit Alert:</strong> Blood reserve stocks are currently below safety thresholds in affected regions.
+          </div>
+          <div class="alert-banner-actions">
+            <button type="button" class="btn btn-sm btn-danger" onclick="openEmergencySmsModal('O-', 'Dhaka')">
+              <span>⚡ Dispatch SOS SMS</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline" onclick="switchAdminSection('stock')">
+              <span>Inspect Heatmap →</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Hero KPI Cards -->
+        <div class="kpi-grid-4">
+          <article class="kpi-card" id="kpi-total-users">
+            <div class="kpi-icon-wrap icon-blue">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Registered Network Users</span>
+              <strong class="kpi-value" id="kpiTotalUsersVal">0</strong>
+              <div class="kpi-trend neutral">
+                <span id="kpiUserBreakdownText">0 Donors, 0 Seekers, 0 Facilities</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="kpi-card" id="kpi-total-requests">
+            <div class="kpi-icon-wrap icon-red">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Active Urgent Requests</span>
+              <strong class="kpi-value" id="kpiActiveRequestsVal">0</strong>
+              <div class="kpi-trend warning">
+                <span id="kpiCriticalRequestsVal">0 Critical SOS</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="kpi-card" id="kpi-fulfilled-donations">
+            <div class="kpi-icon-wrap icon-green">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Fulfilled Donations &amp; Lives</span>
+              <strong class="kpi-value" id="kpiLivesSavedVal">0 Lives</strong>
+              <div class="kpi-trend positive">
+                <span id="kpiFulfillCountText">0 Transfusions</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="kpi-card" id="kpi-response-latency">
+            <div class="kpi-icon-wrap icon-purple">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="kpi-content">
+              <span class="kpi-label">Avg Donor Match Latency</span>
+              <strong class="kpi-value" id="kpiMatchLatencyVal">—</strong>
+              <div class="kpi-trend neutral">
+                <span>Real-Time SLA</span>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Secondary Network Health & Infrastructure Metrics -->
+        <div class="kpi-grid-sub">
+          <div class="kpi-sub-card">
+            <span class="sub-icon">🏥</span>
+            <div class="sub-content">
+              <span class="sub-label">Monitored Facilities</span>
+              <strong class="sub-val" id="kpiMonitoredFacilities">0 Hospitals &amp; Blood Banks</strong>
+            </div>
+          </div>
+          <div class="kpi-sub-card">
+            <span class="sub-icon">❄️</span>
+            <div class="sub-content">
+              <span class="sub-label">Cold Storage Compliance</span>
+              <strong class="sub-val" id="kpiColdStorageCompliance">N/A</strong>
+            </div>
+          </div>
+          <div class="kpi-sub-card">
+            <span class="sub-icon">🩸</span>
+            <div class="sub-content">
+              <span class="sub-label">Apheresis Readiness</span>
+              <strong class="sub-val" id="kpiApheresisUnits">0 Platelet Units Active</strong>
+            </div>
+          </div>
+          <div class="kpi-sub-card">
+            <span class="sub-icon">🛡️</span>
+            <div class="sub-content">
+              <span class="sub-label">Verified Donor Ratio</span>
+              <strong class="sub-val" id="kpiVerifiedDonorRate">0.0% Identity Verified</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2 Column Analytics Visualizers -->
+        <div class="analytics-charts-grid">
+          <!-- Blood Group Supply vs Demand Matrix -->
+          <div class="admin-card">
+            <div class="card-header-clean">
+              <h2 class="card-title">Blood Group Supply vs Demand Balance</h2>
+              <span class="tag-status">National Distribution</span>
+            </div>
+            <p class="card-subtext">Comparison of active institutional stock units against incoming recipient demand.</p>
+            <div class="supply-demand-matrix" id="supplyDemandMatrix">
+              <div class="loading-spinner-row">Loading supply-demand balance...</div>
+            </div>
+          </div>
+
+          <!-- Weekly Requests Trend Visualizer -->
+          <div class="admin-card">
+            <div class="card-header-clean">
+              <h2 class="card-title" id="trendChartCardTitle">Request &amp; Transfusion Trend</h2>
+              <span class="tag-status" id="trendChartPeriodTag">7 Days</span>
+            </div>
+            <p class="card-subtext">Requests posted, voluntary donor responses, and critical emergency broadcasts.</p>
+            <div class="trend-chart-container" id="trendChartContainer">
+              <div class="loading-spinner-row">Loading trend analysis...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Divisional Activity Summary Table -->
+        <div class="admin-card mt-4">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Regional Activity &amp; Deficit Indices</h2>
+              <p class="card-subtext mb-0">Overview of blood stock availability, active requests, and critical shortages across all 8 divisions of Bangladesh.</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline" onclick="switchAdminSection('stock')">Open Division Heatmap →</button>
+          </div>
+          
+          <div style="margin: 12px 0 16px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div class="search-input-wrap" style="max-width: 320px; flex: 1;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="regionalSearchInput" placeholder="Filter division (e.g. Dhaka, Chittagong)..." oninput="handleRegionalSearch(this.value)">
+            </div>
+            <span class="text-xs text-muted" id="divisionSummaryCountText">Showing 8 Divisions</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Division</th>
+                  <th>Stock Units Available</th>
+                  <th>Active Requests</th>
+                  <th>Critical Deficit Alerts</th>
+                  <th>Health Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="regionalSummaryTableBody">
+                <tr id="regionalLoadingRow"><td colspan="6" class="text-center py-4 text-muted">Loading division metrics...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Platform Activity & Incident Stream -->
+        <div class="admin-card mt-4">
+          <div class="card-header-clean">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h2 class="card-title">Live Platform Activity &amp; Transaction Stream</h2>
+              <span class="status-pulse-dot"></span>
+              <span class="text-xs text-muted">Streaming Live</span>
+            </div>
+            <button type="button" class="btn btn-xs btn-outline" onclick="loadAnalyticsData(true)">Refresh Feed</button>
+          </div>
+          <p class="card-subtext">Real-time ledger of voluntary donor accepts, verified transfusions, emergency SOS broadcasts, and regulatory actions.</p>
+          <div class="activity-feed-list" id="analyticsActivityFeed">
+            <div class="loading-spinner-row">Loading activity feed...</div>
+          </div>
+        </div>
       </section>
 
       <!-- 2. User & Role Control (SBDS-40) -->
@@ -636,6 +847,91 @@
 
       <!-- 6. Flagged Reports & Reviews (SBDS-44) -->
       <section class="admin-section" id="section-reports">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Moderation Reports &amp; Quality Reviews</h1>
+            <p class="section-subtext">Investigate flagged user compliance reports (commercial solicitation, no-shows), and monitor donor feedback.</p>
+          </div>
+        </div>
+
+        <div class="tabs-clean">
+          <button type="button" class="tab-clean active" onclick="switchReportsSubTab('reports', this)">Flagged Reports Queue</button>
+          <button type="button" class="tab-clean" onclick="switchReportsSubTab('reviews', this)">Platform User Reviews &amp; Ratings</button>
+          <button type="button" class="tab-clean" onclick="switchReportsSubTab('contact', this)">Contact Inquiries <span class="badge badge-warning" id="inquiriesTabBadge" style="display:none; font-size: 0.7rem; margin-left: 6px;">0 Unread</span></button>
+        </div>
+
+        <!-- Subtab 1: Reports Queue -->
+        <div class="reports-subtab active" id="subtab-reports-queue">
+          <div class="admin-card mt-3">
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Report ID</th>
+                    <th>Category</th>
+                    <th>Reporter</th>
+                    <th>Reported Target</th>
+                    <th>Priority</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="reportsTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtab 2: User Reviews -->
+        <div class="reports-subtab" id="subtab-user-reviews" style="display: none;">
+          <div class="admin-card mt-3">
+            <div class="reviews-header-stats mb-3">
+              <div class="rating-badge-large">
+                <span class="rating-num" id="avgRatingNum">0.0</span>
+                <span class="stars">★★★★★</span>
+                <span class="rating-count" id="totalReviewsCount">Based on 0 Verified Transfusions</span>
+              </div>
+            </div>
+            <div class="reviews-list-grid" id="reviewsListGrid">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtab 3: Contact Inquiries -->
+        <div class="reports-subtab" id="subtab-contact-inquiries" style="display: none;">
+          <div class="admin-card mt-3">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <h3 style="font-size: 1.1rem; font-weight: 600; margin: 0;">User Contact Messages &amp; Inquiries</h3>
+              <select id="contactFilterStatus" class="admin-select" onchange="loadContactMessages(this.value)">
+                <option value="all">All Messages</option>
+                <option value="unread">Unread Only</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </div>
+            <div class="table-responsive">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Sender Name</th>
+                    <th>Email</th>
+                    <th>Subject</th>
+                    <th>Received At</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="contactMessagesTableBody">
+                  <!-- Dynamically populated -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- 7. Portal Settings & Security (SBDS-45) -->
@@ -825,7 +1121,7 @@
           </div>
           <div class="form-group">
             <label for="smsHospitalName" class="form-label">Hospital / Trauma Center Name</label>
-            <input type="text" id="smsHospitalName" class="admin-input full-width" placeholder="e.g. Dhaka Medical College Hospital ICU" value="Dhaka Medical College Hospital" required>
+            <input type="text" id="smsHospitalName" class="admin-input full-width" placeholder="e.g. Dhaka Medical College Hospital ICU" placeholder="Enter hospital / medical facility name" value="" required>
           </div>
           <div class="form-group">
             <label for="smsCustomMessage" class="form-label">Custom Alert Message (Optional)</label>
@@ -833,7 +1129,7 @@
           </div>
           <div class="sms-preview-box">
             <span class="preview-label">Live SMS Preview:</span>
-            <div class="preview-text" id="smsPreviewText">[CRITICAL SBDS ALERT] Emergency O- blood needed at Dhaka Medical College Hospital, Dhaka. Reply YES or open app immediately.</div>
+            <div class="preview-text" id="smsPreviewText">[CRITICAL SBDS ALERT] Emergency blood needed at hospital. Complete alert details will appear here.</div>
           </div>
         </div>
         <div class="modal-footer">
@@ -858,9 +1154,9 @@
             <label for="pushRecipient" class="form-label">Target Audience</label>
             <select id="pushRecipient" class="admin-select full-width">
               <option value="all">All Platform Users (Broadcast)</option>
-              <option value="+8801712345678">Donor (+8801712345678 - Ayesha Rahman)</option>
-              <option value="+8801723456789">Seeker (+8801723456789 - Nabil Hasan)</option>
-              <option value="+8801734567890">Hospital (+8801734567890 - Dhaka General)</option>
+              <option value="donors">All Registered Blood Donors</option>
+              <option value="seekers">All Blood Seekers</option>
+              <option value="facilities">All Healthcare Facilities</option>
             </select>
           </div>
           <div class="form-group">
@@ -934,7 +1230,7 @@
             </div>
             <div class="form-group">
               <label for="editUserDistrict" class="form-label">District / Location</label>
-              <input type="text" id="editUserDistrict" class="admin-input full-width" value="Dhaka">
+              <input type="text" id="editUserDistrict" class="admin-input full-width" placeholder="District / City" value="">
             </div>
           </div>
           <div class="form-group">
@@ -1071,7 +1367,7 @@
             </div>
             <div class="form-group">
               <label for="createPassword" class="form-label">Initial Password</label>
-              <input type="password" id="createPassword" class="admin-input full-width" value="Password12345" required>
+              <input type="password" id="createPassword" class="admin-input full-width" placeholder="Enter initial password" value="" required>
             </div>
           </div>
         </div>
@@ -1103,12 +1399,12 @@
           <div class="kyc-meta-panel">
             <h4>Donor Information</h4>
             <table class="kyc-meta-table">
-              <tr><td><strong>Donor Name:</strong></td><td id="kycDonorName">Tanvir Ahmed</td></tr>
-              <tr><td><strong>Phone Number:</strong></td><td id="kycDonorPhone">+8801735070125</td></tr>
-              <tr><td><strong>Blood Group:</strong></td><td><span class="badge badge-primary" id="kycBloodGroup">O+</span></td></tr>
-              <tr><td><strong>Document Type:</strong></td><td id="kycDocType">National ID (NID)</td></tr>
-              <tr><td><strong>ID Number:</strong></td><td id="kycNidNumber">19942691234567891</td></tr>
-              <tr><td><strong>Submission Date:</strong></td><td id="kycSubmissionDate">2 hours ago</td></tr>
+              <tr><td><strong>Donor Name:</strong></td><td id="kycDonorName">—</td></tr>
+              <tr><td><strong>Phone Number:</strong></td><td id="kycDonorPhone">—</td></tr>
+              <tr><td><strong>Blood Group:</strong></td><td><span class="badge badge-primary" id="kycBloodGroup">—</span></td></tr>
+              <tr><td><strong>Document Type:</strong></td><td id="kycDocType">—</td></tr>
+              <tr><td><strong>ID Number:</strong></td><td id="kycNidNumber">—</td></tr>
+              <tr><td><strong>Submission Date:</strong></td><td id="kycSubmissionDate">—</td></tr>
             </table>
 
             <div class="form-group mt-3">
@@ -1222,6 +1518,33 @@
         <button type="button" class="btn btn-warning" onclick="submitReportAction('warn_user')">Issue Warning Notice</button>
         <button type="button" class="btn btn-danger" onclick="submitReportAction('suspend_user')">Suspend User</button>
         <button type="button" class="btn btn-success" onclick="submitReportAction('resolve')">Mark Resolved</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. Contact Message Modal -->
+  <div class="admin-modal" id="contactMessageModal" aria-hidden="true">
+    <div class="admin-modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Contact Message Details</h3>
+        <button type="button" class="btn-close" onclick="closeContactMessageModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="viewMessageId">
+        <div class="message-meta mb-3">
+          <p><strong>From:</strong> <span id="viewMessageSender"></span> (<a id="viewMessageEmail" href="#"></a>)</p>
+          <p><strong>Received:</strong> <span id="viewMessageTime" class="text-muted"></span></p>
+          <p><strong>Subject:</strong> <span id="viewMessageSubject"></span></p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message Content</label>
+          <div id="viewMessageBody" class="admin-textarea full-width" style="white-space: pre-wrap; background: var(--admin-bg); min-height: 100px; padding: 10px; border-radius: 6px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeContactMessageModal()">Close</button>
+        <button type="button" class="btn btn-success" id="modalResolveBtn" onclick="resolveCurrentModalMessage()">✓ Mark Resolved</button>
+        <a id="replyEmailBtn" href="#" class="btn btn-primary">✉ Reply via Email</a>
       </div>
     </div>
   </div>

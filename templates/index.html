@@ -83,40 +83,14 @@
 
       <div class="ticker-badge">
         <span class="pulse-dot"></span>
-        <span class="ticker-badge-text">10,482 VERIFIED DONORS ACTIVE TODAY</span>
+        <span class="ticker-badge-text">{{ total_donors if total_donors else 0 }} VERIFIED DONORS ACTIVE TODAY</span>
       </div>
 
       <div class="ticker-track-container" id="ticker-track-container">
         <div class="ticker-track" id="ticker-track">
-
           <span class="ticker-item">
-            <strong class="blood-group">O+</strong> Mijanur R. verified in Farmgate, Dhaka (Just now)
+            <strong class="blood-group">0</strong> No live emergency activity recorded currently (0)
           </span>
-
-          <span class="ticker-divider">•</span>
-
-          <span class="ticker-item">
-            <strong class="blood-group">A-</strong> Farhana Y. completed donation at DMCH (15 mins ago)
-          </span>
-
-          <span class="ticker-divider">•</span>
-
-          <span class="ticker-item">
-            <strong class="blood-group">B+</strong> Anisur R. verified in Dhanmondi (25 mins ago)
-          </span>
-
-          <span class="ticker-divider">•</span>
-
-          <span class="ticker-item">
-            <strong class="blood-group">AB+</strong> Tanvir A. available in Mirpur-10 (40 mins ago)
-          </span>
-
-          <span class="ticker-divider">•</span>
-
-          <span class="ticker-item">
-            <strong class="blood-group">O-</strong> Sultana K. responded to emergency request (1 hour ago)
-          </span>
-
         </div>
       </div>
 
@@ -158,19 +132,19 @@
 
           <div class="info-card highlight-card">
             <span class="card-label">Average response</span>
-            <strong>12 minutes</strong>
+            <strong>{{ avg_response_time if avg_response_time else '0 mins' }}</strong>
           </div>
 
           <div class="mini-grid">
 
             <div class="info-card">
-              <span class="card-label">Nearby donors</span>
-              <strong>2,480</strong>
+              <span class="card-label">Registered donors</span>
+              <strong>{{ total_donors if total_donors else 0 }}</strong>
             </div>
 
             <div class="info-card">
               <span class="card-label">Lives supported</span>
-              <strong>9.4k</strong>
+              <strong>{{ (successful_connections * 3) if successful_connections else 0 }}</strong>
             </div>
 
           </div>
@@ -178,18 +152,18 @@
           <div class="activity-list">
 
             <div class="activity-item">
-              <span class="status-dot urgent"></span>
+              <span class="status-dot {{ 'urgent' if active_emergency_count else 'ready' }}"></span>
               <div>
-                <strong>O+ needed</strong>
-                <small>Dhaka Medical - 15 mins ago</small>
+                <strong>{{ active_emergency_count if active_emergency_count else 0 }} Emergency Requests</strong>
+                <small>{{ 'Active emergency in network' if active_emergency_count else '0 pending emergencies' }}</small>
               </div>
             </div>
 
             <div class="activity-item">
               <span class="status-dot ready"></span>
               <div>
-                <strong>4 donors available</strong>
-                <small>Within 5km radius</small>
+                <strong>{{ available_donors_count if available_donors_count else 0 }} donors available</strong>
+                <small>{{ 'Ready to donate' if available_donors_count else '0 available' }}</small>
               </div>
             </div>
 
@@ -203,17 +177,17 @@
       <section class="metrics-row" aria-label="Fast response metrics">
 
         <article class="metric-card">
-          <strong>2.4k+</strong>
+          <strong>{{ total_donors if total_donors else 0 }}</strong>
           <span>Verified donors</span>
         </article>
 
         <article class="metric-card">
-          <strong>93%</strong>
+          <strong>{{ match_rate if match_rate else '0%' }}</strong>
           <span>Requests matched within 30 min</span>
         </article>
 
         <article class="metric-card">
-          <strong>4.8/5</strong>
+          <strong>{{ trust_rating if trust_rating else '0.0/5' }}</strong>
           <span>Community trust rating</span>
         </article>
 
@@ -253,8 +227,8 @@
 
             <strong
               class="impact-stat-number"
-              data-target="10000"
-              data-display="10K+"
+              data-target="{{ total_donors if total_donors else 0 }}"
+              data-display="{{ total_donors if total_donors else 0 }}"
             >
               0
             </strong>
@@ -275,8 +249,8 @@
 
             <strong
               class="impact-stat-number"
-              data-target="5000"
-              data-display="5K+"
+              data-target="{{ successful_connections if successful_connections else 0 }}"
+              data-display="{{ successful_connections if successful_connections else 0 }}"
             >
               0
             </strong>
@@ -297,8 +271,8 @@
 
             <strong
               class="impact-stat-number"
-              data-target="95"
-              data-display="95%"
+              data-target="{{ response_rate if response_rate else 0 }}"
+              data-display="{{ (response_rate ~ '%') if response_rate else '0%' }}"
             >
               0
             </strong>
@@ -308,7 +282,7 @@
             </span>
 
             <small class="impact-stat-note">
-              Under 15 mins
+              {{ 'Under 15 mins' if response_rate else '0 responses recorded' }}
             </small>
 
           </article>

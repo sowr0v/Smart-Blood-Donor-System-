@@ -70,11 +70,11 @@
           <div class="donor-avatar-circle">
             {{ user.name[0] if user and user.name else "A" }}
           </div>
-          <span class="donor-blood-badge">A+</span>
+          <span class="donor-blood-badge">{{ profile.blood_group if profile and profile.blood_group else "0" }}</span>
         </div>
         <div class="donor-meta-info">
           <div class="donor-name-text">
-            <span>{{ user.name if user and user.name else "Ayesha Rahman" }}</span>
+            <span>{{ user.name if user and user.name else "" }}</span>
             <svg class="verified-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
             </svg>
@@ -166,7 +166,7 @@
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           <span class="nav-item-title">Donor In-App Chat</span>
-          <span class="nav-badge-count" id="sidebarChatBadge">2</span>
+          <span class="nav-badge-count" id="sidebarChatBadge">0</span>
         </button>
 
         <!-- 8. Donor Reviews -->
@@ -211,8 +211,8 @@
         <!-- Welcome Banner -->
         <div class="donor-banner-header">
           <div class="banner-welcome-text">
-            <h1>Welcome back, {{ user.name if user and user.name else "Ayesha" }}! 👋</h1>
-            <p>Your blood group <strong>A+</strong> can help <strong>A+ and AB+</strong> patients in Dhaka today.</p>
+            <h1>Welcome back, {{ user.name if user and user.name else "" }}! 👋</h1>
+            <p>Your blood group <strong>{{ profile.blood_group if profile and profile.blood_group else "0" }}</strong> can help patients today.</p>
           </div>
 
           <div class="banner-controls-group">
@@ -230,8 +230,8 @@
               <span style="font-weight: 800; font-size: 1.1rem;">A+</span>
             </div>
             <div>
-              <div class="metric-value-text">Blood A+</div>
-              <div class="metric-title-text">Verified Lab Tested</div>
+              <div class="metric-value-text">{{ 'Blood ' ~ profile.blood_group if profile and profile.blood_group else '0 Blood Group' }}</div>
+              <div class="metric-title-text">{{ 'Verified Lab Tested' if profile and profile.updated_at else '0 Verified' }}</div>
             </div>
           </article>
 
@@ -241,8 +241,8 @@
               <span>❤️</span>
             </div>
             <div>
-              <div class="metric-value-text">24 Lives</div>
-              <div class="metric-title-text">Saved Across 8 Donations</div>
+              <div class="metric-value-text">{{ (donations|length * 3) if donations else 0 }} Lives</div>
+              <div class="metric-title-text">Saved Across {{ donations|length if donations else 0 }} Donations</div>
             </div>
           </article>
 
@@ -252,8 +252,8 @@
               <span>✅</span>
             </div>
             <div>
-              <div class="metric-value-text">Eligible</div>
-              <div class="metric-title-text">Ready for Whole Blood</div>
+              <div class="metric-value-text">{{ profile.fitness_status if profile and profile.fitness_status and profile.updated_at else '0' }}</div>
+              <div class="metric-title-text">{{ 'Ready for Whole Blood' if profile and profile.updated_at else '0 Eligibility Record' }}</div>
             </div>
           </article>
 
@@ -263,8 +263,8 @@
               <span>⭐</span>
             </div>
             <div>
-              <div class="metric-value-text">4.9 / 5.0</div>
-              <div class="metric-title-text">18 Recipient Reviews</div>
+              <div class="metric-value-text">0.0 / 5.0</div>
+              <div class="metric-title-text">0 Recipient Reviews</div>
             </div>
           </article>
         </div>
@@ -285,20 +285,20 @@
             <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
               <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">👤 Donor Profile Summary</h4>
               <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
-                <strong>Name:</strong> {{ user.name if user and user.name else "Ayesha Rahman" }}<br>
-                <strong>Phone:</strong> {{ user.phone if user and user.phone else "+880 1712345678" }}<br>
-                <strong>Location:</strong> Dhanmondi, Dhaka<br>
-                <strong>Tier:</strong> Gold Tier Donor
+                <strong>Name:</strong> {{ user.name if user and user.name else "0" }}<br>
+                <strong>Phone:</strong> {{ user.phone if user and user.phone else "0" }}<br>
+                <strong>Location:</strong> {{ (profile.area ~ ', ' ~ profile.district) if profile and (profile.area or profile.district) else "0" }}<br>
+                <strong>Tier:</strong> {{ ("Gold Tier Donor" if donations and (donations|length >= 5) else ("Silver Tier Donor" if donations and (donations|length >= 2) else "0 Tier")) }}
               </p>
             </div>
 
             <div style="padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-card);">
               <h4 style="font-size: 0.95rem; color: var(--text-primary); margin-bottom: 8px;">🩺 Health &amp; Medical</h4>
               <p style="font-size: 0.86rem; color: var(--text-secondary); line-height: 1.6;">
-                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">{{ profile.fitness_status if profile and profile.fitness_status else 'Eligible' }}</span><br>
-                <strong>Conditions:</strong> {{ profile.medical_conditions if profile and profile.medical_conditions else 'None reported' }}<br>
-                <strong>Medications:</strong> {{ profile.medications if profile and profile.medications else 'None' }}<br>
-                <strong>Allergies:</strong> {{ profile.allergies if profile and profile.allergies else 'None' }}
+                <strong>Status:</strong> <span style="color: var(--success-green); font-weight: 600;">{{ profile.fitness_status if profile and profile.updated_at else '0' }}</span><br>
+                <strong>Conditions:</strong> <span id="summaryMedicalConditions">{{ profile.medical_conditions if profile and profile.medical_conditions else '0' }}</span><br>
+                <strong>Medications:</strong> <span id="summaryMedications">{{ profile.medications if profile and profile.medications else '0' }}</span><br>
+                <strong>Allergies:</strong> <span id="summaryAllergies">{{ profile.allergies if profile and profile.allergies else '0' }}</span>
               </p>
             </div>
 
