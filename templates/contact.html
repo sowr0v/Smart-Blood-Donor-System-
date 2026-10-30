@@ -1,116 +1,190 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contact Us</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-  <header class="global-navbar">
-    <div class="nav-container">
-      <a href="/" class="brand-logo">
-        <div class="logo-icon-wrap">
-          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
-        </div>
-        <div class="brand-text">
-          <span class="brand-name">Smart Blood</span>
-          <span class="brand-sub">Donor Network</span>
-        </div>
-      </a>
-      
-      <nav class="desktop-nav" aria-label="Main Navigation">
-        <ul class="nav-links">
-          <li><a href="/" class="nav-link">Home</a></li>
-          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
-          <li><a href="/about" class="nav-link">About</a></li>
-          <li><a href="/contact" class="nav-link active">Contact</a></li>
-        </ul>
-      </nav>
-
-      <div class="nav-auth-actions">
-        {% set current_u = user or logged_in_user %}
-        {% if current_u %}
-          <a href="{{ '/admin/dashboard' if current_u.role == 'admin' else ('/seeker/dashboard' if current_u.role == 'seeker' else ('/hospital/dashboard' if current_u.role in ['hospital', 'bank', 'blood_bank'] else '/donor/dashboard')) }}" class="btn btn-outline">Dashboard</a>
-          <a href="/logout" class="btn btn-primary">Logout</a>
-        {% else %}
-          <a href="/login" class="btn btn-outline">Login</a>
-          <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
-        {% endif %}
-      </div>
-    </div>
-  </header>
-
-  <main class="main-shell">
-    <div class="container">
-      <section class="page-panel">
-        <span class="eyebrow">Get in Touch</span>
-        <h1>We're Here to Help.</h1>
-        <p class="hero-subtext">Whether you need technical support, want to partner with us, or have general inquiries, reach out anytime.</p>
-        
-        <div class="contact-grid">
-          <div class="contact-info-block">
-            <div class="contact-method-row">
-              <div class="contact-method-icon">📧</div>
-              <div class="contact-method-details">
-                <h3>Email Support</h3>
-                <a href="mailto:support@smartblood.org">support@smartblood.org</a>
-              </div>
-            </div>
-            
-            <div class="contact-method-row">
-              <div class="contact-method-icon">📞</div>
-              <div class="contact-method-details">
-                <h3>Call Us (Non-Emergency)</h3>
-                <a href="tel:+8809611223344">+880 9611 223 344</a>
-              </div>
-            </div>
-
-            <div class="contact-method-row">
-              <div class="contact-method-icon">📍</div>
-              <div class="contact-method-details">
-                <h3>Headquarters</h3>
-                <p>House 42, Road 7, Banani<br>Dhaka 1213, Bangladesh</p>
-              </div>
-            </div>
-
-            <div class="alert-box">
-              <strong>Emergency?</strong>
-              <p>If you need blood urgently, please use the <a href="/find-blood" style="text-decoration: underline; color: inherit;">Urgent Requests Board</a> instead of this contact form.</p>
-            </div>
-          </div>
-
-          <div class="contact-form-block">
-            <form action="/contact" method="GET" onsubmit="event.preventDefault(); alert('Message sent successfully!');">
-              <div class="form-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" required placeholder="John Doe">
-              </div>
-              <div class="form-group">
-                <label for="email">Email Address</label>
-                <input type="email" id="email" name="email" required placeholder="john@example.com">
-              </div>
-              <div class="form-group">
-                <label for="subject">Subject</label>
-                <input type="text" id="subject" name="subject" required placeholder="How can we help?">
-              </div>
-              <div class="form-group">
-                <label for="message">Message</label>
-                <textarea id="message" name="message" rows="4" required placeholder="Your message here..."></textarea>
-              </div>
-              <button type="submit" class="btn btn-primary btn-full">Send Message</button>
-            </form>
-          </div>
-        </div>
-
-      </section>
-    </div>
-  </main>
-
-  {% include "partials/public_footer.html" %}
-  <script src="/static/js/main.js"></script>
-</body>
-</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+          <li><a href="/contact" class="nav-link active">Contact</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions">
+        {% set current_u = user or logged_in_user %}
+        {% if current_u %}
+          <a href="{{ '/admin/dashboard' if current_u.role == 'admin' else ('/seeker/dashboard' if current_u.role == 'seeker' else ('/hospital/dashboard' if current_u.role in ['hospital', 'bank', 'blood_bank'] else '/donor/dashboard')) }}" class="btn btn-outline">Dashboard</a>
+          <a href="/logout" class="btn btn-primary">Logout</a>
+        {% else %}
+          <a href="/login" class="btn btn-outline">Login</a>
+          <a href="/auth/register?role=donor" class="btn btn-primary">Register</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main class="main-shell">
+    <div class="container">
+      <section class="page-panel">
+        <span class="eyebrow">Get in Touch</span>
+        <h1>We're Here to Help.</h1>
+        <p class="hero-subtext">Whether you need technical support, want to partner with us, or have general inquiries, reach out anytime.</p>
+        
+        <div class="contact-grid">
+          <div class="contact-info-block">
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📧</div>
+              <div class="contact-method-details">
+                <h3>Email Support</h3>
+                <a href="mailto:support@smartblood.org">support@smartblood.org</a>
+              </div>
+            </div>
+            
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📞</div>
+              <div class="contact-method-details">
+                <h3>Call Us (Non-Emergency)</h3>
+                <a href="tel:+8809611223344">+880 9611 223 344</a>
+              </div>
+            </div>
+
+            <div class="contact-method-row">
+              <div class="contact-method-icon">📍</div>
+              <div class="contact-method-details">
+                <h3>Headquarters</h3>
+                <p>House 42, Road 7, Banani<br>Dhaka 1213, Bangladesh</p>
+              </div>
+            </div>
+
+            <div class="alert-box">
+              <strong>Emergency?</strong>
+              <p>If you need blood urgently, please use the <a href="/find-blood" style="text-decoration: underline; color: inherit;">Urgent Requests Board</a> instead of this contact form.</p>
+            </div>
+          </div>
+
+          <div class="contact-form-block">
+            {% if success_message %}
+            <div class="alert-box" style="background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; margin-bottom: 1.25rem; padding: 1rem; border-radius: 8px;">
+              <strong>Success!</strong> {{ success_message }}
+            </div>
+            {% endif %}
+            {% if error_message %}
+            <div class="alert-box" style="background: #ffebee; color: #c62828; border-color: #ef9a9a; margin-bottom: 1.25rem; padding: 1rem; border-radius: 8px;">
+              <strong>Error:</strong> {{ error_message }}
+            </div>
+            {% endif %}
+
+            <div id="contactFormAlert" style="display: none; margin-bottom: 1.25rem; padding: 1rem; border-radius: 8px; font-size: 0.95rem;"></div>
+
+            <form id="contactForm" action="/contact" method="POST" onsubmit="handleContactSubmit(event)">
+              <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required placeholder="John Doe">
+              </div>
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="john@example.com">
+              </div>
+              <div class="form-group">
+                <label for="subject">Subject</label>
+                <input type="text" id="subject" name="subject" required placeholder="How can we help?">
+              </div>
+              <div class="form-group">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" rows="4" required placeholder="Your message here..."></textarea>
+              </div>
+              <button type="submit" id="contactSubmitBtn" class="btn btn-primary btn-full">Send Message</button>
+            </form>
+          </div>
+        </div>
+
+      </section>
+    </div>
+  </main>
+
+  {% include "partials/public_footer.html" %}
+  <script src="/static/js/main.js"></script>
+  <script>
+    async function handleContactSubmit(event) {
+      event.preventDefault();
+      const form = document.getElementById('contactForm');
+      const submitBtn = document.getElementById('contactSubmitBtn');
+      const alertBox = document.getElementById('contactFormAlert');
+
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        subject: document.getElementById('subject').value.trim(),
+        message: document.getElementById('message').value.trim()
+      };
+
+      if (!payload.name || !payload.email || !payload.subject || !payload.message) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#ffebee';
+        alertBox.style.color = '#c62828';
+        alertBox.style.border = '1px solid #ef9a9a';
+        alertBox.innerHTML = '<strong>Error:</strong> Please fill in all fields before sending.';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Sending Message...';
+
+      try {
+        const response = await fetch('/api/v1/contact', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#e8f5e9';
+          alertBox.style.color = '#2e7d32';
+          alertBox.style.border = '1px solid #a5d6a7';
+          alertBox.innerHTML = '<strong>Message Sent!</strong> ' + (result.message || 'Thank you! Your inquiry has been submitted.');
+          form.reset();
+        } else {
+          throw new Error(result.detail || result.message || 'Failed to submit contact inquiry.');
+        }
+      } catch (err) {
+        alertBox.style.display = 'block';
+        alertBox.style.background = '#ffebee';
+        alertBox.style.color = '#c62828';
+        alertBox.style.border = '1px solid #ef9a9a';
+        alertBox.innerHTML = '<strong>Submission Failed:</strong> ' + (err.message || 'Please check your connection and try again.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
+  </script>
+</body>
+</html>

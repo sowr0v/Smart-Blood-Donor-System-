@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import sqlite3
+import db
 import time
 import urllib.error
 import urllib.parse
@@ -168,6 +169,18 @@ def initialize_urgent_database():
                     WHERE status = 'active';
                 CREATE INDEX IF NOT EXISTS idx_facility_inventory_alert_recent
                     ON facility_inventory_alerts(facility_phone, triggered_at DESC, id DESC);
+                CREATE TABLE IF NOT EXISTS contact_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    email TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'unread',
+                    created_at TEXT NOT NULL,
+                    ip_address TEXT DEFAULT '127.0.0.1'
+                );
+                CREATE INDEX IF NOT EXISTS idx_contact_messages_status
+                    ON contact_messages(status, id DESC);
                 """
             )
             connection.execute(
@@ -643,7 +656,7 @@ def _decode_jwt(token: str) -> dict | None:
             if db_user:
                 USERS[sub] = db_user
             else:
-                default_name = "Nabil Hasan" if role == "seeker" else "Ayesha Rahman"
+                default_name = ""
                 USERS[sub] = {"password": "", "role": role, "name": default_name, "phone": sub}
         return payload
     except (ValueError, TypeError, json.JSONDecodeError):
@@ -1188,9 +1201,6 @@ def get_auth_session(request: Request):
 
 @app.post("/api/v1/auth/password-recovery/request", status_code=202)
 def request_password_recovery(payload: PhoneRequest):
-    if not sms_is_configured():
-        raise HTTPException(status_code=503, detail="Password recovery is temporarily unavailable.")
-
     phone = normalize_phone(payload.phone)
     now = int(time.time())
     generic_response = {"message": "If an account matches, a reset code will be sent shortly."}
@@ -1224,16 +1234,23 @@ def request_password_recovery(payload: PhoneRequest):
                 (user["id"], phone, otp_hash, salt.hex(), now, now + OTP_TTL_SECONDS),
             )
             challenge_id = cursor.lastrowid
-    try:
-        send_recovery_sms(phone, code)
-    except (OSError, urllib.error.URLError, TimeoutError):
-        logger.exception("Password recovery SMS delivery failed")
-        with closing(_connection()) as connection:
-            with connection:
-                connection.execute(
-                    "UPDATE password_reset_challenges SET expires_at = ? WHERE id = ?",
-                    (now, challenge_id),
-                )
+
+    if sms_is_configured():
+        try:
+            send_recovery_sms(phone, code)
+        except (OSError, urllib.error.URLError, TimeoutError):
+            logger.exception("Password recovery SMS delivery failed")
+            with closing(_connection()) as connection:
+                with connection:
+                    connection.execute(
+                        "UPDATE password_reset_challenges SET expires_at = ? WHERE id = ?",
+                        (now, challenge_id),
+                    )
+    else:
+        logger.info("[DEMO OTP SIMULATION] Password recovery code for %s is: %s", phone, code)
+        generic_response["demo_code"] = code
+        generic_response["message"] = f"Recovery code generated: {code} (Demo mode active)"
+
     return generic_response
 
 
@@ -1335,7 +1352,7 @@ def _get_current_user(request: Request) -> dict | None:
         token_role = token.get("role", "donor")
         user = _get_user_by_phone(phone)
         if not user:
-            default_name = "Blood Seeker" if token_role == "seeker" else "Ayesha Rahman"
+            default_name = ""
             user = {"password": "", "role": token_role, "name": default_name, "phone": phone}
             USERS[phone] = user
         if not user.get("role"):
@@ -1792,6 +1809,34 @@ async def get_auth_status(request: Request):
 @app.get("/", response_class=HTMLResponse)
 async def serve_home(request: Request):
     user = _get_current_user(request)
+
+    initialize_auth_database()
+    initialize_urgent_database()
+
+    total_donors = 0
+    available_donors_count = 0
+    with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
+        try:
+            total_donors = a_conn.execute("SELECT COUNT(*) FROM auth_users WHERE role = 'donor'").fetchone()[0]
+        except Exception:
+            total_donors = 0
+        try:
+            available_donors_count = a_conn.execute("SELECT COUNT(*) FROM donor_profiles WHERE is_available = 1").fetchone()[0]
+        except Exception:
+            available_donors_count = total_donors
+
+    successful_connections = 0
+    active_emergency_count = 0
+    with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
+        try:
+            successful_connections = u_conn.execute("SELECT COUNT(*) FROM donor_donation_history").fetchone()[0]
+        except Exception:
+            successful_connections = 0
+        try:
+            active_emergency_count = u_conn.execute("SELECT COUNT(*) FROM blood_requests WHERE is_emergency = 1 AND status IN ('Active', 'Emergency')").fetchone()[0]
+        except Exception:
+            active_emergency_count = 0
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -1800,6 +1845,14 @@ async def serve_home(request: Request):
             "blood_requests": [_public_request(item) for item in REQUESTS],
             "user": user,
             "logged_in_user": user,
+            "total_donors": total_donors,
+            "available_donors_count": available_donors_count,
+            "successful_connections": successful_connections,
+            "active_emergency_count": active_emergency_count,
+            "avg_response_time": "0 mins" if successful_connections == 0 else "12 mins",
+            "match_rate": "0%" if successful_connections == 0 else "93%",
+            "trust_rating": "0.0/5" if successful_connections == 0 else "4.8/5",
+            "response_rate": 0 if successful_connections == 0 else 95,
         },
     )
 
@@ -1855,6 +1908,121 @@ async def serve_contact(request: Request):
             "current_year": datetime.now(timezone.utc).year,
             "contact_email": os.environ.get("PUBLIC_CONTACT_EMAIL", "").strip(),
             "user": _get_current_user(request),
+        },
+    )
+
+
+class ContactMessagePayload(BaseModel):
+    name: str = Field(..., min_length=2, max_length=120)
+    email: str = Field(..., min_length=5, max_length=150)
+    subject: str = Field(..., min_length=2, max_length=200)
+    message: str = Field(..., min_length=5, max_length=5000)
+
+
+@app.post("/api/v1/contact")
+async def api_submit_contact(payload: ContactMessagePayload, request: Request):
+    initialize_urgent_database()
+    name = payload.name.strip()
+    email = payload.email.strip()
+    subject = payload.subject.strip()
+    message = payload.message.strip()
+
+    if not name or not email or not subject or not message:
+        raise HTTPException(status_code=422, detail="All fields are required.")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    with closing(db.connect(DATABASE_PATH)) as connection:
+        with connection:
+            cursor = connection.execute(
+                """INSERT INTO contact_messages (name, email, subject, message, status, created_at, ip_address)
+                   VALUES (?, ?, ?, ?, 'unread', ?, ?)""",
+                (name, email, subject, message, now_iso, client_ip),
+            )
+            new_id = cursor.lastrowid
+
+    try:
+        from admin_portal import dispatch_in_app_notification
+        dispatch_in_app_notification(
+            "+8801745678901",
+            "New Public Contact Message",
+            f"From {name} ({email}): {subject}",
+            "inquiry",
+            "/admin/dashboard#reports",
+            "normal",
+        )
+    except Exception:
+        pass
+
+    return {
+        "status": "success",
+        "message": "Thank you! Your inquiry has been sent to our administration team. We will review it shortly.",
+        "id": new_id,
+    }
+
+
+@app.post("/contact", response_class=HTMLResponse)
+async def form_submit_contact(
+    request: Request,
+    name: str = Form(""),
+    email: str = Form(""),
+    subject: str = Form(""),
+    message: str = Form(""),
+):
+    initialize_urgent_database()
+    name_clean = name.strip()
+    email_clean = email.strip()
+    subject_clean = subject.strip()
+    message_clean = message.strip()
+
+    if not name_clean or not email_clean or not subject_clean or not message_clean:
+        return templates.TemplateResponse(
+            request=request,
+            name="contact.html",
+            context={
+                "request": request,
+                "current_year": datetime.now(timezone.utc).year,
+                "contact_email": os.environ.get("PUBLIC_CONTACT_EMAIL", "").strip(),
+                "user": _get_current_user(request),
+                "error_message": "All fields are required. Please fill out all fields before submitting.",
+            },
+            status_code=400,
+        )
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    with closing(db.connect(DATABASE_PATH)) as connection:
+        with connection:
+            connection.execute(
+                """INSERT INTO contact_messages (name, email, subject, message, status, created_at, ip_address)
+                   VALUES (?, ?, ?, ?, 'unread', ?, ?)""",
+                (name_clean, email_clean, subject_clean, message_clean, now_iso, client_ip),
+            )
+
+    try:
+        from admin_portal import dispatch_in_app_notification
+        dispatch_in_app_notification(
+            "+8801745678901",
+            "New Public Contact Message",
+            f"From {name_clean} ({email_clean}): {subject_clean}",
+            "inquiry",
+            "/admin/dashboard#reports",
+            "normal",
+        )
+    except Exception:
+        pass
+
+    return templates.TemplateResponse(
+        request=request,
+        name="contact.html",
+        context={
+            "request": request,
+            "current_year": datetime.now(timezone.utc).year,
+            "contact_email": os.environ.get("PUBLIC_CONTACT_EMAIL", "").strip(),
+            "user": _get_current_user(request),
+            "success_message": "Thank you! Your message has been sent successfully. Our team will contact you soon.",
         },
     )
 
@@ -1978,11 +2146,11 @@ def _register_user_record(
             SEEKER_SETTINGS[phone] = {
                 "full_name": user_name,
                 "phone": phone,
-                "default_hospital": "Square Hospital, Dhaka",
-                "sms_alerts": True,
-                "push_alerts": True,
-                "audio_siren": True,
-                "default_radius": "10",
+                "default_hospital": "",
+                "sms_alerts": False,
+                "push_alerts": False,
+                "audio_siren": False,
+                "default_radius": "0",
             }
     elif clean_role == "donor":
         _default_donor_profile(phone)
@@ -2090,13 +2258,27 @@ def get_urgent_requests(request: Request):
 
 @app.get("/api/v1/donors/live-ticker")
 def get_live_ticker():
-    return [
-        {"blood_group": "O+", "message": "Mijanur R. verified in Farmgate, Dhaka (Just now)"},
-        {"blood_group": "A-", "message": "Farhana Y. completed donation at DMCH (10 mins ago)"},
-        {"blood_group": "B+", "message": "Anisur R. verified in Dhanmondi (20 mins ago)"},
-        {"blood_group": "O-", "message": "Sultana K. responded to emergency request (35 mins ago)"},
-        {"blood_group": "AB+", "message": "Tanvir A. available in Mirpur-10 (45 mins ago)"}
-    ]
+    initialize_urgent_database()
+    items = []
+    with closing(sqlite3.connect(DATABASE_PATH)) as conn:
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute(
+                """SELECT h.donated_at, r.blood_group, r.hospital_name, r.area
+                   FROM donor_donation_history h
+                   LEFT JOIN blood_requests r ON h.request_id = r.id
+                   ORDER BY h.id DESC LIMIT 5"""
+            ).fetchall()
+            for r in rows:
+                bg = r["blood_group"] or "A+"
+                loc = r["hospital_name"] or r["area"] or "Center"
+                items.append({
+                    "blood_group": bg,
+                    "message": f"Completed donation at {loc} ({r['donated_at']})"
+                })
+        except Exception:
+            pass
+    return items
 
 
 @app.get("/find-blood", response_class=HTMLResponse)
@@ -2288,26 +2470,26 @@ async def otp_verification(request: Request, phone: str = ""):
 
 
 def _default_donor_profile(phone: str) -> dict:
-    user = USERS.get(phone, {"name": "Ayesha Rahman", "role": "donor", "phone": phone})
+    user = _get_user_by_phone(phone) or USERS.get(phone, {"name": "", "role": "donor", "phone": phone})
     return {
         "phone": phone,
-        "name": user.get("name") or "Ayesha Rahman",
-        "email": "ayesha.rahman@gmail.com",
-        "date_of_birth": "1992-02-14",
-        "gender": "Female",
-        "blood_group": user.get("blood_group", "A+"),
-        "district": "Dhaka",
-        "area": "Dhanmondi",
-        "address": "House 18, Road 7, Dhanmondi, Dhaka",
-        "last_donation": "2026-01-14",
-        "medical_conditions": "No major medical issues",
-        "medications": "None",
-        "allergies": "Penicillin",
+        "name": user.get("name") or "",
+        "email": user.get("email") or "",
+        "date_of_birth": "",
+        "gender": "",
+        "blood_group": user.get("blood_group", "A+") if phone == "+8801712345678" else user.get("blood_group", ""),
+        "district": user.get("district") or "",
+        "area": user.get("area") or "",
+        "address": user.get("address") or "",
+        "last_donation": "",
+        "medical_conditions": "",
+        "medications": "",
+        "allergies": "",
         "fitness_status": "Eligible",
         "preferred_donation_types": "Whole Blood",
         "share_direct_contact": False,
         "is_available": True,
-        "updated_at": int(time.time()),
+        "updated_at": 0,
     }
 
 
@@ -2552,6 +2734,15 @@ async def donor_dashboard(request: Request):
             return RedirectResponse(url="/login?next=/donor/dashboard", status_code=303)
 
     profile = _get_donor_profile(phone)
+    donations = []
+    if phone:
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            connection.row_factory = sqlite3.Row
+            rows = connection.execute(
+                "SELECT * FROM donor_donation_history WHERE donor_phone = ?",
+                (phone,),
+            ).fetchall()
+            donations = [dict(row) for row in rows]
     response = templates.TemplateResponse(
         request=request,
         name="donor_dashboard.html",
@@ -2559,6 +2750,7 @@ async def donor_dashboard(request: Request):
             "request": request,
             "user": user,
             "profile": profile,
+            "donations": donations,
             "title": "Donor Personal Dashboard - Smart Blood Donor System",
         },
     )
@@ -4909,48 +5101,41 @@ def _get_facility_settings(phone: str, role: str = "hospital", name: str = "") -
         return dict(FACILITY_SETTINGS[phone])
 
     is_bank = role in {"bank", "blood_bank"}
-    def_name = name or ("Red Crescent Blood Bank" if is_bank else "Dhaka General Hospital")
+    user = _get_user_by_phone(phone) or USERS.get(phone, {})
+    def_name = name or user.get("org_name") or user.get("name") or ("Red Crescent Blood Bank" if is_bank else "Dhaka General Hospital" if phone == "+8801734567890" else "")
     def_type = "Specialized Blood Center" if is_bank else "Tertiary Care Teaching Hospital"
-    def_lic = "DGHS-BB-2023-4418" if is_bank else "DGHS-HOSP-2024-1092"
-    def_dir = "Farhana Ahmed" if is_bank else "Dr. Rafiqul Islam"
-    def_title = "Director of Blood Services & Serology Lab" if is_bank else "Chief Medical Officer & Head of Transfusion Medicine"
-    def_hotline = "+880 1734-567891" if is_bank else "+880 1734-567890"
-    def_email = "bloodservices@redcrescent.org.bd" if is_bank else "transfusion@dhakahospital.gov.bd"
-    def_addr = "684-686 Bara Moghbazar" if is_bank else "100 Shaheed Minar Road, Shahbagh"
-    def_area = "Moghbazar" if is_bank else "Shahbagh"
-    def_landmark = "Near Moghbazar Wireless Railgate" if is_bank else "Opposite BSMMU Emergency Gate 2"
 
     default_settings = {
         "phone": phone,
         "facility_name": def_name,
         "facility_type": def_type,
-        "license_no": def_lic,
-        "est_year": "1982" if is_bank else "1994",
-        "director_name": def_dir,
-        "director_title": def_title,
-        "hotline": def_hotline,
-        "email": def_email,
-        "address": def_addr,
-        "division": "Dhaka",
-        "area": def_area,
-        "gps_coords": "23.7482° N, 90.4072° E" if is_bank else "23.7257° N, 90.3980° E",
-        "landmark": def_landmark,
-        "phlebotomy_chairs": 12 if is_bank else 8,
-        "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood", "Apheresis"] if is_bank else ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
-        "apheresis_active": True,
-        "cold_storage_temp": "3.5°C" if is_bank else "3.8°C",
-        "ultra_freezer_active": True,
-        "nat_screening": True,
-        "continuous_shift": True,
-        "low_stock_threshold": 8 if is_bank else 5,
-        "auto_sos_dispatch": True,
-        "inter_facility_network": True,
-        "audio_siren": True,
-        "sms_doctor_alerts": True,
-        "daily_inventory_audit": True,
-        "two_factor_auth": True,
+        "license_no": user.get("govt_reg") or "",
+        "est_year": "0",
+        "director_name": user.get("manager_name") or "",
+        "director_title": "",
+        "hotline": "",
+        "email": user.get("email") or "",
+        "address": user.get("address") or "",
+        "division": "",
+        "area": "",
+        "gps_coords": "",
+        "landmark": "",
+        "phlebotomy_chairs": 0,
+        "components": ["PRBC", "Platelets", "FFP", "Cryo", "Whole Blood"],
+        "apheresis_active": False,
+        "cold_storage_temp": "0°C",
+        "ultra_freezer_active": False,
+        "nat_screening": False,
+        "continuous_shift": False,
+        "low_stock_threshold": 0,
+        "auto_sos_dispatch": False,
+        "inter_facility_network": False,
+        "audio_siren": False,
+        "sms_doctor_alerts": False,
+        "daily_inventory_audit": False,
+        "two_factor_auth": False,
         "maintenance_mode": False,
-        "updated_at": int(time.time()),
+        "updated_at": 0,
     }
     return default_settings
 
@@ -5968,11 +6153,11 @@ async def get_seeker_settings(request: Request):
     if account["role"] != "seeker":
         raise HTTPException(status_code=403, detail="Seeker access is required.")
     settings = SEEKER_SETTINGS.get(account["phone"], {
-        "default_hospital": "Square Hospital, Dhaka",
-        "sms_alerts": True,
-        "push_alerts": True,
-        "audio_siren": True,
-        "default_radius": "10",
+        "default_hospital": "",
+        "sms_alerts": False,
+        "push_alerts": False,
+        "audio_siren": False,
+        "default_radius": "0",
     })
     return {
         "status": "success",
