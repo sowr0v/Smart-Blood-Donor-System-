@@ -444,6 +444,112 @@ class FacilityBloodInventoryTests(unittest.TestCase):
                         (facility_phone,),
                     )
 
+    def test_admin_inventory_overview_aggregates_authorized_facility_stock_and_locations(self):
+        facility_phone = "+8801999990098"
+        with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+            with connection:
+                connection.executemany(
+                    """INSERT OR REPLACE INTO facility_blood_inventory
+                       (facility_phone, blood_group, quantity, updated_at)
+                       VALUES (?, ?, ?, ?)""",
+                    [
+                        (facility_phone, group, 12 if group == "A+" else 0, "2026-10-28T12:00:00+00:00")
+                        for group in BLOOD_GROUPS
+                    ],
+                )
+        with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+            with connection:
+                connection.execute(
+                    """INSERT OR REPLACE INTO facility_settings
+                       (phone, facility_name, facility_type, division, gps_coords, updated_at)
+                       VALUES (?, 'Overview Test Hospital', 'Hospital', 'Test Division',
+                               '23.7257° N, 90.3980° E', 1)""",
+                    (facility_phone,),
+                )
+
+        facility_user = {
+            "phone": facility_phone,
+            "role": "hospital",
+            "name": "Overview Test Hospital",
+        }
+        try:
+            with patch.dict("main.USERS", {facility_phone: facility_user}):
+                summary = self.client.get(
+                    "/api/v1/admin/inventory/summary",
+                    cookies=self.admin_cookies,
+                )
+                heatmap = self.client.get(
+                    "/api/v1/admin/inventory/heatmap",
+                    cookies=self.admin_cookies,
+                )
+                facilities = self.client.get(
+                    "/api/v1/admin/inventory/facilities?district=Test%20Division",
+                    cookies=self.admin_cookies,
+                )
+
+                self.assertEqual(summary.status_code, 200)
+                self.assertEqual(heatmap.status_code, 200)
+                self.assertEqual(facilities.status_code, 200)
+                summary_data = summary.json()
+                self.assertEqual(
+                    [item["blood_group"] for item in summary_data["groups"]],
+                    list(BLOOD_GROUPS),
+                )
+                self.assertGreaterEqual(summary_data["total_units"], 12)
+
+                facility = facilities.json()["facilities"][0]
+                self.assertEqual(facility["facility_name"], "Overview Test Hospital")
+                self.assertEqual(facility["stock"]["A+"], 12)
+                self.assertEqual(facility["total_units"], 12)
+                self.assertAlmostEqual(facility["latitude"], 23.7257)
+                self.assertAlmostEqual(facility["longitude"], 90.398)
+                self.assertNotIn("facility_phone", facility)
+                self.assertNotIn("phone", facility)
+
+                division = next(
+                    item
+                    for item in heatmap.json()["heatmap"]
+                    if item["division"] == "Test Division"
+                )
+                self.assertEqual(division["total_units"], 12)
+                self.assertEqual(division["facilities_count"], 1)
+                self.assertEqual(division["groups"]["A+"], 12)
+
+                for endpoint in (
+                    "/api/v1/admin/inventory/summary",
+                    "/api/v1/admin/inventory/heatmap",
+                    "/api/v1/admin/inventory/facilities",
+                ):
+                    self.assertEqual(self.client.get(endpoint).status_code, 401)
+                    self.assertEqual(
+                        self.client.get(
+                            endpoint,
+                            cookies=self.hospital_cookies,
+                        ).status_code,
+                        403,
+                    )
+        finally:
+            self._clear_inventory(facility_phone)
+            with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+                with connection:
+                    connection.execute(
+                        "DELETE FROM facility_settings WHERE phone = ?",
+                        (facility_phone,),
+                    )
+
+    def test_admin_stock_dashboard_includes_leaflet_map_assets_and_container(self):
+        response = self.client.get("/admin/dashboard?preview=1#stock")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('<div id="stock-map" style="height: 400px;"></div>', response.text)
+        self.assertIn(
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
+            response.text,
+        )
+        self.assertIn(
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+            response.text,
+        )
+
     def test_low_stock_threshold_is_validated(self):
         for invalid_threshold in (-1, 51, 1.5, "5"):
             with self.subTest(threshold=invalid_threshold):

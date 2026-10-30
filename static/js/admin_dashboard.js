@@ -23,6 +23,8 @@ let currentKycFilter = 'pending';
 let currentRoleFilter = 'all';
 let currentDistrictFilter = 'all';
 let currentKycItem = null;
+let adminBloodStockMap = null;
+let adminBloodStockMarkers = null;
 
 document.addEventListener('DOMContentLoaded', function () {
   initAdminDashboard();
@@ -457,7 +459,7 @@ function printAnalyticsBrief() {
 
 function drilldownDivision(division) {
   switchAdminSection('stock');
-  const select = document.getElementById('districtFilterSelect');
+  const select = document.getElementById('stockDistrictFilter');
   if (select) {
     select.value = division;
     filterFacilitiesByDistrict(division);
@@ -1407,42 +1409,71 @@ function formatDatePretty(iso) {
 // 5. SBDS-43: Platform Blood Stock Oversight & Heatmap
 // -----------------------------------------------------------------------------
 async function loadInventoryHeatmap() {
+  const statusEl = document.getElementById('stockOverviewStatus');
   try {
-    const [heatRes, facRes] = await Promise.all([
-      fetch('/api/v1/admin/inventory/heatmap'),
-      fetch(`/api/v1/admin/inventory/facilities?district=${encodeURIComponent(currentDistrictFilter)}`),
+    const [summaryRes, heatRes, facRes] = await Promise.all([
+      fetch('/api/v1/admin/inventory/summary', { credentials: 'same-origin', cache: 'no-store' }),
+      fetch('/api/v1/admin/inventory/heatmap', { credentials: 'same-origin', cache: 'no-store' }),
+      fetch(`/api/v1/admin/inventory/facilities?district=${encodeURIComponent(currentDistrictFilter)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+      }),
     ]);
-
-    if (heatRes.ok) {
-      const hData = await heatRes.json();
-      heatmapDataCache = hData.heatmap || [];
-      renderHeatmapGrid(heatmapDataCache);
-
-      // Total units & facilities stats
-      const totalUnits = heatmapDataCache.reduce((sum, d) => sum + (d.total_units || 0), 0);
-      const totalFacs = heatmapDataCache.reduce((sum, d) => sum + (d.facilities_count || 0), 0);
-
-      const totEl = document.getElementById('stockTotalUnitsVal');
-      if (totEl) totEl.textContent = `${totalUnits} Units`;
-
-      const facEl = document.getElementById('stockFacilitiesCountVal');
-      if (facEl) facEl.textContent = `${totalFacs} Centers Connected`;
-
-      const critDivs = heatmapDataCache.filter(d => d.critical_deficits > 0).map(d => d.division);
-      const critEl = document.getElementById('stockCriticalGroupsVal');
-      if (critEl) {
-        critEl.textContent = critDivs.length > 0 ? `Critical: ${critDivs.join(', ')}` : 'All Divisions Balanced';
-      }
+    if (!summaryRes.ok || !heatRes.ok || !facRes.ok) {
+      throw new Error('Unable to load authorized facility inventory data.');
     }
 
-    if (facRes.ok) {
-      const fData = await facRes.json();
-      facilitiesCache = fData.facilities || [];
-      renderFacilitiesTable(facilitiesCache);
+    const [summary, heatmap, facilityData] = await Promise.all([
+      summaryRes.json(),
+      heatRes.json(),
+      facRes.json(),
+    ]);
+    heatmapDataCache = heatmap.heatmap || [];
+    facilitiesCache = facilityData.facilities || [];
+    renderBloodGroupOverview(summary.groups || []);
+    renderHeatmapGrid(heatmapDataCache);
+    renderFacilitiesTable(facilitiesCache);
+    try {
+      renderFacilityAvailabilityMap(facilitiesCache, heatmapDataCache);
+    } catch (mapError) {
+      console.error('Error rendering facility availability map:', mapError);
+      const mapStatus = document.getElementById('stockMapStatus');
+      if (mapStatus) mapStatus.textContent = 'Map could not be rendered; facility stock data is still available below.';
+    }
+
+    const totalEl = document.getElementById('stockTotalUnitsVal');
+    if (totalEl) totalEl.textContent = `${summary.total_units || 0} units`;
+    const facilitiesEl = document.getElementById('stockFacilitiesCountVal');
+    if (facilitiesEl) facilitiesEl.textContent = summary.facilities_reporting || 0;
+    const criticalEl = document.getElementById('stockCriticalGroupsVal');
+    if (criticalEl) criticalEl.textContent = summary.critical_shortage_alerts_count || 0;
+    if (statusEl) {
+      statusEl.textContent = `Showing aggregated inventory from ${summary.facilities_reporting || 0} participating facilities.`;
     }
   } catch (err) {
     console.error('Error loading inventory heatmap:', err);
+    if (statusEl) statusEl.textContent = 'Facility stock overview could not be loaded. Please try again.';
+    const mapStatus = document.getElementById('stockMapStatus');
+    if (mapStatus) mapStatus.textContent = 'Map data is unavailable until the authorized inventory request succeeds.';
   }
+}
+
+function renderBloodGroupOverview(groups) {
+  const container = document.getElementById('stockBloodGroupsGrid');
+  if (!container) return;
+  const expectedGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const groupData = new Map(groups.map(group => [group.blood_group, group]));
+  container.innerHTML = expectedGroups.map(bloodGroup => {
+    const item = groupData.get(bloodGroup) || {};
+    const isLow = Number(item.low_stock_facilities || 0) > 0;
+    return `
+      <article class="stock-group-card${isLow ? ' low' : ''}">
+        <header><strong>${bloodGroup}</strong><span>${isLow ? 'Low stock' : 'On target'}</span></header>
+        <strong>${Number(item.units || 0).toLocaleString()} units</strong>
+        <p>${Number(item.facilities_available || 0)} facilities reporting stock · minimum ${Number(item.threshold || 0)} units</p>
+      </article>
+    `;
+  }).join('');
 }
 
 function renderHeatmapGrid(heatmap) {
@@ -1465,42 +1496,42 @@ function renderHeatmapGrid(heatmap) {
       cardClass = 'heatmap-card warning';
     }
 
-    return `
-      <div class="${cardClass}" onclick="drilldownDivision('${d.division}')" title="Click to filter facilities in ${d.division}">
-        <div class="heat-card-header">
-          <strong class="division-title">${d.division}</strong>
-          <span class="heat-score-badge" style="color: ${scoreColor}; border-color: ${scoreColor}">${d.shortage_score}/100 Risk</span>
-        </div>
-        <div class="heat-metrics-row">
-          <div>
-            <span class="metric-sublabel">Total Units:</span>
-            <strong class="metric-subval">${d.total_units} units</strong>
-          </div>
-          <div>
-            <span class="metric-sublabel">Centers:</span>
-            <strong class="metric-subval">${d.facilities_count}</strong>
-          </div>
-        </div>
-        <div class="heat-rare-groups">
-          <span class="rare-chip ${d.o_minus_units <= 2 ? 'crit' : ''}">O-: ${d.o_minus_units}u</span>
-          <span class="rare-chip ${d.b_minus_units <= 1 ? 'crit' : ''}">B-: ${d.b_minus_units}u</span>
-        </div>
-        <div class="heat-card-footer">
-          <span class="severity-label" style="color: ${scoreColor}">${d.severity}</span>
-          <span class="arrow-indicator">→</span>
-        </div>
-      </div>
-    `;
+    return `<button type="button" class="${cardClass}" data-division="${escapeHtml(d.division)}" title="Filter facilities in ${escapeHtml(d.division)}">
+      <span class="heat-card-header">
+        <strong class="division-title">${escapeHtml(d.division)}</strong>
+        <span class="heat-score-badge" style="color: ${scoreColor}; border-color: ${scoreColor}">${Number(d.shortage_score || 0)}/100 risk</span>
+      </span>
+      <span class="heat-metrics-row">
+        <span><span class="metric-sublabel">Units:</span> <strong class="metric-subval">${Number(d.total_units || 0)}</strong></span>
+        <span><span class="metric-sublabel">Facilities:</span> <strong class="metric-subval">${Number(d.facilities_count || 0)}</strong></span>
+      </span>
+      <span class="heat-rare-groups">
+        <span class="rare-chip ${Number(d.o_minus_units || 0) <= 2 ? 'crit' : ''}">O-: ${Number(d.o_minus_units || 0)}u</span>
+        <span class="rare-chip ${Number(d.b_minus_units || 0) <= 1 ? 'crit' : ''}">B-: ${Number(d.b_minus_units || 0)}u</span>
+      </span>
+      <span class="heat-card-footer">
+        <span class="severity-label" style="color: ${scoreColor}">${escapeHtml(d.severity)}</span>
+        <span class="arrow-indicator" aria-hidden="true">→</span>
+      </span>
+    </button>`;
   }).join('');
+  container.querySelectorAll('[data-division]').forEach(button => {
+    button.addEventListener('click', () => drilldownDivision(button.dataset.division));
+  });
 }
 
 function filterFacilitiesByDistrict(district) {
   currentDistrictFilter = district;
+  const select = document.getElementById('stockDistrictFilter');
+  if (select && !Array.from(select.options).some(option => option.value === district)) {
+    select.add(new Option(district, district));
+  }
+  if (select && select.value !== district) select.value = district;
   const titleEl = document.getElementById('facilityTableTitle');
   if (titleEl) {
     titleEl.textContent = district === 'all'
-      ? 'Hospital & Blood Bank Inventories (All Divisions)'
-      : `Hospital & Blood Bank Inventories (${district} Division)`;
+      ? 'Participating facility inventories'
+      : `Participating facility inventories (${district} division)`;
   }
   loadInventoryHeatmap();
 }
@@ -1526,25 +1557,142 @@ function renderFacilitiesTable(facilities) {
     }).join('');
 
     const statusBadge = f.has_critical
-      ? '<span class="badge badge-danger">Critical Shortage</span>'
-      : (f.total_units < 20 ? '<span class="badge badge-warning">Low Stock</span>' : '<span class="badge badge-success">Adequate</span>');
+      ? '<span class="badge badge-danger">Low stock</span>'
+      : '<span class="badge badge-success">Above minimum</span>';
 
     return `
       <tr>
         <td><strong>${escapeHtml(f.facility_name)}</strong></td>
         <td><span class="badge badge-outline">${escapeHtml(f.facility_type)}</span></td>
-        <td>${escapeHtml(f.district)}</td>
+        <td>${escapeHtml(f.division)}</td>
         ${stockCols}
         <td><strong>${f.total_units}u</strong></td>
         <td>${statusBadge}</td>
         <td>
-          <button type="button" class="btn btn-xs btn-danger-soft" onclick="openEmergencySmsForFacility('${escapeHtml(f.facility_name)}', '${f.district}')">
+          <button type="button" class="btn btn-xs btn-danger-soft" data-low-stock-facility="${escapeHtml(f.facility_name)}" data-low-stock-division="${escapeHtml(f.division)}">
             ⚡ Low Stock SOS
           </button>
         </td>
       </tr>
     `;
   }).join('');
+  tbody.querySelectorAll('[data-low-stock-facility]').forEach(button => {
+    button.addEventListener('click', () => {
+      openEmergencySmsForFacility(
+        button.dataset.lowStockFacility,
+        button.dataset.lowStockDivision
+      );
+    });
+  });
+}
+
+function renderFacilityAvailabilityMap(facilities, heatmap) {
+  const status = document.getElementById('stockMapStatus');
+  const mapContainer = document.getElementById('stock-map');
+  if (!mapContainer) {
+    throw new Error('Facility availability map container was not found.');
+  }
+  if (typeof L === 'undefined') {
+    if (status) status.textContent = 'The interactive map library is unavailable. Use the regional heatmap below.';
+    return;
+  }
+
+  if (!adminBloodStockMap) {
+    adminBloodStockMap = L.map(mapContainer).setView([23.685, 90.3563], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 18,
+    }).addTo(adminBloodStockMap);
+    adminBloodStockMarkers = L.featureGroup().addTo(adminBloodStockMap);
+  }
+
+  adminBloodStockMarkers.clearLayers();
+  const locatedFacilities = facilities.filter(facility =>
+    facility.latitude !== null && facility.longitude !== null &&
+    Number.isFinite(Number(facility.latitude)) && Number.isFinite(Number(facility.longitude))
+  );
+  const locatedDivisions = new Set(
+    locatedFacilities.map(facility => String(facility.division).toLocaleLowerCase())
+  );
+  locatedFacilities.forEach(facility => {
+    const lowStock = Boolean(facility.has_critical);
+    const marker = L.circleMarker(
+      [Number(facility.latitude), Number(facility.longitude)],
+      {
+        radius: 9,
+        color: '#ffffff',
+        weight: 2,
+        fillColor: lowStock ? '#ef4444' : '#10b981',
+        fillOpacity: 0.9,
+      }
+    );
+    const groupSummary = Object.entries(facility.stock || {})
+      .map(([group, units]) => `${escapeHtml(group)}: ${Number(units)} units`)
+      .join('<br>');
+    marker.bindPopup(
+      `<strong>${escapeHtml(facility.facility_name)}</strong><br>${escapeHtml(facility.division)}<br>` +
+      `${lowStock ? 'Low-stock groups: ' + escapeHtml((facility.low_groups || []).join(', ')) : 'Stock above minimum'}<hr>${groupSummary}`
+    );
+    adminBloodStockMarkers.addLayer(marker);
+  });
+
+  const divisionCenters = {
+    barisal: [22.701, 90.3535],
+    chittagong: [22.3569, 91.7832],
+    dhaka: [23.8103, 90.4125],
+    khulna: [22.8456, 89.5403],
+    mymensingh: [24.7471, 90.4203],
+    rajshahi: [24.3745, 88.6042],
+    rangpur: [25.7439, 89.2752],
+    sylhet: [24.8949, 91.8687],
+  };
+  const regionalSummaries = (heatmap || []).filter(region =>
+    currentDistrictFilter === 'all' ||
+    String(region.division).toLocaleLowerCase() === currentDistrictFilter.toLocaleLowerCase()
+  );
+  let regionalMarkers = 0;
+  regionalSummaries.forEach(region => {
+    const key = String(region.division).toLocaleLowerCase();
+    const center = divisionCenters[key];
+    if (!center || locatedDivisions.has(key)) return;
+    const lowStock = Number(region.low_stock_facilities || 0) > 0;
+    const marker = L.circleMarker(center, {
+      radius: 12,
+      color: lowStock ? '#b91c1c' : '#047857',
+      weight: 2,
+      dashArray: '3 4',
+      fillColor: lowStock ? '#ef4444' : '#10b981',
+      fillOpacity: 0.65,
+    });
+    const groupSummary = Object.entries(region.groups || {})
+      .map(([group, units]) => `${escapeHtml(group)}: ${Number(units)} units`)
+      .join('<br>');
+    marker.bindPopup(
+      `<strong>${escapeHtml(region.division)} regional summary</strong><br>` +
+      `Approximate division center · ${Number(region.facilities_count || 0)} facilities<br>` +
+      `${Number(region.low_stock_facilities || 0)} facilities with low-stock groups<hr>${groupSummary}`
+    );
+    adminBloodStockMarkers.addLayer(marker);
+    regionalMarkers += 1;
+  });
+
+  const markerCount = locatedFacilities.length + regionalMarkers;
+  if (markerCount) {
+    adminBloodStockMap.fitBounds(adminBloodStockMarkers.getBounds().pad(0.15), { maxZoom: 12 });
+    if (status) {
+      const withoutCoordinates = facilities.length - locatedFacilities.length;
+      const locationSummary = withoutCoordinates
+        ? ` ${withoutCoordinates} facility locations are not saved; dashed markers show approximate regional summaries where available.`
+        : '';
+      status.textContent = `${locatedFacilities.length} facilities and ${regionalMarkers} regional summaries shown.${locationSummary}`;
+    }
+  } else {
+    adminBloodStockMap.setView([23.685, 90.3563], 7);
+    if (status) status.textContent = facilities.length
+      ? 'No facilities in this filter have valid saved coordinates; regional stock is shown below.'
+      : 'No participating facilities are available in this filter.';
+  }
+  setTimeout(() => adminBloodStockMap.invalidateSize(), 0);
 }
 
 function openEmergencySmsForFacility(facilityName, district) {

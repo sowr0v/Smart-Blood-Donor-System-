@@ -41,10 +41,105 @@ AUTH_DATABASE_PATH = Path(
 DATABASE_PATH = Path(
     os.environ.get("SBDS_DATABASE_PATH", str(BASE_DIR / "urgent_requests.db"))
 )
+ADMIN_INVENTORY_BLOOD_GROUPS = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 EMERGENCY_SMS_BLOOD_GROUPS = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
 EMERGENCY_SMS_COOLDOWN = timedelta(minutes=30)
 
 router = APIRouter()
+
+
+def _parse_facility_coordinates(value: str) -> tuple[Optional[float], Optional[float]]:
+    coordinates = re.findall(r"[+-]?\d+(?:\.\d+)?", value or "")
+    if len(coordinates) != 2:
+        return None, None
+
+    latitude, longitude = (float(coordinate) for coordinate in coordinates)
+    hemispheres = re.findall(r"\b([NSWE])\b", (value or "").upper())
+    if hemispheres:
+        if "S" in hemispheres:
+            latitude = -abs(latitude)
+        elif "N" in hemispheres:
+            latitude = abs(latitude)
+        if "W" in hemispheres:
+            longitude = -abs(longitude)
+        elif "E" in hemispheres:
+            longitude = abs(longitude)
+
+    if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
+        return None, None
+    return latitude, longitude
+
+
+def _get_admin_facility_inventory() -> tuple[list[dict[str, Any]], dict[str, int]]:
+    import main
+
+    main.initialize_auth_database()
+    main.initialize_urgent_database()
+    thresholds = main._get_blood_stock_thresholds()
+    facility_users = main._get_facility_inventory_users()
+
+    with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        setting_rows = connection.execute(
+            """SELECT phone, facility_name, facility_type, division, gps_coords
+               FROM facility_settings"""
+        ).fetchall()
+    settings_by_phone = {row["phone"]: dict(row) for row in setting_rows}
+
+    with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        inventory_rows = connection.execute(
+            """SELECT facility_phone, blood_group, quantity, updated_at
+               FROM facility_blood_inventory"""
+        ).fetchall()
+
+    inventory_by_phone: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in inventory_rows:
+        inventory_by_phone.setdefault(row["facility_phone"], {})[row["blood_group"]] = {
+            "quantity": row["quantity"],
+            "updated_at": row["updated_at"],
+        }
+
+    facilities = []
+    for phone, user in facility_users:
+        settings = settings_by_phone.get(phone)
+        if settings is None and phone in main.FACILITY_SETTINGS:
+            settings = main.FACILITY_SETTINGS[phone]
+        settings = settings or {}
+        stored_inventory = inventory_by_phone.get(phone, {})
+        stock = {
+            group: int(stored_inventory.get(group, {}).get("quantity", 0))
+            for group in ADMIN_INVENTORY_BLOOD_GROUPS
+        }
+        low_groups = [
+            group
+            for group in ADMIN_INVENTORY_BLOOD_GROUPS
+            if stock[group] <= thresholds.get(group, 0)
+        ]
+        latitude, longitude = _parse_facility_coordinates(
+            str(settings.get("gps_coords") or "")
+        )
+        updated_values = [
+            item.get("updated_at")
+            for item in stored_inventory.values()
+            if item.get("updated_at")
+        ]
+        facilities.append(
+            {
+                "facility_name": settings.get("facility_name") or user.get("name") or "Facility",
+                "facility_type": settings.get("facility_type") or user.get("role") or "facility",
+                "division": str(settings.get("division") or "").strip() or "Unspecified",
+                "stock": stock,
+                "total_units": sum(stock.values()),
+                "low_groups": low_groups,
+                "has_critical": bool(low_groups),
+                "last_updated": max(updated_values) if updated_values else None,
+                "latitude": latitude,
+                "longitude": longitude,
+            }
+        )
+
+    return facilities, thresholds
 
 
 def _get_eligible_emergency_sms_recipients(
@@ -2146,118 +2241,107 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # SBDS-43: Platform-Wide Blood Stock Oversight & Heatmap
     # -----------------------------------------------------------------------
     @app.get("/api/v1/admin/inventory/summary")
-    async def get_inventory_summary():
-        initialize_admin_and_notification_database()
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            u_conn.row_factory = sqlite3.Row
-            total_units = u_conn.execute("SELECT SUM(units_available) FROM hospital_blood_inventory").fetchone()[0] or 0
-            facilities_count = u_conn.execute("SELECT COUNT(DISTINCT facility_name) FROM hospital_blood_inventory").fetchone()[0] or 0
-            critical_alerts = u_conn.execute("SELECT COUNT(*) FROM hospital_blood_inventory WHERE status = 'critical'").fetchone()[0] or 0
-
-            # Blood group breakdown
-            groups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
-            breakdown = []
-            for bg in groups:
-                u = u_conn.execute("SELECT SUM(units_available) FROM hospital_blood_inventory WHERE blood_group = ?", (bg,)).fetchone()[0] or 0
-                c = u_conn.execute("SELECT COUNT(*) FROM hospital_blood_inventory WHERE blood_group = ? AND status = 'critical'", (bg,)).fetchone()[0] or 0
-                status_label = "critical" if c > 0 or u < 10 else ("low" if u < 25 else "adequate")
-                breakdown.append({
-                    "blood_group": bg,
-                    "units": int(u),
-                    "status": status_label,
-                    "critical_facilities_count": c,
-                })
+    async def get_inventory_summary(request: Request):
+        _require_admin(request)
+        facilities, thresholds = _get_admin_facility_inventory()
+        group_summary = []
+        for group in ADMIN_INVENTORY_BLOOD_GROUPS:
+            units = sum(facility["stock"][group] for facility in facilities)
+            available_count = sum(
+                facility["stock"][group] > 0 for facility in facilities
+            )
+            low_count = sum(group in facility["low_groups"] for facility in facilities)
+            group_summary.append(
+                {
+                    "blood_group": group,
+                    "units": units,
+                    "facilities_available": available_count,
+                    "low_stock_facilities": low_count,
+                    "threshold": thresholds.get(group, 0),
+                    "status": "critical" if low_count else "adequate",
+                }
+            )
 
         return {
             "status": "success",
-            "total_units": int(total_units),
-            "facilities_reporting": facilities_count,
-            "critical_shortage_alerts_count": critical_alerts,
-            "groups": breakdown,
+            "total_units": sum(facility["total_units"] for facility in facilities),
+            "facilities_reporting": len(facilities),
+            "critical_shortage_alerts_count": sum(
+                len(facility["low_groups"]) for facility in facilities
+            ),
+            "groups": group_summary,
         }
 
     @app.get("/api/v1/admin/inventory/heatmap")
-    async def get_inventory_heatmap():
-        initialize_admin_and_notification_database()
-        divisions = ["Dhaka", "Chittagong", "Sylhet", "Rajshahi", "Khulna", "Barisal", "Rangpur", "Mymensingh"]
+    async def get_inventory_heatmap(request: Request):
+        _require_admin(request)
+        facilities, _ = _get_admin_facility_inventory()
+        grouped: dict[str, list[dict[str, Any]]] = {}
+        for facility in facilities:
+            grouped.setdefault(facility["division"], []).append(facility)
+
         heatmap_data = []
+        for division in sorted(grouped):
+            regional_facilities = grouped[division]
+            group_units = {
+                group: sum(item["stock"][group] for item in regional_facilities)
+                for group in ADMIN_INVENTORY_BLOOD_GROUPS
+            }
+            low_groups = sum(
+                len(facility["low_groups"]) for facility in regional_facilities
+            )
+            shortage_score = round(
+                100 * low_groups / (len(regional_facilities) * len(ADMIN_INVENTORY_BLOOD_GROUPS))
+            )
+            if shortage_score >= 50:
+                severity, color_code = "Critical Deficit", "#EF4444"
+            elif shortage_score >= 25:
+                severity, color_code = "Low Supply Warning", "#F59E0B"
+            else:
+                severity, color_code = "Adequate Availability", "#10B981"
 
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            u_conn.row_factory = sqlite3.Row
-            for div in divisions:
-                units = u_conn.execute("SELECT SUM(units_available) FROM hospital_blood_inventory WHERE district = ?", (div,)).fetchone()[0] or 0
-                fac_cnt = u_conn.execute("SELECT COUNT(DISTINCT facility_name) FROM hospital_blood_inventory WHERE district = ?", (div,)).fetchone()[0] or 0
-                critical_cnt = u_conn.execute("SELECT COUNT(*) FROM hospital_blood_inventory WHERE district = ? AND status = 'critical'", (div,)).fetchone()[0] or 0
-
-                # Shortage severity index (0 - 100)
-                if critical_cnt > 2 or units < 10:
-                    severity = "Critical Deficit"
-                    color_code = "#EF4444"
-                    shortage_score = 90
-                elif critical_cnt > 0 or units < 25:
-                    severity = "Low Supply Warning"
-                    color_code = "#F59E0B"
-                    shortage_score = 55
-                else:
-                    severity = "Adequate Surplus"
-                    color_code = "#10B981"
-                    shortage_score = 15
-
-                # Group summary
-                o_minus = u_conn.execute("SELECT SUM(units_available) FROM hospital_blood_inventory WHERE district = ? AND blood_group = 'O-'", (div,)).fetchone()[0] or 0
-                b_minus = u_conn.execute("SELECT SUM(units_available) FROM hospital_blood_inventory WHERE district = ? AND blood_group = 'B-'", (div,)).fetchone()[0] or 0
-
-                heatmap_data.append({
-                    "division": div,
-                    "total_units": int(units),
-                    "facilities_count": fac_cnt,
-                    "critical_deficits": critical_cnt,
+            heatmap_data.append(
+                {
+                    "division": division,
+                    "total_units": sum(group_units.values()),
+                    "facilities_count": len(regional_facilities),
+                    "critical_deficits": low_groups,
+                    "low_stock_facilities": sum(
+                        bool(facility["low_groups"])
+                        for facility in regional_facilities
+                    ),
                     "severity": severity,
                     "color_code": color_code,
                     "shortage_score": shortage_score,
-                    "o_minus_units": int(o_minus),
-                    "b_minus_units": int(b_minus),
-                })
+                    "groups": group_units,
+                    "o_minus_units": group_units["O-"],
+                    "b_minus_units": group_units["B-"],
+                }
+            )
 
         return {"status": "success", "heatmap": heatmap_data}
 
     @app.get("/api/v1/admin/inventory/facilities")
-    async def get_inventory_facilities(district: str = Query("all", description="District filter")):
-        initialize_admin_and_notification_database()
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            u_conn.row_factory = sqlite3.Row
-            sql = "SELECT * FROM hospital_blood_inventory"
-            params: list[Any] = []
-            if district != "all":
-                sql += " WHERE district = ?"
-                params.append(district)
-            sql += " ORDER BY district, facility_name"
-
-            rows = [dict(r) for r in u_conn.execute(sql, params).fetchall()]
-
-        # Group by facility
-        facilities_map: dict[str, dict] = {}
-        for r in rows:
-            name = r["facility_name"]
-            if name not in facilities_map:
-                facilities_map[name] = {
-                    "facility_name": name,
-                    "facility_type": r["facility_type"],
-                    "district": r["district"],
-                    "stock": {},
-                    "total_units": 0,
-                    "has_critical": False,
-                    "last_updated": r["last_updated"],
-                }
-            facilities_map[name]["stock"][r["blood_group"]] = r["units_available"]
-            facilities_map[name]["total_units"] += r["units_available"]
-            if r["status"] == "critical":
-                facilities_map[name]["has_critical"] = True
-
-        return {"status": "success", "facilities": list(facilities_map.values())}
+    async def get_inventory_facilities(
+        request: Request,
+        district: str = Query("all", description="Facility division filter"),
+    ):
+        _require_admin(request)
+        facilities, _ = _get_admin_facility_inventory()
+        if district.strip().lower() != "all":
+            facilities = [
+                facility
+                for facility in facilities
+                if facility["division"].casefold() == district.strip().casefold()
+            ]
+        facilities.sort(
+            key=lambda facility: (facility["division"].casefold(), facility["facility_name"].casefold())
+        )
+        return {"status": "success", "facilities": facilities}
 
     @app.post("/api/v1/admin/inventory/alert")
     async def trigger_inventory_alert(payload: InventoryAlertPayload, request: Request):
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
         msg = payload.message or f"Emergency low-stock SOS triggered for {payload.blood_group} blood in {payload.district} region."
         dispatch_in_app_notification(
@@ -2269,8 +2353,8 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
             "critical",
         )
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
+            admin["phone"],
+            admin["name"],
             "INVENTORY_ALERT_DISPATCHED",
             f"{payload.district} ({payload.blood_group})",
             msg,
