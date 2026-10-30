@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs, urlparse
 
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import app
 

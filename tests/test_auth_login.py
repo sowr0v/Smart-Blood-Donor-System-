@@ -1,6 +1,6 @@
 import unittest
 
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import app
 
@@ -310,7 +310,6 @@ class AuthenticationLoginTests(unittest.TestCase):
         response = self.client.get("/admin/login", cookies={"access_token": admin_token}, follow_redirects=False)
         self.assertEqual(response.status_code, 303)
         self.assertEqual(response.headers.get("location"), "/admin/dashboard")
-
 
 
 

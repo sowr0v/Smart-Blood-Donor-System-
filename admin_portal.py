@@ -41,8 +41,75 @@ AUTH_DATABASE_PATH = Path(
 DATABASE_PATH = Path(
     os.environ.get("SBDS_DATABASE_PATH", str(BASE_DIR / "urgent_requests.db"))
 )
+EMERGENCY_SMS_BLOOD_GROUPS = ("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-")
+EMERGENCY_SMS_COOLDOWN = timedelta(minutes=30)
 
 router = APIRouter()
+
+
+def _get_eligible_emergency_sms_recipients(
+    blood_group: str,
+    district: str,
+    area: str = "",
+    requested_recipients: Optional[list[str]] = None,
+) -> list[str]:
+    import main
+
+    main.initialize_auth_database()
+    with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """SELECT profiles.phone, settings.settings_json
+               FROM donor_profiles AS profiles
+               JOIN auth_users AS users ON users.phone = profiles.phone
+               LEFT JOIN donor_settings AS settings ON settings.phone = profiles.phone
+               WHERE users.role = 'donor'
+                 AND LOWER(COALESCE(users.status, 'active')) = 'active'
+                 AND COALESCE(profiles.is_available, 0) = 1
+                 AND UPPER(TRIM(profiles.blood_group)) IN (?, 'O-')
+                 AND LOWER(TRIM(profiles.district)) = LOWER(TRIM(?))
+                 AND (? = '' OR LOWER(TRIM(profiles.area)) = LOWER(TRIM(?)))
+               ORDER BY profiles.phone""",
+            (blood_group, district, area, area),
+        ).fetchall()
+
+    eligible: list[str] = []
+    for row in rows:
+        settings_json = row["settings_json"]
+        if settings_json:
+            try:
+                preferences = json.loads(settings_json)
+            except (TypeError, json.JSONDecodeError):
+                logger.warning(
+                    "Skipping emergency SMS recipient with invalid preferences."
+                )
+                continue
+            sms_alerts = preferences.get("sms_alerts", True) if isinstance(preferences, dict) else None
+            if not isinstance(sms_alerts, bool) or not sms_alerts:
+                continue
+        eligible.append(str(row["phone"]))
+
+    if requested_recipients is not None:
+        requested = set(requested_recipients)
+        eligible = [phone for phone in eligible if phone in requested]
+    return eligible[:25]
+
+
+def _emergency_sms_campaign_key(payload: "EmergencySmsDispatchPayload") -> str:
+    campaign = [
+        payload.request_id or "",
+        payload.blood_group.strip().upper(),
+        payload.hospital_name.strip().casefold(),
+        payload.district.strip().casefold(),
+        (payload.area or "").strip().casefold(),
+    ]
+    return hashlib.sha256(
+        json.dumps(campaign, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    ).hexdigest()
+
+
+def _mask_sms_recipient(phone: str) -> str:
+    return f"••••{phone[-4:]}" if len(phone) >= 4 else "••••"
 
 
 # ---------------------------------------------------------------------------
@@ -149,12 +216,30 @@ def initialize_admin_and_notification_database():
                     hospital_name TEXT DEFAULT '',
                     district TEXT DEFAULT '',
                     message TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'delivered',
+                    status TEXT NOT NULL DEFAULT 'pending',
                     provider TEXT NOT NULL DEFAULT 'Twilio/SSL Wireless',
                     tracking_id TEXT NOT NULL,
+                    request_id INTEGER,
+                    campaign_key TEXT DEFAULT '',
+                    failure_reason TEXT DEFAULT '',
                     created_at TEXT NOT NULL
                 );
                 """
+            )
+
+            sms_log_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(sms_dispatch_logs)").fetchall()
+            }
+            if "request_id" not in sms_log_columns:
+                connection.execute("ALTER TABLE sms_dispatch_logs ADD COLUMN request_id INTEGER")
+            if "campaign_key" not in sms_log_columns:
+                connection.execute("ALTER TABLE sms_dispatch_logs ADD COLUMN campaign_key TEXT DEFAULT ''")
+            if "failure_reason" not in sms_log_columns:
+                connection.execute("ALTER TABLE sms_dispatch_logs ADD COLUMN failure_reason TEXT DEFAULT ''")
+            connection.execute(
+                """CREATE INDEX IF NOT EXISTS idx_sms_dispatch_campaign_recent
+                   ON sms_dispatch_logs(campaign_key, recipient_phone, status, created_at)"""
             )
 
             # Ensure blood_requests table has moderation and duplicate detection columns
@@ -915,12 +1000,14 @@ class PushDispatchPayload(BaseModel):
     click_url: Optional[str] = "/admin/dashboard"
 
 class EmergencySmsDispatchPayload(BaseModel):
-    blood_group: str
-    hospital_name: str
-    district: str
-    message: Optional[str] = ""
-    recipients: Optional[list[str]] = None
-    is_critical: bool = True
+    blood_group: str = Field(..., min_length=2, max_length=3)
+    hospital_name: str = Field(..., min_length=1, max_length=120)
+    district: str = Field(..., min_length=1, max_length=80)
+    area: Optional[str] = Field(default="", max_length=80)
+    message: Optional[str] = Field(default="", max_length=480)
+    recipients: Optional[list[str]] = Field(default=None, max_length=100)
+    request_id: Optional[int] = Field(default=None, gt=0)
+    is_critical: bool
 
 
 # ---------------------------------------------------------------------------
@@ -2235,7 +2322,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     async def resolve_moderation_report(report_id: int, payload: ReportResolutionPayload, request: Request):
         initialize_admin_and_notification_database()
         action = payload.action.strip().lower()
-        if action not in {"resolve", "dismiss", "warn_user", "suspend_user"}:
+        if action not in {"resolve", "dismiss", "warn_user", "suspend_user", "under_review", "mark_under_review"}:
             raise HTTPException(status_code=422, detail="Invalid action")
 
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -2246,7 +2333,7 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
                     raise HTTPException(status_code=404, detail="Report not found")
                 target_phone = rep[3]
 
-                new_status = "resolved" if action in {"resolve", "warn_user", "suspend_user"} else "dismissed"
+                new_status = "resolved" if action in {"resolve", "warn_user", "suspend_user"} else ("under_review" if action in {"under_review", "mark_under_review"} else "dismissed")
                 u_conn.execute(
                     """
                     UPDATE user_moderation_reports
@@ -2653,86 +2740,272 @@ def setup_admin_and_notification_routes(app: FastAPI, templates: Any):
     # SBDS-48: Critical Emergency SMS Notification Dispatch
     # -----------------------------------------------------------------------
     @app.post("/api/v1/notifications/sms/dispatch")
-    async def dispatch_critical_emergency_sms(payload: EmergencySmsDispatchPayload, request: Request):
+    async def dispatch_critical_emergency_sms(
+        payload: EmergencySmsDispatchPayload, request: Request
+    ) -> dict[str, Any]:
+        admin = _require_admin(request)
         initialize_admin_and_notification_database()
-        now_iso = datetime.now(timezone.utc).isoformat()
+        import main
 
-        # Find matching recipient donors if not explicitly provided
-        recipients = payload.recipients or []
-        if not recipients:
-            with closing(sqlite3.connect(AUTH_DATABASE_PATH)) as a_conn:
-                a_conn.row_factory = sqlite3.Row
-                # Match donors with requested blood group or O-
-                donor_rows = a_conn.execute(
-                    """
-                    SELECT phone FROM auth_users
-                    WHERE role = 'donor' AND status = 'active'
-                      AND (blood_group = ? OR blood_group = 'O-')
-                    LIMIT 25
-                    """,
-                    (payload.blood_group.strip().upper(),),
-                ).fetchall()
-                recipients = [r["phone"] for r in donor_rows]
-                if not recipients:
-                    recipients = ["+8801712345678", "+8801735070125", "+8801799990001"]
+        blood_group = payload.blood_group.strip().upper()
+        if blood_group not in EMERGENCY_SMS_BLOOD_GROUPS:
+            raise HTTPException(status_code=422, detail="Choose a valid blood group.")
+        if not payload.is_critical:
+            raise HTTPException(
+                status_code=422,
+                detail="SMS dispatch is reserved for critical emergency blood requests.",
+            )
 
-        sms_body = payload.message.strip() if payload.message else (
-            f"[CRITICAL SBDS ALERT] Emergency {payload.blood_group} blood needed at "
-            f"{payload.hospital_name}, {payload.district}. Reply YES or open app immediately."
+        hospital_name = payload.hospital_name.strip()
+        district = payload.district.strip()
+        area = (payload.area or "").strip()
+        if payload.request_id is not None:
+            main.initialize_urgent_database()
+            with closing(sqlite3.connect(DATABASE_PATH)) as connection:
+                connection.row_factory = sqlite3.Row
+                blood_request = connection.execute(
+                    "SELECT * FROM blood_requests WHERE id = ?",
+                    (payload.request_id,),
+                ).fetchone()
+            if not blood_request or not blood_request["is_emergency"]:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Critical emergency blood request not found.",
+                )
+            request_status = str(blood_request["status"] or "").strip().casefold()
+            moderation_status = (
+                str(blood_request["moderation_status"] or "").strip().casefold()
+                if "moderation_status" in blood_request.keys()
+                else "approved"
+            )
+            try:
+                expires_at = datetime.fromisoformat(
+                    str(blood_request["expires_at"]).replace("Z", "+00:00")
+                )
+            except ValueError:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Emergency request has an invalid expiry and cannot be dispatched.",
+                ) from None
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+            if (
+                request_status != "active"
+                or moderation_status != "approved"
+                or expires_at <= datetime.now(timezone.utc)
+            ):
+                raise HTTPException(
+                    status_code=409,
+                    detail="SMS alerts can only be sent for active, approved, unexpired emergency requests.",
+                )
+            if (
+                str(blood_request["blood_group"]).strip().upper() != blood_group
+                or str(blood_request["hospital_name"]).strip().casefold() != hospital_name.casefold()
+                or str(blood_request["district"] or "").strip().casefold() != district.casefold()
+                or (
+                    area
+                    and str(blood_request["area"] or "").strip().casefold() != area.casefold()
+                )
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Alert details must match the selected emergency request.",
+                )
+
+        sms_body = (payload.message or "").strip() or (
+            f"[CRITICAL SBDS ALERT] Emergency {blood_group} blood needed at "
+            f"{hospital_name}, {district}. Please open the app to respond."
         )
+        recipients = _get_eligible_emergency_sms_recipients(
+            blood_group,
+            district,
+            area,
+            payload.recipients,
+        )
+        if not recipients:
+            log_admin_action(
+                admin["phone"],
+                admin["name"],
+                "EMERGENCY_SMS_NO_ELIGIBLE_RECIPIENTS",
+                f"{hospital_name} ({blood_group})",
+                f"No opted-in available donors matched the critical request in {district}.",
+                request.client.host if request.client else "127.0.0.1",
+            )
+            return {
+                "status": "no_recipients",
+                "message": "No available, opted-in donors matched this blood group and location.",
+                "recipients_count": 0,
+                "sent_count": 0,
+                "failed_count": 0,
+                "skipped_duplicate_count": 0,
+                "dispatches": [],
+            }
 
-        dispatched_items = []
-        with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
-            with u_conn:
+        campaign_key = _emergency_sms_campaign_key(payload)
+        now = datetime.now(timezone.utc)
+        now_iso = now.isoformat()
+        cooldown_start = (now - EMERGENCY_SMS_COOLDOWN).isoformat()
+        reserved_dispatches: list[dict[str, Any]] = []
+        skipped_duplicate_count = 0
+        with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+            with connection:
+                connection.execute("BEGIN IMMEDIATE")
                 for phone in recipients:
-                    tracking_id = f"SMS-BD-{int(time.time())}-{secrets.token_hex(3).upper()}"
-                    u_conn.execute(
-                        """
-                        INSERT INTO sms_dispatch_logs (
-                            sender, recipient_phone, blood_group, hospital_name, district,
-                            message, status, provider, tracking_id, created_at
-                        ) VALUES ('Admin Emergency Dispatcher', ?, ?, ?, ?, ?, 'delivered', 'Twilio / SSL Wireless', ?, ?)
-                        """,
-                        (phone, payload.blood_group, payload.hospital_name, payload.district, sms_body, tracking_id, now_iso),
-                    )
-                    dispatched_items.append({"phone": phone, "tracking_id": tracking_id})
+                    prior = connection.execute(
+                        """SELECT 1 FROM sms_dispatch_logs
+                           WHERE campaign_key = ? AND recipient_phone = ?
+                             AND status IN ('pending', 'sent', 'delivered')
+                             AND created_at >= ?
+                           LIMIT 1""",
+                        (campaign_key, phone, cooldown_start),
+                    ).fetchone()
+                    if prior:
+                        skipped_duplicate_count += 1
+                        continue
 
-                    # Dispatch in-app mirror alert
+                    tracking_id = (
+                        f"SMS-BD-{int(time.time())}-{secrets.token_hex(3).upper()}"
+                    )
+                    cursor = connection.execute(
+                        """INSERT INTO sms_dispatch_logs (
+                               sender, recipient_phone, blood_group, hospital_name, district,
+                               message, status, provider, tracking_id, request_id,
+                               campaign_key, failure_reason, created_at
+                           ) VALUES (?, ?, ?, ?, ?, ?, 'pending', 'Twilio', ?, ?, ?, '', ?)""",
+                        (
+                            "Admin Emergency Dispatcher",
+                            phone,
+                            blood_group,
+                            hospital_name,
+                            district,
+                            sms_body,
+                            tracking_id,
+                            payload.request_id,
+                            campaign_key,
+                            now_iso,
+                        ),
+                    )
+                    reserved_dispatches.append(
+                        {"id": cursor.lastrowid, "tracking_id": tracking_id, "phone": phone}
+                    )
+
+        if not reserved_dispatches:
+            return {
+                "status": "duplicate",
+                "message": "This emergency alert was already sent recently; duplicate SMS was skipped.",
+                "recipients_count": len(recipients),
+                "sent_count": 0,
+                "failed_count": 0,
+                "skipped_duplicate_count": skipped_duplicate_count,
+                "dispatches": [],
+            }
+
+        gateway_configured = main.sms_is_configured()
+        dispatches: list[dict[str, str]] = []
+        sent_count = 0
+        failed_count = 0
+        for dispatch in reserved_dispatches:
+            failure_reason = ""
+            if not gateway_configured:
+                failure_reason = "SMS gateway is not configured."
+            else:
+                try:
+                    main.send_sms_message(dispatch["phone"], sms_body)
+                except Exception as exc:
+                    failure_reason = "SMS gateway failed to accept the message."
+                    logger.warning(
+                        "Emergency SMS dispatch %s failed (%s).",
+                        dispatch["tracking_id"],
+                        type(exc).__name__,
+                    )
+
+            status = "failed" if failure_reason else "sent"
+            with closing(sqlite3.connect(DATABASE_PATH, timeout=10)) as connection:
+                with connection:
+                    connection.execute(
+                        """UPDATE sms_dispatch_logs
+                           SET status = ?, failure_reason = ?
+                           WHERE id = ? AND status = 'pending'""",
+                        (status, failure_reason, dispatch["id"]),
+                    )
+
+            if failure_reason:
+                failed_count += 1
+            else:
+                sent_count += 1
+                try:
                     dispatch_in_app_notification(
-                        phone,
-                        f"🚨 EMERGENCY SMS: {payload.blood_group} Needed!",
-                        f"Urgent request at {payload.hospital_name}, {payload.district}. Please confirm availability.",
+                        dispatch["phone"],
+                        f"Critical emergency: {blood_group} blood needed",
+                        f"An urgent request at {hospital_name}, {district} may match your donation profile.",
                         "emergency",
                         "/find-blood",
                         "critical",
                     )
+                except Exception as exc:
+                    logger.warning(
+                        "In-app emergency notification for SMS dispatch %s failed (%s).",
+                        dispatch["tracking_id"],
+                        type(exc).__name__,
+                    )
+            dispatches.append(
+                {
+                    "tracking_id": dispatch["tracking_id"],
+                    "status": status,
+                    "failure_reason": failure_reason,
+                }
+            )
 
+        result_status = (
+            "partial_failure"
+            if sent_count and failed_count
+            else ("failed" if failed_count else "success")
+        )
         log_admin_action(
-            "+8801745678901",
-            "System Admin",
+            admin["phone"],
+            admin["name"],
             "EMERGENCY_SMS_BROADCAST",
-            f"{payload.hospital_name} ({payload.blood_group})",
-            f"Dispatched {len(recipients)} emergency SMS alerts across {payload.district}",
+            f"{hospital_name} ({blood_group})",
+            (
+                f"SMS dispatch results: {sent_count} sent, {failed_count} failed, "
+                f"{skipped_duplicate_count} duplicate recipients skipped in {district}."
+            ),
             request.client.host if request.client else "127.0.0.1",
         )
 
         return {
-            "status": "success",
-            "message": f"Successfully broadcasted {len(recipients)} emergency SMS messages.",
+            "status": result_status,
+            "message": (
+                f"{sent_count} SMS accepted by the gateway; {failed_count} failed; "
+                f"{skipped_duplicate_count} recent duplicates skipped."
+            ),
             "recipients_count": len(recipients),
-            "dispatched_items": dispatched_items,
+            "sent_count": sent_count,
+            "failed_count": failed_count,
+            "skipped_duplicate_count": skipped_duplicate_count,
+            "dispatches": dispatches,
         }
 
     @app.get("/api/v1/notifications/sms/logs")
-    async def get_emergency_sms_logs():
+    async def get_emergency_sms_logs(request: Request) -> dict[str, Any]:
+        _require_admin(request)
         initialize_admin_and_notification_database()
         with closing(sqlite3.connect(DATABASE_PATH)) as u_conn:
             u_conn.row_factory = sqlite3.Row
-            rows = [dict(r) for r in u_conn.execute("SELECT * FROM sms_dispatch_logs ORDER BY id DESC LIMIT 50").fetchall()]
+            rows = []
+            for record in u_conn.execute(
+                """SELECT id, blood_group, hospital_name, district, status, provider,
+                          tracking_id, request_id, failure_reason, created_at, recipient_phone
+                   FROM sms_dispatch_logs ORDER BY id DESC LIMIT 50"""
+            ).fetchall():
+                item = dict(record)
+                item["recipient"] = _mask_sms_recipient(item.pop("recipient_phone"))
+                rows.append(item)
         return {"status": "success", "logs": rows}
 
     @app.get("/api/v1/notifications/sms/quota")
-    async def get_sms_gateway_quota():
+    async def get_sms_gateway_quota(request: Request) -> dict[str, Any]:
+        _require_admin(request)
         return {
             "status": "success",
             "provider": "Twilio & SSL Wireless Primary Gateway",

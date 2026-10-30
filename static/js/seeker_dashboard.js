@@ -1272,19 +1272,13 @@ document.addEventListener('DOMContentLoaded', () => {
     settingsForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const newName = document.getElementById('setSeekerName')?.value.trim() || 'Nabil Hasan';
       const settingsPayload = {
-        full_name: newName,
-        phone: document.getElementById('setSeekerPhone')?.value.trim() || '+8801723456789',
         default_hospital: document.getElementById('setDefaultHospital')?.value || 'Square Hospital',
         sms_alerts: document.getElementById('toggleSmsAlerts')?.checked ?? true,
         push_alerts: document.getElementById('togglePushAlerts')?.checked ?? true,
         audio_siren: document.getElementById('toggleAudioSiren')?.checked ?? true,
         default_radius: document.getElementById('setDefaultRadius')?.value || '10'
       };
-
-      // Immediately update name across sidebar, avatar, and banner!
-      updateSeekerNameEverywhere(newName);
 
       try {
         const response = await fetch('/api/v1/seeker/settings', {
@@ -1293,12 +1287,12 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify(settingsPayload)
         });
         if (response.ok) {
-          showToast('Profile name & settings saved successfully!');
+          showToast('Settings saved successfully!');
         } else {
-          showToast('Settings saved locally.');
+          showToast('Could not save settings. Please try again.');
         }
       } catch (err) {
-        showToast('Profile name & settings saved successfully!');
+        showToast('Could not save settings. Please try again.');
       }
     });
   }
@@ -1311,19 +1305,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await res.json();
         if (data.status === 'success' && data.settings) {
           const s = data.settings;
-          const nameEl = document.getElementById('setSeekerName');
-          const phoneEl = document.getElementById('setSeekerPhone');
           const hospEl = document.getElementById('setDefaultHospital');
           const radiusEl = document.getElementById('setDefaultRadius');
           const smsEl = document.getElementById('toggleSmsAlerts');
           const pushEl = document.getElementById('togglePushAlerts');
           const sirenEl = document.getElementById('toggleAudioSiren');
 
-          if (nameEl && s.full_name) {
-            nameEl.value = s.full_name;
-            updateSeekerNameEverywhere(s.full_name);
-          }
-          if (phoneEl && s.phone) phoneEl.value = s.phone;
           if (hospEl && s.default_hospital) hospEl.value = s.default_hospital;
           if (radiusEl && s.default_radius) radiusEl.value = s.default_radius;
           if (smsEl && typeof s.sms_alerts === 'boolean') smsEl.checked = s.sms_alerts;

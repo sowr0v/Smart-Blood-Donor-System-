@@ -1,5 +1,5 @@
 import unittest
-from fastapi.testclient import TestClient
+from _client import TestClient
 
 from main import app, _generate_jwt
 from admin_portal import initialize_admin_and_notification_database
