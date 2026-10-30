@@ -1,5 +1,5 @@
 import unittest
-from fastapi.testclient import TestClient
+from _client import TestClient
 from main import app, _generate_jwt
 
 
@@ -653,6 +653,5 @@ class HospitalBloodBankPortalTests(unittest.TestCase):
         self.assertIn('id="modalCreateRequest"', html)
         self.assertIn('id="modalAllocateBlood"', html)
         self.assertIn('id="modalRequestDetails"', html)
-
 
 

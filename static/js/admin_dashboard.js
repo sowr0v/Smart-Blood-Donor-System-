@@ -2114,12 +2114,27 @@ async function submitEmergencySms(event) {
 
     const data = await res.json();
     if (res.ok && data.status === 'success') {
-      showAdminToast(`Emergency SMS broadcast dispatched to ${data.recipients_count || 3} donors!`, 'success');
+      showAdminToast(`${data.sent_count} emergency SMS message(s) accepted by the gateway.`, 'success');
       closeEmergencySmsModal();
       loadAuditLogs();
       loadAnalyticsData();
+    } else if (res.ok && data.status === 'partial_failure') {
+      showAdminToast(
+        `${data.sent_count} SMS accepted; ${data.failed_count} failed and ${data.skipped_duplicate_count} duplicates skipped.`,
+        'danger'
+      );
+      loadAuditLogs();
+    } else if (res.ok && data.status === 'duplicate') {
+      showAdminToast('This emergency alert was sent recently; duplicate messages were skipped.', 'warning');
+    } else if (res.ok && data.status === 'no_recipients') {
+      showAdminToast(data.message || 'No available, opted-in donors matched this request.', 'warning');
     } else {
-      showAdminToast(data.detail || 'Emergency SMS dispatch failed.', 'danger');
+      showAdminToast(
+        data.status === 'failed'
+          ? `${data.failed_count} SMS message(s) failed. Check gateway configuration and dispatch logs.`
+          : (data.detail || 'Emergency SMS dispatch failed.'),
+        'danger'
+      );
     }
   } catch (err) {
     console.error('Error dispatching SMS:', err);
