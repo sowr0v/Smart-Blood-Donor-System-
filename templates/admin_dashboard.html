@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/admin_dashboard.css">
   <link rel="stylesheet" href="/static/css/notifications.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script>
     function getSunIcon() {
       return '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41.39.39 1.03.39 1.41 0l1.06-1.06z"/></svg>';
@@ -523,6 +524,107 @@
 
       <!-- 5. Blood Stock Oversight & Heatmap (SBDS-43) -->
       <section class="admin-section" id="section-stock">
+        <div class="section-hero-header">
+          <div>
+            <h1 class="section-title">Blood Stock &amp; Geographic Availability Overview</h1>
+            <p class="section-subtext">Aggregated inventory across registered hospitals and blood banks. Facility-level stock and map locations are visible only to administrators.</p>
+          </div>
+          <button type="button" class="btn btn-outline" onclick="loadInventoryHeatmap()">Refresh overview</button>
+        </div>
+
+        <div class="stock-overview-status" id="stockOverviewStatus" role="status" aria-live="polite">Loading authorized facility stock…</div>
+
+        <div class="stock-overview-stats">
+          <article class="admin-card stock-overview-stat">
+            <span class="stock-stat-label">Total units available</span>
+            <strong id="stockTotalUnitsVal">—</strong>
+          </article>
+          <article class="admin-card stock-overview-stat">
+            <span class="stock-stat-label">Participating facilities</span>
+            <strong id="stockFacilitiesCountVal">—</strong>
+          </article>
+          <article class="admin-card stock-overview-stat">
+            <span class="stock-stat-label">Low-stock group alerts</span>
+            <strong id="stockCriticalGroupsVal">—</strong>
+          </article>
+        </div>
+
+        <div class="admin-card stock-overview-card">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Blood group availability</h2>
+              <p class="section-subtext">Aggregated units and the number of facilities reporting stock for each blood group.</p>
+            </div>
+          </div>
+          <div class="stock-blood-groups-grid" id="stockBloodGroupsGrid" aria-live="polite"></div>
+        </div>
+
+        <div class="admin-card stock-overview-card">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Facility availability map</h2>
+              <p class="section-subtext">Markers show registered facility locations; red markers indicate one or more blood groups at or below their configured minimum.</p>
+            </div>
+            <label class="stock-division-filter" for="stockDistrictFilter">
+              <span>Filter division</span>
+              <select id="stockDistrictFilter" class="admin-select" onchange="filterFacilitiesByDistrict(this.value)">
+                <option value="all">All divisions</option>
+                <option value="Barisal">Barisal</option>
+                <option value="Chittagong">Chittagong</option>
+                <option value="Dhaka">Dhaka</option>
+                <option value="Khulna">Khulna</option>
+                <option value="Mymensingh">Mymensingh</option>
+                <option value="Rajshahi">Rajshahi</option>
+                <option value="Rangpur">Rangpur</option>
+                <option value="Sylhet">Sylhet</option>
+              </select>
+            </label>
+          </div>
+          <div class="stock-map-legend" aria-label="Map legend">
+            <span><i class="stock-map-dot adequate"></i> Availability above minimum</span>
+            <span><i class="stock-map-dot low"></i> At least one low-stock group</span>
+            <span><i class="stock-map-dot regional"></i> Approximate regional summary</span>
+          </div>
+          <div id="stock-map" style="height: 400px;"></div>
+          <p id="stockMapStatus" class="stock-map-status" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="admin-card stock-overview-card">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Regional availability heatmap</h2>
+              <p class="section-subtext">Select a region to filter the facility inventory table and map.</p>
+            </div>
+          </div>
+          <div class="heatmap-divisions-grid" id="heatmapDivisionsGrid"></div>
+        </div>
+
+        <div class="admin-card stock-overview-card">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title" id="facilityTableTitle">Participating facility inventories</h2>
+              <p class="section-subtext">Facility names and stock are included for authorized administrators; private contact details are not returned.</p>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table stock-facilities-table">
+              <thead>
+                <tr>
+                  <th>Facility</th>
+                  <th>Type</th>
+                  <th>Division</th>
+                  <th>A+</th><th>A-</th><th>B+</th><th>B-</th>
+                  <th>AB+</th><th>AB-</th><th>O+</th><th>O-</th>
+                  <th>Total units</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="facilitiesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div style="display:none;" aria-hidden="true">
           <h2>Low Blood Stock Alerts &amp; Reorder Triggers</h2>
           {% for group in blood_groups or [] %}
@@ -1129,6 +1231,7 @@
 
   <!-- Core Javascript Modules -->
   <script src="/static/js/notifications.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="/static/js/admin_dashboard.js"></script>
 </body>
 </html>

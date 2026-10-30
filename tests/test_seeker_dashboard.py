@@ -105,6 +105,11 @@ class SeekerDashboardTests(unittest.TestCase):
         self.assertIn("Seeker Portal Settings &amp; Preferences", html)
         self.assertIn('id="section-seeker-settings"', html)
         self.assertIn('id="nav-item-seeker-settings"', html)
+        self.assertIn('id="saveCommunicationPreferences"', html)
+        for channel in ("in_app_chat", "sms", "phone_call", "whatsapp", "push_notification"):
+            self.assertIn(f'data-communication-channel="{channel}"', html)
+        self.assertIn('data-communication-alert="critical_emergency"', html)
+        self.assertIn('id="communicationFrequency"', html)
 
     def test_seeker_low_stock_alerts_match_only_their_active_request_groups(self):
         with TemporaryDirectory() as temp_dir:
