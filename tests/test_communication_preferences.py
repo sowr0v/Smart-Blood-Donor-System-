@@ -168,6 +168,60 @@ class CommunicationPreferencesTests(unittest.TestCase):
             ).fetchall()
         self.assertEqual([row[0] for row in roles], ["donor", "seeker"])
 
+    def test_existing_phone_key_schema_migrates_without_losing_preferences(self):
+        shared_phone = "+8801999000094"
+        self.addCleanup(USERS.pop, shared_phone, None)
+        existing_preferences = self._payload()
+        existing_preferences["channels"]["sms"] = False
+
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            with connection:
+                connection.execute("DROP TABLE communication_preferences")
+                connection.execute(
+                    """CREATE TABLE communication_preferences (
+                           phone TEXT PRIMARY KEY,
+                           role TEXT NOT NULL CHECK (role IN ('donor', 'seeker')),
+                           preferences_json TEXT NOT NULL,
+                           updated_at INTEGER NOT NULL
+                       )"""
+                )
+                connection.execute(
+                    """INSERT INTO communication_preferences
+                       (phone, role, preferences_json, updated_at)
+                       VALUES (?, 'donor', ?, 1)""",
+                    (shared_phone, json.dumps(existing_preferences)),
+                )
+
+        self._login_as(shared_phone, "donor")
+        loaded = self.client.get("/api/v1/account/communication-preferences")
+        self.assertEqual(loaded.status_code, 200)
+        self.assertFalse(loaded.json()["preferences"]["channels"]["sms"])
+
+        USERS.pop(shared_phone, None)
+        self._login_as(shared_phone, "seeker")
+        saved = self.client.put(
+            "/api/v1/account/communication-preferences",
+            json=self._payload(),
+        )
+        self.assertEqual(saved.status_code, 200)
+
+        with closing(sqlite3.connect(self.database_path)) as connection:
+            primary_key = [
+                row[1]
+                for row in sorted(
+                    (row for row in connection.execute(
+                        "PRAGMA table_info(communication_preferences)"
+                    ).fetchall() if row[5]),
+                    key=lambda row: row[5],
+                )
+            ]
+            roles = connection.execute(
+                "SELECT role FROM communication_preferences WHERE phone = ? ORDER BY role",
+                (shared_phone,),
+            ).fetchall()
+        self.assertEqual(primary_key, ["phone", "role"])
+        self.assertEqual([row[0] for row in roles], ["donor", "seeker"])
+
     def test_unsupported_alert_frequency_is_rejected(self):
         self._login_as(self.seeker_phone, "seeker")
         invalid = self._payload()
