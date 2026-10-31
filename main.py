@@ -3872,6 +3872,44 @@ async def update_donor_location_settings_endpoint(payload: DonorLocationSettings
     }
 
 
+BD_REGIONS = [
+    ("Dhaka", "Dhanmondi", 23.7461, 90.3742),
+    ("Dhaka", "Gulshan", 23.7925, 90.4078),
+    ("Dhaka", "Mirpur", 23.8223, 90.3654),
+    ("Dhaka", "Uttara", 23.8759, 90.3795),
+    ("Dhaka", "Motijheel", 23.7330, 90.4172),
+    ("Dhaka", "Mohakhali", 23.7776, 90.4054),
+    ("Dhaka", "Badda", 23.7805, 90.4267),
+    ("Dhaka", "Farmgate", 23.7570, 90.3888),
+    ("Chittagong", "Panchlaish", 22.3569, 91.8214),
+    ("Chittagong", "Agrabad", 22.3275, 91.8123),
+    ("Chittagong", "GEC Circle", 22.3587, 91.8219),
+    ("Sylhet", "Zindabazar", 24.8949, 91.8687),
+    ("Sylhet", "Amberkhana", 24.9048, 91.8710),
+    ("Rajshahi", "Shaheb Bazar", 24.3636, 88.6241),
+    ("Rajshahi", "Motihar", 24.3687, 88.6380),
+    ("Khulna", "Shibbari", 22.8157, 89.5539),
+    ("Khulna", "Sonadanga", 22.8200, 89.5400),
+    ("Barisal", "Sadar", 22.7010, 90.3535),
+    ("Rangpur", "Dhap", 25.7439, 89.2752),
+    ("Mymensingh", "Ganginar Par", 24.7471, 90.4203),
+    ("Comilla", "Kandirpar", 23.4607, 91.1809),
+    ("Gazipur", "Chowrasta", 23.9989, 90.4255),
+    ("Narayanganj", "Chashara", 23.6238, 90.5000),
+]
+
+
+def _approximate_bd_location(lat: float, lng: float) -> tuple[str, str]:
+    best_dist = float("inf")
+    best_loc = ("Dhaka", "Dhanmondi")
+    for district, area, r_lat, r_lng in BD_REGIONS:
+        d = (lat - r_lat) ** 2 + (lng - r_lng) ** 2
+        if d < best_dist:
+            best_dist = d
+            best_loc = (district, area)
+    return best_loc
+
+
 @app.post("/api/v1/donor/location/detect-gps")
 async def detect_donor_gps_location(request: Request, payload: dict | None = None):
     token = _decode_jwt(request.cookies.get("access_token", ""))
@@ -3884,17 +3922,85 @@ async def detect_donor_gps_location(request: Request, payload: dict | None = Non
             lng = float(payload["longitude"])
         except (ValueError, TypeError):
             pass
+
+    district, area = _approximate_bd_location(lat, lng)
     _update_donor_location_settings(phone, {"latitude": lat, "longitude": lng, "allow_gps_detection": True})
+
+    try:
+        initialize_auth_database()
+        with closing(_connection()) as conn:
+            with conn:
+                conn.execute(
+                    "UPDATE donor_profiles SET district = COALESCE(NULLIF(?, ''), district), area = COALESCE(NULLIF(?, ''), area), updated_at = ? WHERE phone = ?",
+                    (district, area, int(time.time()), phone),
+                )
+                conn.execute(
+                    "UPDATE auth_users SET district = COALESCE(NULLIF(?, ''), district), updated_at = ? WHERE phone = ?",
+                    (district, int(time.time()), phone),
+                )
+    except Exception:
+        pass
+
     return {
         "status": "success",
         "detected_location": {
             "latitude": lat,
             "longitude": lng,
-            "area": "Dhanmondi",
-            "district": "Dhaka",
+            "area": area,
+            "district": district,
             "accuracy_meters": 15,
             "provider": "GPS / Browser Geolocation API",
         },
+    }
+
+
+@app.post("/api/v1/auth/realtime-location")
+async def update_realtime_location(request: Request, payload: dict):
+    token = _decode_jwt(request.cookies.get("access_token", ""))
+    phone = token.get("sub") if token else None
+    role = token.get("role", "donor") if token else "donor"
+    if not phone and request.query_params.get("preview") == "1":
+        phone = "+8801712345678"
+
+    lat = 23.7461
+    lng = 90.3742
+    if payload and "latitude" in payload and "longitude" in payload:
+        try:
+            lat = float(payload["latitude"])
+            lng = float(payload["longitude"])
+        except (ValueError, TypeError):
+            pass
+
+    district, area = _approximate_bd_location(lat, lng)
+
+    if phone:
+        initialize_auth_database()
+        with closing(_connection()) as conn:
+            with conn:
+                if role == "donor":
+                    _update_donor_location_settings(phone, {"latitude": lat, "longitude": lng, "allow_gps_detection": True})
+                    conn.execute(
+                        "UPDATE donor_profiles SET district = COALESCE(NULLIF(?, ''), district), area = COALESCE(NULLIF(?, ''), area), updated_at = ? WHERE phone = ?",
+                        (district, area, int(time.time()), phone),
+                    )
+                    conn.execute(
+                        "UPDATE auth_users SET district = COALESCE(NULLIF(?, ''), district), updated_at = ? WHERE phone = ?",
+                        (district, int(time.time()), phone),
+                    )
+                elif role == "seeker":
+                    conn.execute(
+                        "UPDATE auth_users SET district = COALESCE(NULLIF(?, ''), district), updated_at = ? WHERE phone = ?",
+                        (district, int(time.time()), phone),
+                    )
+
+    return {
+        "status": "success",
+        "role": role,
+        "latitude": lat,
+        "longitude": lng,
+        "district": district,
+        "area": area,
+        "timestamp": int(time.time()),
     }
 
 

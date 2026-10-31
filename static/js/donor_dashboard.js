@@ -1677,6 +1677,41 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   loadDonorLocationSettings();
 
+  // Auto-sync real-time location on login / page load
+  function autoSyncDonorLocation() {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          currentDonorLatitude = pos.coords.latitude;
+          currentDonorLongitude = pos.coords.longitude;
+          try {
+            const res = await fetch('/api/v1/donor/location/detect-gps', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ latitude: currentDonorLatitude, longitude: currentDonorLongitude })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const loc = data.detected_location || {};
+              const statusSpan = document.getElementById('donorGpsStatus');
+              if (statusSpan) {
+                statusSpan.textContent = `Live · ${currentDonorLatitude.toFixed(4)}° N, ${currentDonorLongitude.toFixed(4)}° E (${loc.area || ''}, ${loc.district || ''})`;
+                statusSpan.style.color = 'var(--success-green)';
+              }
+              updateLocationPreview();
+              showToast(`📍 Live GPS location synced: ${loc.area || 'Current Area'}, ${loc.district || 'Dhaka'}`);
+            }
+          } catch (e) {}
+        },
+        (err) => {
+          console.log('Donor live location auto-sync:', err?.message || 'deferred');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+  }
+  autoSyncDonorLocation();
+
   // GPS Detection button
   const btnDetectDonorGps = document.getElementById('btnDetectDonorGps');
   if (btnDetectDonorGps) {
