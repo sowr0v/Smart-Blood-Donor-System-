@@ -12,13 +12,19 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Optional
 
-import psycopg2
-import psycopg2.extras
-from dotenv import load_dotenv
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:
+    psycopg2 = None
 
-# Automatically load .env from project root
-ROOT_DIR = Path(__file__).resolve().parent
-load_dotenv(ROOT_DIR / ".env")
+try:
+    from dotenv import load_dotenv
+    ROOT_DIR = Path(__file__).resolve().parent
+    load_dotenv(ROOT_DIR / ".env")
+except ImportError:
+    ROOT_DIR = Path(__file__).resolve().parent
+    load_dotenv = None
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -46,6 +52,7 @@ TABLES_WITH_ID = {
     "admin_audit_logs",
     "account_phone_update_challenges",
     "contact_messages",
+    "scrubbed_account_audit_logs",
 }
 
 
@@ -54,6 +61,8 @@ def is_postgres(db_path: Optional[Any] = None) -> bool:
     Determines whether queries should route to PostgreSQL or SQLite.
     Returns False when running in tests with temporary SQLite databases.
     """
+    if psycopg2 is None:
+        return False
     if os.environ.get("SBDS_USE_SQLITE") == "1":
         return False
 

@@ -121,6 +121,7 @@ async function initAdminDashboard() {
     loadAdminSettings(),
 
     loadAuditLogs(),
+    loadScrubbedAccounts(),
 
   ]);
 
@@ -208,7 +209,7 @@ function switchAdminSection(sectionName) {
 
   else if (sectionName === 'reports') loadReportsData();
 
-  else if (sectionName === 'settings') { loadAdminSettings(); loadAuditLogs(); }
+  else if (sectionName === 'settings') { loadAdminSettings(); loadAuditLogs(); loadScrubbedAccounts(); } else if (sectionName === 'users') { loadScrubbedAccounts(); }
 
 }
 
@@ -997,6 +998,9 @@ function renderUsersTable(users) {
     if (u.status === 'suspended') statusBadge = '<span class="badge badge-warning">Suspended</span>';
 
     else if (u.status === 'banned') statusBadge = '<span class="badge badge-danger">Banned</span>';
+    else if (u.status === 'permanently_deleted' || u.status === 'deactivated') {
+      statusBadge = '<span class="badge badge-danger" style="background: rgba(225, 29, 72, 0.12); color: #BE123C; border: 1px solid #FDA4AF; font-weight: 700;">PII Purged / Anonymized</span>';
+    }
 
 
 
@@ -4009,6 +4013,47 @@ async function changeAdminPassword(event) {
 }
 
 
+
+
+async function loadScrubbedAccounts() {
+  try {
+    const res = await fetch('/api/v1/admin/scrubbed-accounts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const accounts = data.scrubbed_accounts || [];
+    const tbody = document.getElementById('scrubbedAccountsTableBody');
+    if (!tbody) return;
+
+    if (accounts.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">No accounts have been scrubbed yet. Privacy policy active.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = accounts.map(a => {
+      const originalRole = (a.original_role || 'donor').toLowerCase();
+      const roleBadge = (originalRole === 'seeker' || originalRole === 'recipient')
+        ? '<span class="badge badge-pill badge-info">Recipient / Seeker</span>'
+        : '<span class="badge badge-pill badge-outline">Blood Donor</span>';
+      const timeStr = (a.deletion_timestamp || '').substring(0, 19).replace('T', ' ');
+
+      return `
+        <tr>
+          <td>
+            <div style="font-family: monospace; font-weight: 700; color: #BE123C;">
+              ${escapeHtml(a.scrubbed_id || ('SCRUBBED-' + a.account_id))}
+            </div>
+            <div style="font-size: 0.74rem; color: var(--admin-text-muted);">Account Ref ID: #${escapeHtml(String(a.account_id))}</div>
+          </td>
+          <td>${roleBadge}</td>
+          <td><small class="text-muted">${timeStr} (UTC)</small></td>
+          <td><span class="badge badge-danger" style="background: rgba(225, 29, 72, 0.12); color: #BE123C; border: 1px solid #FDA4AF; font-weight: 700;">PII Purged / Anonymized</span></td>
+        </tr>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading scrubbed accounts:', err);
+  }
+}
 
 async function loadAuditLogs() {
 

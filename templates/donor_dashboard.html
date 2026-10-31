@@ -178,7 +178,7 @@
         </button>
 
         <!-- 9. Donor Portal Settings & Preferences -->
-        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings">
+        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings" onclick="location.hash='section-settings'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1492,6 +1492,32 @@
           </div>
         </div>
 
+        <!-- Danger Zone Card: Permanent Account Deletion -->
+        <div class="donor-card settings-danger-card" id="dangerZoneDonorSection" style="margin-top: 24px; border: 1.5px solid #E11D48; background: rgba(225, 29, 72, 0.04); padding: 24px;">
+          <div class="card-header-flex" style="align-items: flex-start; justify-content: space-between; gap: 20px;">
+            <div style="display: flex; gap: 16px; align-items: flex-start;">
+              <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(225, 29, 72, 0.12); color: #E11D48; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0;">
+                ⚠️
+              </div>
+              <div>
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: #BE123C; margin: 0 0 6px 0;">Permanent Account Deletion &amp; Data Privacy Scrubbing</h3>
+                <p style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; margin: 0; max-width: 680px;">
+                  Permanently deactivate and delete your donor account. All Personally Identifiable Information (PII) including your full name, phone number, email, and granular address will be purged or irreversibly anonymized in compliance with our <strong>Data Retention Policy</strong>. Completed donation volumes and blood group stats remain preserved anonymously for healthcare history integrity.
+                </p>
+                <div style="margin-top: 10px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                  <span style="font-size: 0.78rem; background: rgba(225, 29, 72, 0.1); color: #BE123C; padding: 3px 8px; border-radius: 6px; font-weight: 600;">⚠️ Irreversible Action</span>
+                  <span style="font-size: 0.78rem; background: rgba(14, 165, 233, 0.1); color: #0284C7; padding: 3px 8px; border-radius: 6px; font-weight: 600;">🔒 Password Verification Required</span>
+                  <a href="/account-deletion" style="font-size: 0.82rem; color: #BE123C; text-decoration: underline; font-weight: 600;">View Dedicated Policy Screen &rarr;</a>
+                </div>
+              </div>
+            </div>
+            <button type="button" class="btn-donor-danger" id="btnOpenDonorDeleteModal" style="background: #BE123C; color: #ffffff; border: none; padding: 11px 20px; font-size: 0.9rem; font-weight: 700; border-radius: 8px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px;">
+              <span>🗑️</span>
+              <span>Permanently Delete Account</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Sticky Settings Action Bar -->
         <div class="settings-action-bar">
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -1522,5 +1548,69 @@
   <script src="/static/js/communication_preferences.js"></script>
   <script src="/static/js/account_settings.js"></script>
   <script src="/static/js/donor_dashboard.js"></script>
+  <!-- ================= PERMANENT ACCOUNT DELETION MODAL ================= -->
+  <div class="dashboard-modal-backdrop" id="donorDeleteAccountModal" role="dialog" aria-modal="true" aria-labelledby="donorDeleteModalTitle">
+    <div class="modal-dialog-box" style="max-width: 540px; border: 2px solid #E11D48; box-shadow: 0 16px 48px rgba(0,0,0,0.4);">
+      <div class="modal-dialog-header" style="background: rgba(225, 29, 72, 0.08);">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.4rem;">⚠️</span>
+          <div>
+            <h3 id="donorDeleteModalTitle" style="color: #BE123C; font-size: 1.15rem; margin: 0;">Permanent Account Deletion</h3>
+            <div style="font-size: 0.78rem; color: var(--text-secondary);">Irreversible Privacy Scrubbing &amp; Deactivation</div>
+          </div>
+        </div>
+        <button type="button" class="modal-close-x" id="closeDonorDeleteModalX" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-dialog-body" style="padding: 22px;">
+        <!-- Data Retention Policy Breakdown -->
+        <div style="background: var(--bg-page); border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; font-size: 0.84rem; line-height: 1.5;">
+          <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <span>📋</span> Data Retention Policy Disclosure
+          </div>
+          <div style="margin-bottom: 8px;">
+            <strong style="color: #BE123C;">Personal Data Scrubbed (Purged):</strong>
+            <ul style="margin: 4px 0 0 18px; padding: 0; color: var(--text-secondary);">
+              <li>Full name, registered phone number, and email address</li>
+              <li>Granular physical address and real-time location/GPS data</li>
+              <li>Identity verification (KYC/NID) documents</li>
+              <li>Active sessions, authentication cookies, and alert preferences</li>
+            </ul>
+          </div>
+          <div>
+            <strong style="color: #059669;">Operational Records Retained Anonymously:</strong>
+            <ul style="margin: 4px 0 0 18px; padding: 0; color: var(--text-secondary);">
+              <li>De-identified blood donation units and blood group statistics</li>
+              <li>Past donation dates and hospital timestamps (unlinked from identity)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Identity Verification Form -->
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 6px;">
+          <label style="font-size: 0.86rem; font-weight: 600; color: var(--text-primary);">
+            Identity Verification: Enter Current Account Password <span style="color: #E11D48;">*</span>
+          </label>
+          <input type="password" id="donorDeletePassword" class="form-control-custom" placeholder="Current account password" autocomplete="current-password" required style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-page); color: var(--text-primary);">
+
+          <label style="font-size: 0.86rem; font-weight: 600; color: var(--text-primary); margin-top: 4px;">
+            Type <strong style="color: #BE123C; letter-spacing: 1px;">DELETE</strong> to confirm permanent action:
+          </label>
+          <input type="text" id="donorDeleteConfirm" class="form-control-custom" placeholder="DELETE" autocomplete="off" style="width: 100%; box-sizing: border-box; padding: 10px 14px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-page); color: var(--text-primary);">
+
+          <div id="donorDeleteStatusMsg" role="alert" style="display: none; padding: 8px 12px; border-radius: 6px; font-size: 0.82rem; font-weight: 600;"></div>
+        </div>
+      </div>
+
+      <div class="modal-dialog-footer" style="padding: 14px 22px; display: flex; justify-content: flex-end; gap: 10px;">
+        <button type="button" class="btn-donor-outline" id="cancelDonorDeleteBtn" style="padding: 8px 16px;">
+          Cancel
+        </button>
+        <button type="button" class="btn-donor-danger" id="confirmDonorDeleteBtn" style="background: #BE123C; color: #ffffff; border: none; padding: 8px 18px; font-weight: 700;">
+          Confirm &amp; Permanently Delete
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
