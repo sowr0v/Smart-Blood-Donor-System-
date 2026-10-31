@@ -124,6 +124,51 @@ document.addEventListener('DOMContentLoaded', () => {
   const mapDonorCount = document.getElementById('mapDonorCount');
   const mapDonorList = document.getElementById('mapNearbyDonorsList');
   let nearbyMap = null;
+  let seekerLiveLocation = null;
+  let seekerUserMarker = null;
+
+  function autoSyncSeekerLocation() {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          seekerLiveLocation = { lat, lng };
+          try {
+            const res = await fetch('/api/v1/auth/realtime-location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ latitude: lat, longitude: lng })
+            });
+            if (res.ok) {
+              const d = await res.json();
+              if (d.district) seekerLiveLocation.district = d.district;
+              if (d.area) seekerLiveLocation.area = d.area;
+            }
+          } catch (e) {}
+
+          if (nearbyMap && window.L) {
+            nearbyMap.setView([lat, lng], 13);
+            if (!seekerUserMarker) {
+              const userIcon = window.L.divIcon({
+                className: 'seeker-user-live-pin',
+                html: '<div style="background:#2563eb;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(37,99,235,0.25);font-size:14px;border:2px solid white;">\xF0\x9F\x93\x8D</div>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+              });
+              seekerUserMarker = window.L.marker([lat, lng], { icon: userIcon }).addTo(nearbyMap);
+              seekerUserMarker.bindPopup('<strong>You are here (Live Location)</strong><br>Nearby donors are calibrated around your position.');
+            }
+          }
+        },
+        (err) => {
+          console.log('Seeker location auto-detection:', err?.message || 'deferred');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+  }
+  autoSyncSeekerLocation();
   let nearbyMapLoaded = false;
   let nearbyMapMarkers = [];
 
