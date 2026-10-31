@@ -1901,6 +1901,122 @@ document.addEventListener('DOMContentLoaded', () => {
     // Ignore storage errors
   }
 
+  // ================= PERMANENT ACCOUNT DELETION LOGIC =================
+  const btnOpenDonorDeleteModal = document.getElementById('btnOpenDonorDeleteModal');
+  const donorDeleteAccountModal = document.getElementById('donorDeleteAccountModal');
+  const closeDonorDeleteModalX = document.getElementById('closeDonorDeleteModalX');
+  const cancelDonorDeleteBtn = document.getElementById('cancelDonorDeleteBtn');
+  const confirmDonorDeleteBtn = document.getElementById('confirmDonorDeleteBtn');
+  const donorDeletePassword = document.getElementById('donorDeletePassword');
+  const donorDeleteConfirm = document.getElementById('donorDeleteConfirm');
+  const donorDeleteStatusMsg = document.getElementById('donorDeleteStatusMsg');
+
+  function openDonorDeleteModal() {
+    if (!donorDeleteAccountModal) return;
+    if (donorDeletePassword) donorDeletePassword.value = '';
+    if (donorDeleteConfirm) donorDeleteConfirm.value = '';
+    if (donorDeleteStatusMsg) {
+      donorDeleteStatusMsg.style.display = 'none';
+      donorDeleteStatusMsg.textContent = '';
+    }
+    donorDeleteAccountModal.classList.add('open');
+    donorDeleteAccountModal.style.display = 'flex';
+  }
+
+  function closeDonorDeleteModal() {
+    if (!donorDeleteAccountModal) return;
+    donorDeleteAccountModal.classList.remove('open');
+    donorDeleteAccountModal.style.display = 'none';
+  }
+
+  if (btnOpenDonorDeleteModal) {
+    btnOpenDonorDeleteModal.addEventListener('click', (e) => {
+      e.preventDefault();
+      openDonorDeleteModal();
+    });
+  }
+
+  if (closeDonorDeleteModalX) {
+    closeDonorDeleteModalX.addEventListener('click', closeDonorDeleteModal);
+  }
+
+  if (cancelDonorDeleteBtn) {
+    cancelDonorDeleteBtn.addEventListener('click', closeDonorDeleteModal);
+  }
+
+  if (confirmDonorDeleteBtn) {
+    confirmDonorDeleteBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const pwd = (donorDeletePassword?.value || '').trim();
+      const conf = (donorDeleteConfirm?.value || '').trim();
+
+      if (!pwd) {
+        if (donorDeleteStatusMsg) {
+          donorDeleteStatusMsg.style.display = 'block';
+          donorDeleteStatusMsg.style.background = '#FEE2E2';
+          donorDeleteStatusMsg.style.color = '#B91C1C';
+          donorDeleteStatusMsg.textContent = 'Please enter your current account password to verify identity.';
+        }
+        return;
+      }
+
+      if (conf !== 'DELETE') {
+        if (donorDeleteStatusMsg) {
+          donorDeleteStatusMsg.style.display = 'block';
+          donorDeleteStatusMsg.style.background = '#FEE2E2';
+          donorDeleteStatusMsg.style.color = '#B91C1C';
+          donorDeleteStatusMsg.textContent = 'Please type "DELETE" exactly to confirm permanent deletion.';
+        }
+        return;
+      }
+
+      confirmDonorDeleteBtn.disabled = true;
+      confirmDonorDeleteBtn.textContent = 'Scrubbing Personal Data...';
+
+      try {
+        const response = await fetch('/api/user/delete-account', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            password: pwd,
+            confirmation: conf,
+            reason: 'Permanent account deletion requested from donor portal settings'
+          })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data.status === 'success') {
+          showToast(data.message || 'Account deleted and personal data scrubbed.', 'success');
+          setTimeout(() => {
+            window.location.href = data.redirect_url || '/login?account_deleted=1&role=donor';
+          }, 900);
+        } else {
+          confirmDonorDeleteBtn.disabled = false;
+          confirmDonorDeleteBtn.textContent = 'Confirm & Permanently Delete';
+          if (donorDeleteStatusMsg) {
+            donorDeleteStatusMsg.style.display = 'block';
+            donorDeleteStatusMsg.style.background = '#FEE2E2';
+            donorDeleteStatusMsg.style.color = '#B91C1C';
+            donorDeleteStatusMsg.textContent = data.detail || 'Identity verification failed. Please check your password.';
+          }
+        }
+      } catch (err) {
+        confirmDonorDeleteBtn.disabled = false;
+        confirmDonorDeleteBtn.textContent = 'Confirm & Permanently Delete';
+        if (donorDeleteStatusMsg) {
+          donorDeleteStatusMsg.style.display = 'block';
+          donorDeleteStatusMsg.style.background = '#FEE2E2';
+          donorDeleteStatusMsg.style.color = '#B91C1C';
+          donorDeleteStatusMsg.textContent = 'Network error while attempting account deletion.';
+        }
+      }
+    });
+  }
+
   window.activateSection = activateSection;
   window.showToast = showToast;
 });
