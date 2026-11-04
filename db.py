@@ -13,8 +13,12 @@ from pathlib import Path
 from typing import Any, Optional
 
 import psycopg2
+import psycopg2.extensions
 import psycopg2.extras
 from dotenv import load_dotenv
+
+# Adapt Python bool to 1/0 for PostgreSQL INTEGER columns (matching SQLite behavior)
+psycopg2.extensions.register_adapter(bool, lambda b: psycopg2.extensions.AsIs(1 if b else 0))
 
 # Automatically load .env from project root
 ROOT_DIR = Path(__file__).resolve().parent
@@ -176,6 +180,12 @@ class PostgresCursorWrapper:
         if translated.startswith("-- NO-OP"):
             return self
 
+        if params is not None:
+            if isinstance(params, (list, tuple)):
+                params = tuple(int(x) if isinstance(x, bool) else x for x in params)
+            elif isinstance(params, dict):
+                params = {k: int(v) if isinstance(v, bool) else v for k, v in params.items()}
+
         try:
             self._raw_cursor.execute(translated, params or ())
         except psycopg2.IntegrityError as exc:
@@ -198,6 +208,17 @@ class PostgresCursorWrapper:
         translated, _ = translate_sql(sql, for_executemany=True)
         if translated.startswith("-- NO-OP"):
             return self
+
+        if seq_of_params:
+            cleaned_seq = []
+            for p in seq_of_params:
+                if isinstance(p, (list, tuple)):
+                    cleaned_seq.append(tuple(int(x) if isinstance(x, bool) else x for x in p))
+                elif isinstance(p, dict):
+                    cleaned_seq.append({k: int(v) if isinstance(v, bool) else v for k, v in p.items()})
+                else:
+                    cleaned_seq.append(p)
+            seq_of_params = cleaned_seq
 
         try:
             self._raw_cursor.executemany(translated, seq_of_params)

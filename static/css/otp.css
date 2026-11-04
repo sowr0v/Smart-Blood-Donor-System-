@@ -1,121 +1,133 @@
-*{
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-    font-family: Arial, sans-serif;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-
-body{
-    min-height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    background:#f8f9fa;
+body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #F8FAFC;
+    color: #0F172A;
 }
 
-
-.otp-container{
-    width:100%;
-    display:flex;
-    justify-content:center;
+.otp-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
 }
 
-
-.otp-card{
-    width:380px;
-    background:white;
-    padding:40px;
-    border-radius:15px;
-    text-align:center;
-    box-shadow:0 10px 30px rgba(0,0,0,0.1);
+.otp-card {
+    width: 100%;
+    max-width: 400px;
+    background: #FFFFFF;
+    padding: 40px 32px;
+    border-radius: 20px;
+    text-align: center;
+    border: 1px solid #E2E8F0;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
 }
 
-
-.logo{
-    width:70px;
-    height:70px;
-    margin:auto;
-    border-radius:50%;
-    background:#d32f2f;
-    color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:35px;
+.logo {
+    width: 68px;
+    height: 68px;
+    margin: auto;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #E11D48, #BE123C);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    box-shadow: 0 8px 20px rgba(225, 29, 72, 0.3);
 }
 
-
-h2{
-    margin-top:20px;
-    color:#333;
+h2 {
+    margin-top: 22px;
+    color: #0F172A;
+    font-size: 1.5rem;
+    font-weight: 700;
 }
 
-
-.subtitle{
-    margin:15px 0 25px;
-    color:#777;
-    font-size:14px;
+.subtitle {
+    margin: 10px 0 24px;
+    color: #64748B;
+    font-size: 14px;
+    line-height: 1.5;
 }
 
-
-.otp-inputs{
-    display:flex;
-    justify-content:center;
-    gap:10px;
+.otp-inputs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
 }
 
-
-.otp-inputs input{
-    width:42px;
-    height:45px;
-    border:1px solid #ccc;
-    border-radius:8px;
-    text-align:center;
-    font-size:20px;
-    outline:none;
+.otp-inputs input {
+    width: 46px;
+    height: 50px;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #0F172A;
+    outline: none;
+    transition: all 0.2s ease;
+    background: #FFFFFF;
 }
 
-
-.otp-inputs input:focus{
-    border-color:#d32f2f;
+.otp-inputs input:focus {
+    border-color: #E11D48;
+    box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
 }
 
-
-#verifyBtn{
-    width:100%;
-    margin-top:25px;
-    padding:12px;
-    border:none;
-    border-radius:8px;
-    background:#d32f2f;
-    color:white;
-    font-size:16px;
-    cursor:pointer;
+#verifyBtn {
+    width: 100%;
+    margin-top: 26px;
+    padding: 13px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #E11D48, #BE123C);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(225, 29, 72, 0.35);
+    transition: all 0.2s ease;
 }
 
-
-#verifyBtn:hover{
-    background:#b71c1c;
+#verifyBtn:hover {
+    background: linear-gradient(135deg, #FB7185, #E11D48);
+    box-shadow: 0 6px 20px rgba(225, 29, 72, 0.45);
+    transform: translateY(-1px);
 }
 
-
-.resend-text{
-    margin-top:20px;
-    font-size:14px;
+.resend-text {
+    margin-top: 20px;
+    font-size: 14px;
+    color: #64748B;
 }
 
-
-#resendBtn{
-    border:none;
-    background:none;
-    color:#d32f2f;
-    cursor:pointer;
+#resendBtn {
+    border: none;
+    background: none;
+    color: #E11D48;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s;
 }
 
+#resendBtn:hover {
+    color: #BE123C;
+    text-decoration: underline;
+}
 
-#timer{
-    margin-top:10px;
-    color:#777;
-    font-size:13px;
+#timer {
+    margin-top: 10px;
+    color: #94A3B8;
+    font-size: 13px;
 }

@@ -9,6 +9,7 @@ import os
 import re
 import secrets
 import sqlite3
+import sys
 import db
 import time
 import urllib.error
@@ -212,7 +213,7 @@ def initialize_urgent_database():
                         f"ALTER TABLE blood_requests ADD COLUMN {column} {definition}"
                     )
             count = connection.execute("SELECT COUNT(*) FROM blood_requests").fetchone()[0]
-            if count == 0:
+            if count == 0 and "unittest" in sys.modules:
                 now = datetime.now(timezone.utc)
                 connection.executescript(f"""
                     INSERT INTO blood_requests (blood_group, hospital_name, district, area, distance_km, expires_at, contact_phone, is_emergency) VALUES 
@@ -4581,7 +4582,7 @@ def _chat_thread_dict(row: sqlite3.Row, user: dict) -> dict:
         connection.row_factory = sqlite3.Row
         last_message = connection.execute(
             """SELECT text, sent_at FROM chat_messages
-               WHERE thread_id = ? ORDER BY sent_at DESC, rowid DESC LIMIT 1""",
+               WHERE thread_id = ? ORDER BY sent_at DESC, id DESC LIMIT 1""",
             (row["id"],),
         ).fetchone()
         unread_count = connection.execute(
@@ -4832,7 +4833,7 @@ async def get_live_chat_messages(role: str, thread_id: str, request: Request):
         connection.row_factory = sqlite3.Row
         rows = connection.execute(
             """SELECT * FROM chat_messages WHERE thread_id = ?
-               ORDER BY sent_at, rowid""",
+               ORDER BY sent_at, id""",
             (thread["id"],),
         ).fetchall()
     return {

@@ -903,7 +903,7 @@
 
                   <div class="inst-form-group">
                     <label for="reqUnits">Required Units (Bags) <span class="req-star">*</span></label>
-                    <input type="number" id="reqUnits" class="inst-form-control" min="1" max="100" value="2" required />
+                    <input type="number" id="reqUnits" class="inst-form-control" min="1" max="100" value="" placeholder="Units (e.g. 2)" required />
                   </div>
                 </div>
 
@@ -920,7 +920,7 @@
 
                   <div class="inst-form-group">
                     <label for="reqRequiredHours">Needed Within (Hours)</label>
-                    <input type="number" id="reqRequiredHours" class="inst-form-control" min="1" max="168" value="24" />
+                    <input type="number" id="reqRequiredHours" class="inst-form-control" min="1" max="168" value="" placeholder="Hours (e.g. 24)" />
                   </div>
                 </div>
 
@@ -964,7 +964,7 @@
                 <div class="inst-form-row">
                   <div class="inst-form-group">
                     <label for="allocUnits">Units to Allocate <span class="req-star">*</span></label>
-                    <input type="number" id="allocUnits" class="inst-form-control" min="1" max="50" value="1" required />
+                    <input type="number" id="allocUnits" class="inst-form-control" min="1" max="50" value="" placeholder="Units (e.g. 1)" required />
                   </div>
 
                   <div class="inst-form-group">
@@ -976,7 +976,7 @@
                 <div class="inst-form-row">
                   <div class="inst-form-group">
                     <label for="allocSourceFacility">Source Facility / Storage Unit</label>
-                    <input type="text" id="allocSourceFacility" class="inst-form-control" value="Main Blood Bank Cold Store" />
+                    <input type="text" id="allocSourceFacility" class="inst-form-control" value="" placeholder="Source Facility" />
                   </div>
 
                   <div class="inst-form-group">
@@ -1028,7 +1028,7 @@
           <!-- Left Column: Settings Configuration Form -->
           <div class="facility-form-column">
             <form id="facilitySettingsForm" novalidate>
-              <input type="hidden" id="facilityPhone" value="{{ facility_settings.phone if facility_settings else (user.phone if user else '+8801734567890') }}">
+              <input type="hidden" id="facilityPhone" value="{{ facility_settings.phone if facility_settings else (user.phone if user and user.phone else '') }}">
 
               <!-- Card 1: Facility Identity & Accreditation -->
               <div class="facility-settings-card">
@@ -1043,7 +1043,7 @@
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityName">Facility Legal Name *</label>
-                    <input type="text" class="form-control-input" id="facilityName" required value="{{ facility_settings.facility_name if facility_settings else (user.name if user and user.name else ('Red Crescent Blood Bank' if role in ['bank', 'blood_bank'] else 'Dhaka General Hospital')) }}">
+                    <input type="text" class="form-control-input" id="facilityName" required value="{{ facility_settings.facility_name if facility_settings else (user.name if user and user.name else '') }}">
                   </div>
                   <div class="form-group-item">
                     <label for="facilityType">Facility Classification *</label>
@@ -1060,22 +1060,22 @@
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityLicense">DGHS License / Registration Number *</label>
-                    <input type="text" class="form-control-input" id="facilityLicense" placeholder="e.g. DGHS-BB-2024-8841" value="{{ facility_settings.license_no if facility_settings else ('DGHS-BB-2023-4418' if role in ['bank', 'blood_bank'] else 'DGHS-HOSP-2024-1092') }}" required>
+                    <input type="text" class="form-control-input" id="facilityLicense" placeholder="e.g. DGHS-BB-2024-8841" value="{{ facility_settings.license_no if facility_settings and facility_settings.license_no else '' }}" required>
                   </div>
                   <div class="form-group-item">
                     <label for="facilityEstYear">Year Established</label>
-                    <input type="text" class="form-control-input" id="facilityEstYear" placeholder="e.g. 1994" value="{{ facility_settings.est_year if facility_settings else ('1982' if role in ['bank', 'blood_bank'] else '1994') }}">
+                    <input type="text" class="form-control-input" id="facilityEstYear" placeholder="e.g. 1994" value="{{ facility_settings.est_year if facility_settings and facility_settings.est_year else '' }}">
                   </div>
                 </div>
 
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityDirectorName">Medical Director / Facility Head *</label>
-                    <input type="text" class="form-control-input" id="facilityDirectorName" placeholder="e.g. Prof. Dr. M. A. Rashid" value="{{ facility_settings.director_name if facility_settings else (user.manager_name if user and user.manager_name else ('Farhana Ahmed' if role in ['bank', 'blood_bank'] else 'Dr. Rafiqul Islam')) }}" required>
+                    <input type="text" class="form-control-input" id="facilityDirectorName" placeholder="e.g. Prof. Dr. M. A. Rashid" value="{{ facility_settings.director_name if facility_settings else (user.manager_name if user and user.manager_name else '') }}" required>
                   </div>
                   <div class="form-group-item">
                     <label for="facilityDirectorTitle">Director Designation / Title</label>
-                    <input type="text" class="form-control-input" id="facilityDirectorTitle" placeholder="e.g. Chief Medical Officer &amp; Head of Transfusion" value="{{ facility_settings.director_title if facility_settings else ('Director of Blood Services &amp; Serology Lab' if role in ['bank', 'blood_bank'] else 'Chief Medical Officer &amp; Head of Transfusion Medicine') }}">
+                    <input type="text" class="form-control-input" id="facilityDirectorTitle" placeholder="e.g. Chief Medical Officer &amp; Head of Transfusion" value="{{ facility_settings.director_title if facility_settings and facility_settings.director_title else '' }}">
                   </div>
                 </div>
               </div>
@@ -1093,36 +1093,37 @@
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityHotline">24/7 Transfusion Emergency Hotline *</label>
-                    <input type="text" class="form-control-input" id="facilityHotline" placeholder="e.g. +880 1734-567890" value="{{ facility_settings.hotline if facility_settings else (user.phone if user else '+880 1734-567890') }}" required>
+                    <input type="text" class="form-control-input" id="facilityHotline" placeholder="e.g. +880 1734-567890" value="{{ facility_settings.hotline if facility_settings else (user.phone if user and user.phone else '') }}" required>
                   </div>
                   <div class="form-group-item">
                     <label for="facilityEmail">Institutional Blood Operations Email *</label>
-                    <input type="email" class="form-control-input" id="facilityEmail" placeholder="transfusion@hospital.gov.bd" value="{{ facility_settings.email if facility_settings else ('bloodservices@redcrescent.org.bd' if role in ['bank', 'blood_bank'] else 'transfusion@dhakahospital.gov.bd') }}" required>
+                    <input type="email" class="form-control-input" id="facilityEmail" placeholder="transfusion@hospital.gov.bd" value="{{ facility_settings.email if facility_settings else (user.email if user and user.email else '') }}" required>
                   </div>
                 </div>
 
                 <div class="form-group-item">
                   <label for="facilityAddress">Physical Facility Address *</label>
-                  <input type="text" class="form-control-input" id="facilityAddress" placeholder="e.g. 100 Shaheed Minar Road, Shahbagh" value="{{ facility_settings.address if facility_settings else (user.address if user and user.address else ('684-686 Bara Moghbazar' if role in ['bank', 'blood_bank'] else '100 Shaheed Minar Road, Shahbagh')) }}" required>
+                  <input type="text" class="form-control-input" id="facilityAddress" placeholder="e.g. 100 Shaheed Minar Road, Shahbagh" value="{{ facility_settings.address if facility_settings else (user.address if user and user.address else '') }}" required>
                 </div>
 
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityDivision">Division</label>
                     <select class="form-control-select" id="facilityDivision">
-                      <option value="Dhaka" selected>Dhaka</option>
-                      <option value="Chattogram">Chattogram</option>
-                      <option value="Rajshahi">Rajshahi</option>
-                      <option value="Khulna">Khulna</option>
-                      <option value="Barishal">Barishal</option>
-                      <option value="Sylhet">Sylhet</option>
-                      <option value="Rangpur">Rangpur</option>
-                      <option value="Mymensingh">Mymensingh</option>
-                    </select>
+                    <option value="" disabled {{ 'selected' if not (facility_settings and facility_settings.division) else '' }}>Select Division</option>
+                    <option value="Dhaka" {{ 'selected' if facility_settings and facility_settings.division == 'Dhaka' else '' }}>Dhaka</option>
+                    <option value="Chattogram" {{ 'selected' if facility_settings and facility_settings.division == 'Chattogram' else '' }}>Chattogram</option>
+                    <option value="Rajshahi" {{ 'selected' if facility_settings and facility_settings.division == 'Rajshahi' else '' }}>Rajshahi</option>
+                    <option value="Khulna" {{ 'selected' if facility_settings and facility_settings.division == 'Khulna' else '' }}>Khulna</option>
+                    <option value="Barishal" {{ 'selected' if facility_settings and facility_settings.division == 'Barishal' else '' }}>Barishal</option>
+                    <option value="Sylhet" {{ 'selected' if facility_settings and facility_settings.division == 'Sylhet' else '' }}>Sylhet</option>
+                    <option value="Rangpur" {{ 'selected' if facility_settings and facility_settings.division == 'Rangpur' else '' }}>Rangpur</option>
+                    <option value="Mymensingh" {{ 'selected' if facility_settings and facility_settings.division == 'Mymensingh' else '' }}>Mymensingh</option>
+                  </select>
                   </div>
                   <div class="form-group-item">
                     <label for="facilityArea">District / Area</label>
-                    <input type="text" class="form-control-input" id="facilityArea" placeholder="e.g. Shahbagh" value="{{ facility_settings.area if facility_settings else ('Moghbazar' if role in ['bank', 'blood_bank'] else 'Shahbagh') }}">
+                    <input type="text" class="form-control-input" id="facilityArea" placeholder="e.g. Shahbagh" value="{{ facility_settings.area if facility_settings and facility_settings.area else '' }}">
                   </div>
                 </div>
 
@@ -1130,7 +1131,7 @@
                   <div class="form-group-item">
                     <label for="facilityGps">GPS Coordinates (Lat / Long)</label>
                     <div class="input-with-action-btn">
-                      <input type="text" class="form-control-input" id="facilityGps" placeholder="23.7257° N, 90.3980° E" value="{{ facility_settings.gps_coords if facility_settings else ('23.7482° N, 90.4072° E' if role in ['bank', 'blood_bank'] else '23.7257° N, 90.3980° E') }}">
+                      <input type="text" class="form-control-input" id="facilityGps" placeholder="23.7257° N, 90.3980° E" value="{{ facility_settings.gps_coords if facility_settings and facility_settings.gps_coords else '' }}">
                       <button type="button" class="btn-input-action" id="btnDetectGps" title="Detect Current GPS Coordinates">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polygon points="12 8 16 16 12 14 8 16 12 8"/></svg>
                         <span>Detect</span>
@@ -1139,7 +1140,7 @@
                   </div>
                   <div class="form-group-item">
                     <label for="facilityLandmark">Key Landmark / Inward Routing Note</label>
-                    <input type="text" class="form-control-input" id="facilityLandmark" placeholder="e.g. Opposite BSMMU Gate 3" value="{{ facility_settings.landmark if facility_settings else ('Near Moghbazar Wireless Railgate' if role in ['bank', 'blood_bank'] else 'Opposite BSMMU Emergency Gate 2') }}">
+                    <input type="text" class="form-control-input" id="facilityLandmark" placeholder="e.g. Opposite BSMMU Gate 3" value="{{ facility_settings.landmark if facility_settings and facility_settings.landmark else '' }}">
                   </div>
                 </div>
               </div>
@@ -1157,11 +1158,11 @@
                 <div class="form-row-2col">
                   <div class="form-group-item">
                     <label for="facilityChairs">Dedicated Phlebotomy Chairs (Donor Beds)</label>
-                    <input type="number" class="form-control-input" id="facilityChairs" min="1" max="60" value="{{ facility_settings.phlebotomy_chairs if facility_settings else (12 if role in ['bank', 'blood_bank'] else 8) }}">
+                    <input type="number" class="form-control-input" id="facilityChairs" min="1" max="60" value="{{ facility_settings.phlebotomy_chairs if facility_settings and facility_settings.phlebotomy_chairs else '' }}" placeholder="e.g. 8">
                   </div>
                   <div class="form-group-item">
                     <label for="facilityColdTemp">Cold Storage Target Safe Temperature (°C)</label>
-                    <input type="text" class="form-control-input" id="facilityColdTemp" placeholder="e.g. 3.8°C" value="{{ facility_settings.cold_storage_temp if facility_settings else ('3.5°C' if role in ['bank', 'blood_bank'] else '3.8°C') }}">
+                    <input type="text" class="form-control-input" id="facilityColdTemp" placeholder="e.g. 3.8°C" value="{{ facility_settings.cold_storage_temp if facility_settings and facility_settings.cold_storage_temp else '' }}">
                   </div>
                 </div>
 
@@ -1562,8 +1563,9 @@
           <div class="form-group-item">
             <label for="reqUnits">Units Required *</label>
             <select class="form-control-select" id="reqUnits" required>
+              <option value="" disabled selected>Select Units</option>
               <option value="1">1 Unit</option>
-              <option value="2" selected>2 Units</option>
+              <option value="2">2 Units</option>
               <option value="3">3 Units</option>
               <option value="4">4 Units</option>
               <option value="5">5 Units (Massive Transfusion)</option>
