@@ -1,27 +1,55 @@
-/* ================= FIGMA DESIGN TOKENS ================= */
+/* ================= MODERN EXECUTIVE MEDICAL DESIGN TOKENS ================= */
 :root {
+  /* Brand Primary: Sophisticated Deep Ruby / Carmine Red */
   --primary-red: #E11D48;
   --primary-dark: #BE123C;
-  --secondary-blue: #3B82F6;
+  --primary-light: #FB7185;
+  --primary-glow: rgba(225, 29, 72, 0.25);
+
+  /* Clinical Accents & Status */
+  --secondary-teal: #0D9488;
+  --secondary-teal-dark: #0F766E;
+  --secondary-teal-light: #CCFBF1;
+  --secondary-blue: #0284C7;
   --secondary-navy: #0F172A;
   --success-green: #10B981;
+  --success-green-light: #ECFDF5;
   --warning-amber: #F59E0B;
+  --warning-amber-light: #FEF3C7;
+
+  /* Typography & Neutrals */
   --text-primary: #0F172A;
   --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-light: #94A3B8;
+
+  /* Surfaces & Backgrounds */
   --bg-page: #F8FAFC;
   --bg-card: #FFFFFF;
+  --bg-card-hover: #FAFCFF;
   --bg-soft-red: #FFF1F2;
   --bg-soft-amber: #FEF3C7;
+  --bg-soft-teal: #F0FDFA;
   --border-color: #E2E8F0;
-  --nav-height: 72px;
-  --transition-speed: 0.25s;
+  --border-subtle: #F1F5F9;
+
+  /* Gradients & Ambient */
+  --bg-grad-start: #FAFAFC;
+  --bg-grad-end: #F1F5F9;
+  --bg-glass-heavy: rgba(255, 255, 255, 0.88);
+  --bg-glass-medium: rgba(255, 255, 255, 0.72);
   --heading-color: var(--secondary-navy);
   --heading-dark: #0F172A;
-  --bg-glass-heavy: rgba(255, 255, 255, 0.85);
-  --bg-grad-start: #FFF1F2;
-  --bg-grad-end: #F8FAFC;
-  --bg-glass-medium: rgba(255, 255, 255, 0.65);
-  --text-muted: #64748B;
+
+  /* Modern Ambient Elevation Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.07), 0 2px 4px -2px rgba(15, 23, 42, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.03);
+
+  --nav-height: 72px;
+  --transition-speed: 0.25s;
 }
 
 
@@ -91,6 +119,11 @@ img {
 .drop-icon {
   width: 22px;
   height: 22px;
+  color: var(--primary-red);
+}
+
+.drop-icon path {
+  fill: var(--primary-red);
 }
 
 .brand-text {
@@ -160,13 +193,15 @@ img {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--primary-red), #f44336);
+  background: linear-gradient(135deg, var(--primary-red), var(--primary-dark));
   color: #FFFFFF;
-  box-shadow: 0 10px 24px rgba(211, 47, 47, 0.22);
+  box-shadow: 0 4px 14px 0 rgba(225, 29, 72, 0.32);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary-red));
+  background: linear-gradient(135deg, var(--primary-light), var(--primary-red));
+  box-shadow: 0 6px 20px rgba(225, 29, 72, 0.42);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -1169,9 +1204,9 @@ font-size: 13px;
   overflow: hidden;
   background: linear-gradient(
     135deg,
-    #b71c1c 0%,
-    #d32f2f 45%,
-    #880e4f 100%
+    #9F1239 0%,
+    #BE123C 45%,
+    #E11D48 100%
   );
   border-radius: 24px;
   padding: 60px 50px;
@@ -1179,7 +1214,7 @@ font-size: 13px;
   align-items: center;
   justify-content: space-between;
   gap: 40px;
-  box-shadow: 0 20px 40px -15px rgba(211, 47, 47, 0.45);
+  box-shadow: 0 20px 40px -15px rgba(225, 29, 72, 0.38);
 }
 
 .sbds-cta-glow {
@@ -2582,28 +2617,55 @@ font-size: 14px;
   border-top: 1px solid var(--border-color);
 }
 
-/* ================= DARK THEME VARIABLES ================= */
+/* ================= MODERN OBSIDIAN DARK THEME ================= */
 [data-theme="dark"] {
-  --primary-red: #E57373;
-  --primary-dark: #EF5350;
-  --secondary-blue: #64B5F6;
-  --secondary-navy: #050B1B;
-  --success-green: #81C784;
-  --warning-amber: #FFD54F;
-  --text-primary: #E0E0E0;
-  --text-secondary: #B0BEC5;
-  --bg-page: #121212;
-  --bg-card: #1E1E1E;
-  --bg-soft-red: #3b1818;
-  --bg-soft-amber: #40300a;
-  --border-color: #333333;
---heading-color: var(--text-primary);
-  --heading-dark: var(--text-primary);
-  --bg-glass-heavy: rgba(30, 30, 30, 0.9);
-  --bg-grad-start: #1e1e1e;
-  --bg-grad-end: #121212;
-  --bg-glass-medium: rgba(30, 30, 30, 0.72);
-  --text-muted: var(--text-secondary);
+  /* Brand Primary */
+  --primary-red: #FB7185;
+  --primary-dark: #F43F5E;
+  --primary-light: #FDA4AF;
+  --primary-glow: rgba(244, 63, 94, 0.3);
+
+  /* Clinical Accents & Status */
+  --secondary-teal: #14B8A6;
+  --secondary-teal-dark: #0D9488;
+  --secondary-teal-light: rgba(20, 184, 166, 0.15);
+  --secondary-blue: #38BDF8;
+  --secondary-navy: #0F172A;
+  --success-green: #34D399;
+  --success-green-light: rgba(52, 211, 153, 0.15);
+  --warning-amber: #FBBF24;
+  --warning-amber-light: rgba(251, 191, 36, 0.15);
+
+  /* Typography & Neutrals */
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --text-light: #64748B;
+
+  /* Surfaces & Backgrounds */
+  --bg-page: #0B0F19;
+  --bg-card: #111827;
+  --bg-card-hover: #1A2234;
+  --bg-soft-red: rgba(225, 29, 72, 0.14);
+  --bg-soft-amber: rgba(245, 158, 11, 0.14);
+  --bg-soft-teal: rgba(13, 148, 136, 0.14);
+  --border-color: #1F2937;
+  --border-subtle: #192231;
+
+  /* Gradients & Ambient */
+  --bg-grad-start: #0B0F19;
+  --bg-grad-end: #111827;
+  --bg-glass-heavy: rgba(17, 24, 39, 0.92);
+  --bg-glass-medium: rgba(17, 24, 39, 0.75);
+  --heading-color: #F8FAFC;
+  --heading-dark: #F8FAFC;
+
+  /* Modern Dark Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45), 0 2px 4px -2px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.45);
 }
 
 [data-theme="dark"] body {

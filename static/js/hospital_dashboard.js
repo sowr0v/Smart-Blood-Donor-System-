@@ -530,14 +530,12 @@ document.addEventListener("DOMContentLoaded", () => {
             showMasterToast(`GPS detected: ${lat}° N, ${lng}° E`, "📍");
           },
           () => {
-            if (inputGps) inputGps.value = "23.7257° N, 90.3980° E";
-            showMasterToast("GPS pinned to Shahbagh Metro Grid (23.7257° N, 90.3980° E)", "📍");
+            showMasterToast("Could not detect GPS location. Please enter coordinates manually.", "\u26a0\ufe0f");
           },
           { timeout: 5000 }
         );
       } else {
-        if (inputGps) inputGps.value = "23.7257° N, 90.3980° E";
-        showMasterToast("GPS pinned to Shahbagh Metro Grid", "📍");
+        showMasterToast("Geolocation is not supported by your browser. Please enter coordinates manually.", "\u26a0\ufe0f");
       }
     });
   }

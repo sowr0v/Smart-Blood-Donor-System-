@@ -10,6 +10,40 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/donor_dashboard.css">
+  <script>
+    function activateSection(targetId) {
+      if (!targetId) return;
+      var cleanId = targetId.replace('#', '');
+      var targetSection = document.getElementById(cleanId);
+      if (!targetSection) return;
+
+      document.querySelectorAll('.dashboard-content-section').forEach(function(sec) {
+        sec.classList.remove('active-section');
+      });
+      targetSection.classList.add('active-section');
+
+      document.querySelectorAll('.donor-nav-item').forEach(function(item) {
+        var target = item.getAttribute('data-target') || item.getAttribute('href');
+        if (target && target.replace('#', '') === cleanId) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+
+      var mobileSidebar = document.getElementById('donorSidebar');
+      if (mobileSidebar && mobileSidebar.classList.contains('mobile-open')) {
+        mobileSidebar.classList.remove('mobile-open');
+      }
+
+      if (history.pushState) {
+        history.pushState(null, null, '#' + cleanId);
+      } else {
+        location.hash = '#' + cleanId;
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
 </head>
 <body>
   <!-- Global Top Navbar -->
@@ -90,7 +124,7 @@
         <div class="sidebar-section-title">Overview</div>
 
         <!-- 0. Donor Personal Dashboard -->
-        <button type="button" class="donor-nav-item active" data-target="section-personal-dashboard" id="nav-item-dashboard">
+        <button type="button" class="donor-nav-item active" data-target="section-personal-dashboard" id="nav-item-dashboard" onclick="activateSection('section-personal-dashboard')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7"/>
             <rect x="14" y="3" width="7" height="7"/>
@@ -103,7 +137,7 @@
         <div class="sidebar-section-title" style="margin-top: 10px;">Donor Operations</div>
 
         <!-- 1. Donor Availability -->
-        <button type="button" class="donor-nav-item" data-target="section-availability" id="nav-item-availability">
+        <button type="button" class="donor-nav-item" data-target="section-availability" id="nav-item-availability" onclick="activateSection('section-availability')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             <path d="m9 12 2 2 4-4"/>
@@ -112,7 +146,7 @@
         </button>
 
         <!-- 2. Donor Profile & Medical Info Management -->
-        <button type="button" class="donor-nav-item" data-target="section-profile" id="nav-item-profile">
+        <button type="button" class="donor-nav-item" data-target="section-profile" id="nav-item-profile" onclick="activateSection('section-profile')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
             <circle cx="12" cy="7" r="4"/>
@@ -121,7 +155,7 @@
         </button>
 
         <!-- 3. Donation History -->
-        <button type="button" class="donor-nav-item" data-target="section-history" id="nav-item-history">
+        <button type="button" class="donor-nav-item" data-target="section-history" id="nav-item-history" onclick="activateSection('section-history')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
@@ -132,7 +166,7 @@
         <div class="sidebar-section-title" style="margin-top: 10px;">Matching & Actions</div>
 
         <!-- 4. Matched Blood Requests Feed & Filter -->
-        <button type="button" class="donor-nav-item" data-target="section-matched-requests" id="nav-item-matched">
+        <button type="button" class="donor-nav-item" data-target="section-matched-requests" id="nav-item-matched" onclick="activateSection('section-matched-requests')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
           </svg>
@@ -140,7 +174,7 @@
         </button>
 
         <!-- 5. Accept & Decline Blood Request Flow -->
-        <button type="button" class="donor-nav-item" data-target="section-request-flow" id="nav-item-flow">
+        <button type="button" class="donor-nav-item" data-target="section-request-flow" id="nav-item-flow" onclick="activateSection('section-request-flow')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -150,7 +184,7 @@
         </button>
 
         <!-- 6. Blood Request Detailed View & Directions -->
-        <button type="button" class="donor-nav-item" data-target="section-request-details" id="nav-item-details">
+        <button type="button" class="donor-nav-item" data-target="section-request-details" id="nav-item-details" onclick="activateSection('section-request-details')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
             <circle cx="12" cy="10" r="3"/>
@@ -161,7 +195,7 @@
         <div class="sidebar-section-title" style="margin-top: 10px;">Communication & Community</div>
 
         <!-- 7. Donor In-App Chat List -->
-        <button type="button" class="donor-nav-item" data-target="section-chat" id="nav-item-chat">
+        <button type="button" class="donor-nav-item" data-target="section-chat" id="nav-item-chat" onclick="activateSection('section-chat')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
@@ -170,7 +204,7 @@
         </button>
 
         <!-- 8. Donor Reviews -->
-        <button type="button" class="donor-nav-item" data-target="section-reviews" id="nav-item-reviews">
+        <button type="button" class="donor-nav-item" data-target="section-reviews" id="nav-item-reviews" onclick="activateSection('section-reviews')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
           </svg>
@@ -178,7 +212,7 @@
         </button>
 
         <!-- 9. Donor Portal Settings & Preferences -->
-        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings" onclick="location.hash='section-settings'">
+        <button type="button" class="donor-nav-item" data-target="section-settings" id="nav-item-settings" onclick="activateSection('section-settings'); location.hash='section-settings';">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -400,8 +434,8 @@
               <span class="form-section-subtitle">Used for proximity matching</span>
             </div>
             <div class="profile-overview-panel">
-              <label class="field-block"><span>District</span><input type="text" name="district" value="{{ profile.district if profile else 'Dhaka' }}" required></label>
-              <label class="field-block"><span>Area</span><input type="text" name="area" value="{{ profile.area if profile else 'Dhanmondi' }}" required></label>
+              <label class="field-block"><span>District</span><input type="text" name="district" value="{{ profile.district if profile and profile.district else '' }}" placeholder="Enter district" required></label>
+              <label class="field-block"><span>Area</span><input type="text" name="area" value="{{ profile.area if profile and profile.area else '' }}" placeholder="Enter area" required></label>
               <label class="field-block" style="grid-column: span 2;"><span>Address</span><input type="text" name="address" value="{{ profile.address if profile else '' }}" required></label>
             </div>
 
