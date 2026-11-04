@@ -528,6 +528,15 @@ def initialize_admin_and_notification_database():
                     ip_address TEXT DEFAULT '127.0.0.1',
                     created_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS scrubbed_account_audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id INTEGER NOT NULL,
+                    scrubbed_id TEXT NOT NULL,
+                    original_role TEXT NOT NULL,
+                    deletion_timestamp TEXT NOT NULL,
+                    status_badge TEXT NOT NULL DEFAULT 'PII Purged / Anonymized',
+                    details TEXT DEFAULT ''
+                );
                 """
             )
 

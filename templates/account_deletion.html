@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or "Permanent Account Deletion & Data Privacy - Smart Blood Donor System" }}</title>
+  <meta name="description" content="Manage permanent account deletion and data privacy scrubbing for the Smart Blood Donor System.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/donor_dashboard.css">
+  <style>
+    .danger-page-container {
+      max-width: 900px;
+      margin: 40px auto 80px auto;
+      padding: 0 20px;
+    }
+    .danger-hero {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+    .danger-zone-box {
+      background: rgba(225, 29, 72, 0.05);
+      border: 2px solid #E11D48;
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+    }
+    .policy-comparison-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 24px 0;
+    }
+    @media (max-width: 768px) {
+      .policy-comparison-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .policy-card {
+      background: var(--bg-page);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .policy-card.scrubbed {
+      border-top: 4px solid #E11D48;
+    }
+    .policy-card.retained {
+      border-top: 4px solid #059669;
+    }
+    .policy-card h4 {
+      margin: 0 0 12px 0;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .policy-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .policy-list li {
+      margin-bottom: 6px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Global Top Navbar -->
+  <header class="global-navbar">
+    <div class="nav-container">
+      <a href="/" class="brand-logo" aria-label="Smart Blood Donor Network Home">
+        <div class="logo-icon-wrap">
+          <svg class="drop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 21.5C16.1421 21.5 19.5 18.1421 19.5 14C19.5 10.5 14.5 3.5 12 2C9.5 3.5 4.5 10.5 4.5 14C4.5 18.1421 7.85786 21.5 12 21.5Z" fill="#D32F2F"/></svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">Smart Blood</span>
+          <span class="brand-sub">Donor Network</span>
+        </div>
+      </a>
+      
+      <nav class="desktop-nav" aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="/" class="nav-link">Home</a></li>
+          <li><a href="/find-blood" class="nav-link">Urgent Requests</a></li>
+          <li><a href="/donor/dashboard" class="nav-link">Donor Dashboard</a></li>
+          <li><a href="/about" class="nav-link">About</a></li>
+        </ul>
+      </nav>
+
+      <div class="nav-auth-actions" style="display: flex; align-items: center; gap: 14px;">
+        <a href="/donor/dashboard#section-settings" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Back to Settings</a>
+        <a href="/logout" class="btn btn-outline" style="padding: 7px 16px; font-size: 0.88rem;">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page Content Container -->
+  <div class="danger-page-container">
+    <!-- Breadcrumbs -->
+    <nav aria-label="Breadcrumb" style="margin-bottom: 20px; font-size: 0.85rem; color: var(--text-secondary);">
+      <a href="/" style="color: var(--text-secondary); text-decoration: none;">Home</a> &rsaquo;
+      <a href="/donor/dashboard" style="color: var(--text-secondary); text-decoration: none;">Donor Portal</a> &rsaquo;
+      <a href="/donor/dashboard#section-settings" style="color: var(--text-secondary); text-decoration: none;">Settings &amp; Preferences</a> &rsaquo;
+      <span style="color: #BE123C; font-weight: 600;">Account Deletion &amp; Data Privacy</span>
+    </nav>
+
+    <!-- Hero Header -->
+    <div class="danger-hero">
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
+        <span style="font-size: 2.2rem;">🛡️</span>
+        <div>
+          <h1 style="font-size: 1.6rem; font-weight: 800; color: var(--heading-color); margin: 0;">Permanent Account Deletion &amp; Data Privacy Scrubbing</h1>
+          <p style="margin: 4px 0 0 0; color: var(--text-secondary); font-size: 0.95rem;">
+            Exercise your right to be forgotten. In compliance with data privacy regulations and medical integrity standards.
+          </p>
+        </div>
+      </div>
+      <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+        <span class="nav-pill-badge" style="background: rgba(225, 29, 72, 0.1); color: #BE123C; font-weight: 600;">
+          ⚠️ Irreversible Action
+        </span>
+        <span class="nav-pill-badge" style="background: rgba(14, 165, 233, 0.1); color: #0284C7; font-weight: 600;">
+          🔒 Re-Authentication Required
+        </span>
+        <span class="nav-pill-badge" style="background: rgba(16, 185, 129, 0.1); color: #059669; font-weight: 600;">
+          🩺 Medical History Retained Anonymously
+        </span>
+      </div>
+    </div>
+
+    <!-- Data Retention Policy Section -->
+    <div class="policy-card" style="margin-bottom: 24px;">
+      <h3 style="margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 700; color: var(--heading-color); display: flex; align-items: center; gap: 8px;">
+        <span>📋</span> System Data Retention &amp; Privacy Scrubbing Policy
+      </h3>
+      <p style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; margin: 0;">
+        When you submit an account deletion request, our automated Data Privacy Scrubbing routine decouples and purges personal identifiers while maintaining aggregate public health records for medical transparency:
+      </p>
+
+      <div class="policy-comparison-grid">
+        <!-- Column 1: Scrubbed -->
+        <div class="policy-card scrubbed">
+          <h4 style="color: #BE123C;">
+            <span>🗑️</span> Personal Data Purged &amp; Scrubbed
+          </h4>
+          <ul class="policy-list">
+            <li><strong>Full Legal Name:</strong> Replaced with a cryptographic anonymous hash (<code>[Scrubbed Donor - ID: UUID]</code>).</li>
+            <li><strong>Contact Phone &amp; Email:</strong> Decoupled and purged from all public directories and notification tables.</li>
+            <li><strong>Physical Location:</strong> Exact address, district, area, and GPS coordinates permanently erased.</li>
+            <li><strong>Identity Documents:</strong> KYC verification files, NID numbers, and uploaded credentials deleted.</li>
+            <li><strong>Active Sessions:</strong> Immediate invalidation of all authentication tokens, cookies, and open devices.</li>
+          </ul>
+        </div>
+
+        <!-- Column 2: Retained -->
+        <div class="policy-card retained">
+          <h4 style="color: #059669;">
+            <span>🛡️</span> Retained Operational Records
+          </h4>
+          <ul class="policy-list">
+            <li><strong>Donation Volumes:</strong> Completed blood unit metrics (e.g. 450 mL units donated) preserved for health facility inventory records.</li>
+            <li><strong>Blood Type Statistics:</strong> Non-identifying ABO/Rh statistical counts preserved for public health reporting.</li>
+            <li><strong>Donation Timestamps:</strong> Historical completion dates retained without any link to your identity.</li>
+            <li><strong>Regulatory Auditing:</strong> Immutable record that user account ID was scrubbed in compliance with safety policies.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger Zone Card -->
+    <div class="danger-zone-box">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <span style="font-size: 1.5rem;">⚠️</span>
+            <h2 style="font-size: 1.3rem; font-weight: 800; color: #BE123C; margin: 0;">Danger Zone: Permanent Account Deletion</h2>
+          </div>
+          <p style="color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5; margin: 0 0 16px 0;">
+            This action is permanent and completely irreversible. Once confirmed, you will be immediately logged out, your personal profile removed from the network, and your credentials cannot be used to log in again.
+          </p>
+          <div style="font-size: 0.82rem; color: var(--text-muted);">
+            Logged in as: <strong>{{ user.name if user and user.name else "Authenticated User" }}</strong> ({{ user.phone if user and user.phone else "" }})
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+          <button type="button" class="btn-donor-danger" id="btnOpenDeletionModal" style="background: #BE123C; color: #ffffff; border: none; padding: 12px 24px; font-weight: 700; font-size: 0.95rem; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 14px rgba(190, 18, 60, 0.3);">
+            <span>🗑️</span>
+            <span>Permanently Delete My Account</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deletion Confirmation Warning Modal -->
+  <div class="dashboard-modal-backdrop" id="accountDeletionModal" role="dialog" aria-modal="true" aria-labelledby="modalDeletionTitle">
+    <div class="modal-dialog-box" style="max-width: 540px; border: 2px solid #E11D48; box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+      <div class="modal-dialog-header" style="background: rgba(225, 29, 72, 0.08); padding: 20px 24px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="font-size: 1.5rem;">⚠️</span>
+          <div>
+            <h3 id="modalDeletionTitle" style="color: #BE123C; font-size: 1.2rem; margin: 0;">Confirm Permanent Account Deletion</h3>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">Identity Verification &amp; Privacy Scrubbing</div>
+          </div>
+        </div>
+        <button type="button" class="modal-close-x" id="modalCloseX" aria-label="Close modal">✕</button>
+      </div>
+
+      <div class="modal-dialog-body" style="padding: 24px;">
+        <!-- Irreversible Warning Alert -->
+        <div style="background: #FFF1F2; border: 1.5px solid #FECDD3; border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+          <div style="color: #9F1239; font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <span>⚠️</span> This action is permanent and irreversible
+          </div>
+          <p style="color: #881337; font-size: 0.82rem; margin: 0; line-height: 1.45;">
+            All your personal data (name, phone, address, and credentials) will be immediately purged. Active sessions on all devices will be terminated.
+          </p>
+        </div>
+
+        <!-- Identity Verification Form -->
+        <form id="accountDeletionForm">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div>
+              <label for="deletePassword" style="display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Confirm Identity: Enter Current Account Password <span style="color: #E11D48;">*</span>
+              </label>
+              <input type="password" id="deletePassword" required autocomplete="current-password" placeholder="Enter your current password" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-page); color: var(--text-primary); font-size: 0.95rem;">
+            </div>
+
+            <div>
+              <label for="deleteConfirmText" style="display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+                Type <strong style="color: #BE123C; letter-spacing: 1px;">DELETE</strong> to confirm: <span style="color: #E11D48;">*</span>
+              </label>
+              <input type="text" id="deleteConfirmText" required autocomplete="off" placeholder="DELETE" style="width: 100%; box-sizing: border-box; padding: 11px 14px; border-radius: 8px; border: 1.5px solid var(--border-color); background: var(--bg-page); color: var(--text-primary); font-size: 0.95rem; font-weight: 700;">
+            </div>
+
+            <div>
+              <label for="deleteReason" style="display: block; font-size: 0.84rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px;">
+                Reason for leaving (Optional)
+              </label>
+              <input type="text" id="deleteReason" placeholder="e.g. Relocated, privacy preference, or no longer eligible" style="width: 100%; box-sizing: border-box; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-page); color: var(--text-primary); font-size: 0.88rem;">
+            </div>
+
+            <div id="modalStatusAlert" role="alert" style="display: none; padding: 10px 14px; border-radius: 8px; font-size: 0.86rem; font-weight: 600;"></div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-dialog-footer" style="padding: 16px 24px; display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-page);">
+        <button type="button" class="btn btn-outline" id="modalCancelBtn" style="padding: 10px 18px; font-weight: 600; border-radius: 8px;">
+          Cancel
+        </button>
+        <button type="button" class="btn-donor-danger" id="modalSubmitBtn" style="background: #BE123C; color: #ffffff; border: none; padding: 10px 22px; font-weight: 700; border-radius: 8px; cursor: pointer;">
+          Permanently Delete Account
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modal = document.getElementById('accountDeletionModal');
+      const openBtn = document.getElementById('btnOpenDeletionModal');
+      const closeX = document.getElementById('modalCloseX');
+      const cancelBtn = document.getElementById('modalCancelBtn');
+      const submitBtn = document.getElementById('modalSubmitBtn');
+      const passwordInput = document.getElementById('deletePassword');
+      const confirmInput = document.getElementById('deleteConfirmText');
+      const reasonInput = document.getElementById('deleteReason');
+      const statusAlert = document.getElementById('modalStatusAlert');
+
+      function openModal() {
+        if (!modal) return;
+        passwordInput.value = '';
+        confirmInput.value = '';
+        reasonInput.value = '';
+        statusAlert.style.display = 'none';
+        modal.classList.add('open');
+        modal.style.display = 'flex';
+      }
+
+      function closeModal() {
+        if (!modal) return;
+        modal.classList.remove('open');
+        modal.style.display = 'none';
+      }
+
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (closeX) closeX.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+      if (submitBtn) {
+        submitBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          const pwd = passwordInput.value.trim();
+          const conf = confirmInput.value.trim();
+          const reason = reasonInput.value.trim();
+
+          if (!pwd) {
+            statusAlert.style.display = 'block';
+            statusAlert.style.background = '#FEE2E2';
+            statusAlert.style.color = '#B91C1C';
+            statusAlert.textContent = 'Please enter your account password to verify identity.';
+            return;
+          }
+
+          if (conf !== 'DELETE') {
+            statusAlert.style.display = 'block';
+            statusAlert.style.background = '#FEE2E2';
+            statusAlert.style.color = '#B91C1C';
+            statusAlert.textContent = 'Please type "DELETE" to confirm permanent deletion.';
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Scrubbing Data...';
+
+          try {
+            const resp = await fetch('/api/user/delete-account', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                password: pwd,
+                confirmation: conf,
+                reason: reason
+              })
+            });
+
+            const data = await resp.json().catch(() => ({}));
+
+            if (resp.ok && data.status === 'success') {
+              statusAlert.style.display = 'block';
+              statusAlert.style.background = '#DCFCE7';
+              statusAlert.style.color = '#15803D';
+              statusAlert.textContent = 'Account permanently deleted. Redirecting...';
+              setTimeout(() => {
+                window.location.href = data.redirect_url || '/login?account_deleted=1&role=donor';
+              }, 800);
+            } else {
+              submitBtn.disabled = false;
+              submitBtn.textContent = 'Permanently Delete Account';
+              statusAlert.style.display = 'block';
+              statusAlert.style.background = '#FEE2E2';
+              statusAlert.style.color = '#B91C1C';
+              statusAlert.textContent = data.detail || 'Incorrect password. Verification failed.';
+            }
+          } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Permanently Delete Account';
+            statusAlert.style.display = 'block';
+            statusAlert.style.background = '#FEE2E2';
+            statusAlert.style.color = '#B91C1C';
+            statusAlert.textContent = 'Network error while attempting account deletion.';
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1074,6 +1074,41 @@
             </table>
           </div>
         </div>
+
+        <!-- Scrubbed Accounts & Data Privacy Audit Trail Table -->
+        <div class="admin-card mt-4" id="card-scrubbed-accounts-audit">
+          <div class="card-header-clean">
+            <div>
+              <h2 class="card-title">Scrubbed Accounts &amp; Data Privacy Audit Trail</h2>
+              <div class="card-subtitle" style="font-size: 0.82rem; color: var(--admin-text-muted); margin-top: 2px;">
+                Permanent account deletion log complying with Data Retention and Right-to-be-Forgotten privacy scrubbing policies.
+              </div>
+            </div>
+            <div class="action-buttons-wrap">
+              <button type="button" class="btn btn-sm btn-outline" onclick="loadScrubbedAccounts()">
+                <span>↻ Refresh Audit</span>
+              </button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Scrubbed Account ID</th>
+                  <th>Original Role (Donor/Recipient)</th>
+                  <th>Deletion Timestamp</th>
+                  <th>Status Badge</th>
+                </tr>
+              </thead>
+              <tbody id="scrubbedAccountsTableBody">
+                <!-- Dynamically populated via loadScrubbedAccounts -->
+                <tr>
+                  <td colspan="4" class="text-center py-4 text-muted">Loading scrubbed accounts audit records...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
     </main>
