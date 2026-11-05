@@ -30,11 +30,39 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
+
+IS_VERCEL = bool(os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or os.environ.get("VERCEL_ENV"))
+_ROOT_DIR = Path(__file__).resolve().parent
+
+if IS_VERCEL:
+    DEFAULT_AUTH_DB = "/tmp/auth.db"
+    DEFAULT_URGENT_DB = "/tmp/urgent_requests.db"
+    _bundled_auth = _ROOT_DIR / "auth.db"
+    _tmp_auth = Path(DEFAULT_AUTH_DB)
+    if _bundled_auth.exists() and not _tmp_auth.exists():
+        try:
+            import shutil
+            shutil.copy2(_bundled_auth, _tmp_auth)
+        except Exception as _e:
+            logger.warning("Could not copy auth.db to /tmp: %s", _e)
+
+    _bundled_urgent = _ROOT_DIR / "urgent_requests.db"
+    _tmp_urgent = Path(DEFAULT_URGENT_DB)
+    if _bundled_urgent.exists() and not _tmp_urgent.exists():
+        try:
+            import shutil
+            shutil.copy2(_bundled_urgent, _tmp_urgent)
+        except Exception as _e:
+            logger.warning("Could not copy urgent_requests.db to /tmp: %s", _e)
+else:
+    DEFAULT_AUTH_DB = str(_ROOT_DIR / "auth.db")
+    DEFAULT_URGENT_DB = str(_ROOT_DIR / "urgent_requests.db")
+
 AUTH_DATABASE_PATH = Path(
-    os.environ.get("SBDS_AUTH_DATABASE_PATH", str(Path(__file__).resolve().with_name("auth.db")))
+    os.environ.get("SBDS_AUTH_DATABASE_PATH", DEFAULT_AUTH_DB)
 )
 DATABASE_PATH = Path(
-    os.environ.get("SBDS_DATABASE_PATH", str(Path(__file__).resolve().with_name("urgent_requests.db")))
+    os.environ.get("SBDS_DATABASE_PATH", DEFAULT_URGENT_DB)
 )
 SESSION_COOKIE = "sbds_session"
 SESSION_TTL_SECONDS = 30 * 24 * 60 * 60

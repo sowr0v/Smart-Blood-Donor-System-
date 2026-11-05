@@ -147,7 +147,7 @@ DISEASE_REASONS = [
 ]
 
 
-def seed_databases():
+def seed_databases(auth_db_path=None, urgent_db_path=None):
     print("=" * 60)
     print("STARTING COMPREHENSIVE SEEDING (220 ACCOUNTS)")
     print("=" * 60)
@@ -159,8 +159,10 @@ def seed_databases():
     common_hash = make_hash(COMMON_PASSWORD)
 
     # 1. Connect to SQLite auth.db and urgent_requests.db
-    auth_conn = sqlite3.connect("auth.db")
-    urgent_conn = sqlite3.connect("urgent_requests.db")
+    target_auth = auth_db_path or os.environ.get("SBDS_AUTH_DATABASE_PATH", "auth.db")
+    target_urgent = urgent_db_path or os.environ.get("SBDS_DATABASE_PATH", "urgent_requests.db")
+    auth_conn = sqlite3.connect(target_auth)
+    urgent_conn = sqlite3.connect(target_urgent)
 
     # Connect to PostgreSQL if available
     pg_conn = None

@@ -5,10 +5,12 @@ ENV/
 env/
 
 # SQLite databases & runtime storage
-*.db
 *.db-shm
 *.db-wal
 *.sqlite3
+*.db
+!auth.db
+!urgent_requests.db
 
 # Python bytecode & cache
 __pycache__/
